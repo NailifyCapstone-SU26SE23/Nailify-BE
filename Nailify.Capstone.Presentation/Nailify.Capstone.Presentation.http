@@ -1,0 +1,6 @@
+@Nailify.Capstone.Presentation_HostAddress = http://localhost:5004
+
+GET {{Nailify.Capstone.Presentation_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="DTOs\ResponseDTOs\" />
+    <Folder Include="DTOs\RequestDTOs\" />
+    <Folder Include="Interfaces\ServiceInterfaces\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="12.0.1" />
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+	  <PackageReference Include="FluentValidation" Version="12.1.0" />
+	  <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.0" />  
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nailify.Capstone.Domain\Nailify.Capstone.Domain.csproj">
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
