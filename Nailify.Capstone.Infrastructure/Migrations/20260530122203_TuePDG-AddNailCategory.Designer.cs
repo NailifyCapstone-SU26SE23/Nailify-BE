@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    [Migration("20260530123308_TuePDG-AddNailCategory")]
+    [Migration("20260530122203_TuePDG-AddNailCategory")]
     partial class TuePDGAddNailCategory
     {
         /// <inheritdoc />
