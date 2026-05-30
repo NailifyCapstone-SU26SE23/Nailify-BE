@@ -40,10 +40,10 @@ namespace Nailify.Capstone.Application.Services
 
             var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
 
-            var mappedItems = _mapper.Map<List<UserDto>>(pagedResult);
+            var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<UserDto>(
                 mappedItems,
-                pagedResult.GetMetaData().TotalItems,
+                pagedResult.MetaData.TotalItems,
                 pageNumber,
                 pageSize
             );
