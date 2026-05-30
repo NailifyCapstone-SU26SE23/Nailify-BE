@@ -14,7 +14,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
     public class GenericRepository<T> : IGenericRepository<T> where T : class
     {
         private readonly NailifyDbContext _context;
-        private readonly DbSet<T> _dbSet;
+        protected readonly DbSet<T> _dbSet;
         #region CTOR
         public GenericRepository(NailifyDbContext context)
         {
@@ -115,6 +115,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
         /// <param name="id"></param>
         /// <returns></returns>
         public async Task<T?> GetByIdAsync(Guid id) => await _dbSet.FindAsync(id);
+
+        public async Task<T?> GetByIdAsync(int id) => await _dbSet.FindAsync(id);
 
         public async Task<PagedList<T>> GetPagedAsync(int pageNumber, int pageSize,
        Expression<Func<T, bool>>? predicate = null,
