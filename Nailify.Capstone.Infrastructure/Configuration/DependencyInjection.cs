@@ -28,10 +28,16 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             // Đăng ký Unit of Work & Repositories
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<ICategoryTypeRepository, CategoryTypeRepository>();
+            services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<INailDesignRepository, NailDesignRepository>();
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<ICategoryTypeService, CategoryTypeService>();
+            services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<INailDesignService, NailDesignService>();
 
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);

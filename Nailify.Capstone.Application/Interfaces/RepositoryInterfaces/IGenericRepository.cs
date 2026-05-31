@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IQueryable<T> FindAll(bool trackChanges = false);
         Task<IEnumerable<T>> FindAllAsync(params Expression<Func<T, object>>[] includes);
         Task<T?> GetByIdAsync(Guid id);
+        Task<T?> GetByIdAsync(int id);
         Task<T> CreateAsync(T entity);
         void Update(T entity);
         void Delete(T entity);
