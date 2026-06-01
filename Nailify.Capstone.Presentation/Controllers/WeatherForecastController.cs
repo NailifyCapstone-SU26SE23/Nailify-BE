@@ -26,7 +26,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// không phải chương trình dự báo thời tiết của VTV đâu
         /// </summary>
         [HttpPost(Name = "GetWeatherForecast")]
-        [HasRole("Admin")]
         public async Task<IActionResult> SpamUsers()
         {
             var spamTargets = new List<(string Email, string FirstName, string LastName, string Role )>
