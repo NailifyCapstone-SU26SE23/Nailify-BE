@@ -22,24 +22,17 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách tất cả mẫu nail.
+        /// Lấy danh sách mẫu nail phân trang, hỗ trợ lọc theo tên và danh mục.
         /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResult<List<NailDesignDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
-        {
-            var result = await _nailDesignService.GetAllNailDesignsAsync();
-            return Ok(result);
-        }
-
-        /// <summary>
-        /// Lấy danh sách mẫu nail phân trang.
-        /// </summary>
-        [HttpGet("paged")]
         [ProducesResponseType(typeof(ApiResult<PagedList<NailDesignDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null,
+            [FromQuery] List<int>? categoryIds = null)
         {
-            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize);
+            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds);
             return Ok(result);
         }
 

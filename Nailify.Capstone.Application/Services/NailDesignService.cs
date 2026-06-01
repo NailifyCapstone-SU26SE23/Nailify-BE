@@ -19,26 +19,26 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<List<NailDesignDto>>> GetAllNailDesignsAsync()
+        public async Task<ApiResult<PagedList<NailDesignDto>>> GetPagedNailDesignsAsync(
+            int pageNumber,
+            int pageSize,
+            string? name = null,
+            IEnumerable<int>? categoryIds = null)
         {
-            var designs = await _unitOfWork.NailDesignRepository.GetActiveNailDesignsAsync();
-            var designDtos = _mapper.Map<List<NailDesignDto>>(designs);
-
-            return new ApiSuccessResult<List<NailDesignDto>>(designDtos, "Lấy danh sách mẫu nail thành công.");
-        }
-
-        public async Task<ApiResult<PagedList<NailDesignDto>>> GetPagedNailDesignsAsync(int pageNumber, int pageSize)
-        {
-            var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(pageNumber, pageSize);
-            var mappedItems = _mapper.Map<List<NailDesignDto>>(pagedResult);
+            var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(
+                pageNumber,
+                pageSize,
+                name,
+                categoryIds);
+            var mappedItems = _mapper.Map<List<NailDesignDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<NailDesignDto>(
                 mappedItems,
-                pagedResult.GetMetaData().TotalItems,
+                pagedResult.MetaData.TotalItems,
                 pageNumber,
                 pageSize
             );
 
-            return new ApiSuccessResult<PagedList<NailDesignDto>>(resultPagedList, "Lấy danh sách mẫu nail phân trang thành công.");
+            return new ApiSuccessResult<PagedList<NailDesignDto>>(resultPagedList, "Lấy danh sách mẫu nail thành công.");
         }
 
         public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id)

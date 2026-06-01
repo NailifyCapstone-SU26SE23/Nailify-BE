@@ -32,9 +32,28 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
         }
 
-        public async Task<PagedList<NailDesign>> GetPagedActiveNailDesignsAsync(int pageNumber, int pageSize)
+        public async Task<PagedList<NailDesign>> GetPagedActiveNailDesignsAsync(
+            int pageNumber,
+            int pageSize,
+            string? name = null,
+            IEnumerable<int>? categoryIds = null)
         {
             var query = BuildNailDesignQuery().Where(nd => nd.Status == "Active");
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                var normalizedName = name.Trim().ToLower();
+                query = query.Where(nd => nd.Name.ToLower().Contains(normalizedName));
+            }
+
+            var filterCategoryIds = categoryIds?
+                .Where(categoryId => categoryId > 0)
+                .Distinct()
+                .ToList();
+            if (filterCategoryIds != null && filterCategoryIds.Any())
+            {
+                query = query.Where(nd => nd.NailCategories.Any(nc => filterCategoryIds.Contains(nc.CategoryId)));
+            }
+
             var count = await query.CountAsync();
             var items = await query
                 .Skip((pageNumber - 1) * pageSize)

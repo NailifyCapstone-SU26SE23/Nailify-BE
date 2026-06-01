@@ -19,12 +19,24 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<List<CategoryTypeDto>>> GetAllCategoryTypesAsync()
+        public async Task<ApiResult<PagedList<CategoryTypeDto>>> GetPagedCategoryTypesAsync(
+            int pageNumber,
+            int pageSize,
+            string? name = null)
         {
-            var categoryTypes = await _unitOfWork.CategoryTypeRepository.FindAllAsync(ct => ct.Categories);
-            var categoryTypeDtos = _mapper.Map<List<CategoryTypeDto>>(categoryTypes);
+            var pagedResult = await _unitOfWork.CategoryTypeRepository.GetPagedCategoryTypesAsync(
+                pageNumber,
+                pageSize,
+                name);
+            var mappedItems = _mapper.Map<List<CategoryTypeDto>>(pagedResult.Items);
+            var resultPagedList = new PagedList<CategoryTypeDto>(
+                mappedItems,
+                pagedResult.MetaData.TotalItems,
+                pageNumber,
+                pageSize
+            );
 
-            return new ApiSuccessResult<List<CategoryTypeDto>>(categoryTypeDtos, "Lấy danh sách loại danh mục thành công.");
+            return new ApiSuccessResult<PagedList<CategoryTypeDto>>(resultPagedList, "Lấy danh sách loại danh mục thành công.");
         }
 
         public async Task<ApiResult<CategoryTypeDto>> GetCategoryTypeByIdAsync(int id)
