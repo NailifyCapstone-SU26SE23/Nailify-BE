@@ -31,13 +31,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             var spamTargets = new List<(string Email, string FirstName, string LastName, string Role )>
             {
                 ("admin1@gmail.com","Ông Chủ", "Admin", "Admin"),
-                ("thichtamphuc01@meomeo.com","Trụ trì", "Admin", "Admin"),
+                //("thichtamphuc01@meomeo.com","Trụ trì", "Admin", "Admin"),
                 ("artist@gmail.com","Nghệ Sĩ", "Staff_Artist", "Staff_Artist"),
-                ("dreambully@mbatu.cum", "Siêu Nghệ Nhân", "Staff_Artist", "Staff_Artist"),
+                //("dreambully@mbatu.cum", "Siêu Nghệ Nhân", "Staff_Artist", "Staff_Artist"),
                 ("manager1@gmail.com", "Quản lý", "Manager", "Manager"),
-                ("diddy@skibidi.com", "Quản lý", "Manager", "manager"),
+                //("diddy@skibidi.com", "Quản lý", "Manager", "manager"),
                 ("customer1@gmail.com", "Khách", "customer", "Customer"),
-                ("sirEpstein@gmail.com", "Đại gia", "customer", "Customer"),
+                //("sirEpstein@gmail.com", "Đại gia", "customer", "Customer"),
 
             };
 

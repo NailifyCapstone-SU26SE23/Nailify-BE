@@ -21,6 +21,13 @@ namespace Nailify.Capstone.Infrastructure.Configuration
           IConfiguration configuration)
         {
             // cấu hình JWT Authentication
+            var jwtSection = configuration.GetSection("Jwt");
+            services.Configure<JwtOptions>(jwtSection); // Đăng ký để các class như JwtProvider có thể dùng IOptions
+
+            // Ánh xạ ngầm cấu hình ra dạng Object để nạp cho JwtBearer lúc Startup hệ thống
+            var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+
+            // 2. CẤU HÌNH XÁC THỰC SỬ DỤNG THUỘC TÍNH ĐỊNH DANH (Dùng jwtOptions thay vì configuration thô)
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -34,9 +41,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!))
+                    ValidIssuer = jwtOptions.Issuer,
+                    ValidAudience = jwtOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
                 };
             });
             // Cấu hình DbContext với PostgreSQL

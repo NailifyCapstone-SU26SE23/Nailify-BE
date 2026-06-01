@@ -1,23 +1,25 @@
 ﻿// File: Nailify.Capstone.Infrastructure/Repository/JwtProvider.cs
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Infrastructure.Configuration;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
-using Nailify.Capstone.Domain.Entities;
 
 namespace Nailify.Capstone.Infrastructure.Repository
 {
     public class JwtProvider : IJwtProvider
     {
-        private readonly IConfiguration _configuration;
+        private readonly JwtOptions _jwtOptions;
 
-        public JwtProvider(IConfiguration configuration)
+        public JwtProvider(IOptions<JwtOptions> jwtOptions)
         {
-            _configuration = configuration;
+            _jwtOptions = jwtOptions.Value;
         }
 
         public string GenerateToken(User user)
@@ -30,14 +32,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 new Claim (ClaimTypes.Role, user.Role),
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
+                issuer: _jwtOptions.Issuer,
+                audience: _jwtOptions.Audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(2), // Hết hạn sau x tiếng
+                expires: DateTime.UtcNow.AddHours(2), // hết hạn sau x giờ
                 signingCredentials: creds
             );
 
