@@ -9,5 +9,6 @@ namespace Nailify.Capstone.Domain.Entities
         public string Status { get; set; } = "Active";
 
         public virtual ICollection<NailCategory> NailCategories { get; set; } = new List<NailCategory>();
+        public virtual ICollection<NailDesignImage> NailDesignImages { get; set; } = new List<NailDesignImage>();
     }
 }

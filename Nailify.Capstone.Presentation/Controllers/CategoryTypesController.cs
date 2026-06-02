@@ -22,13 +22,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách loại danh mục.
+        /// Lấy danh sách loại danh mục phân trang, hỗ trợ lọc theo tên và danh mục.
         /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResult<List<CategoryTypeDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
+        [ProducesResponseType(typeof(ApiResult<PagedList<CategoryTypeDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null)
         {
-            var result = await _categoryTypeService.GetAllCategoryTypesAsync();
+            var result = await _categoryTypeService.GetPagedCategoryTypesAsync(pageNumber, pageSize, name);
             return Ok(result);
         }
 

@@ -22,13 +22,17 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách danh mục.
+        /// Lấy danh sách danh mục phân trang, hỗ trợ lọc theo tên.
         /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResult<List<CategoryDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
+        [ProducesResponseType(typeof(ApiResult<PagedList<CategoryDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null,
+            [FromQuery] int? categoryTypeId = null)
         {
-            var result = await _categoryService.GetAllCategoriesAsync();
+            var result = await _categoryService.GetPagedCategoriesAsync(pageNumber, pageSize, name, categoryTypeId);
             return Ok(result);
         }
 
@@ -100,15 +104,5 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
-        /// <summary>
-        /// Lấy danh sách danh mục theo loại danh mục.
-        /// </summary>
-        [HttpGet("by-type/{categoryTypeId}")]
-        [ProducesResponseType(typeof(ApiResult<List<CategoryDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetByType(int categoryTypeId)
-        {
-            var result = await _categoryService.GetCategoriesByTypeAsync(categoryTypeId);
-            return Ok(result);
-        }
     }
 }
