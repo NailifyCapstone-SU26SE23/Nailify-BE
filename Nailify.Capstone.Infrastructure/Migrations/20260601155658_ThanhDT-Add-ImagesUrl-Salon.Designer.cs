@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260601155658_ThanhDT-Add-ImagesUrl-Salon")]
+    partial class ThanhDTAddImagesUrlSalon
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -78,19 +81,11 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SalonId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("NailArtistId");
-
-                    b.HasIndex("AccountId")
-                        .IsUnique();
-
-                    b.HasIndex("SalonId");
 
                     b.ToTable("NailArtists");
                 });
@@ -270,10 +265,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -292,25 +283,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CategoryType");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "Account")
-                        .WithOne()
-                        .HasForeignKey("Nailify.Capstone.Domain.Entities.NailArtist", "AccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
-                        .WithMany("NailArtists")
-                        .HasForeignKey("SalonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Account");
-
-                    b.Navigation("Salon");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailCategory", b =>
@@ -376,8 +348,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
                 {
-                    b.Navigation("NailArtists");
-
                     b.Navigation("OperatingHours");
                 });
 #pragma warning restore 612, 618
