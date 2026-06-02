@@ -2,11 +2,13 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
+using Nailify.Capstone.Infrastructure.Service;
 using System.Reflection;
 
 namespace Nailify.Capstone.Infrastructure.Configuration
@@ -32,12 +34,27 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ICategoryRepository, CategoryRepository>();
             services.AddScoped<INailDesignRepository, NailDesignRepository>();
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            services.AddScoped<ISalonRepository, SalonRepository>();
+            services.AddScoped<INailArtistRepository, NailArtistRepository>();
+            services.AddScoped<IScheduleRepository, ScheduleRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<INailDesignService, NailDesignService>();
+            services.AddScoped<ISalonService, SalonService>();
+            services.AddScoped<INailArtistService, NailArtistService>();
+            services.AddScoped<IScheduleService, ScheduleService>();
+            services.AddScoped<CloudinaryService>();
+
+            // Đăng ký Cloudinary Configuration
+            var cloudinarySettings = configuration.GetSection("CloudinarySettings")
+                                                  .Get<CloudinaryConfiguration>();
+            if (cloudinarySettings != null)
+            {
+                services.AddSingleton<ICloudinaryConfiguration>(cloudinarySettings);
+            }
 
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 {
     public class GenericRepository<T> : IGenericRepository<T> where T : class
     {
-        private readonly NailifyDbContext _context;
+        protected readonly NailifyDbContext _context;
         protected readonly DbSet<T> _dbSet;
         #region CTOR
         public GenericRepository(NailifyDbContext context)
