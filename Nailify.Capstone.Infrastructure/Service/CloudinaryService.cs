@@ -96,8 +96,7 @@ namespace Nailify.Capstone.Infrastructure.Service
 
             var segment = url.Substring(startIndex + startTag.Length);
 
-            var versionTagRegex = new Regex(@"v\d+/");
-            var match = versionTagRegex.Match(segment);
+            var versionTagRegex = new Regex(@"v\d+/", RegexOptions.None, TimeSpan.FromSeconds(2)); var match = versionTagRegex.Match(segment);
 
             if (match.Success)
             {
