@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Lấy thông tin mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request)
+        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, List<string>? imageUrls = null)
         {
             var invalidCategoryIds = await GetInvalidCategoryIdsAsync(request.CategoryIds);
             if (invalidCategoryIds.Any())
@@ -67,6 +67,11 @@ namespace Nailify.Capstone.Application.Services
                 .Distinct()
                 .Select(categoryId => new NailCategory { CategoryId = categoryId })
                 .ToList();
+            design.NailDesignImages = (imageUrls ?? new List<string>())
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .Distinct()
+                .Select(imageUrl => new NailDesignImage { ImageUrl = imageUrl })
+                .ToList();
 
             await _unitOfWork.NailDesignRepository.CreateAsync(design);
             await _unitOfWork.SaveChangesAsync();
@@ -77,7 +82,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Tạo mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request)
+        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
             if (existingDesign == null || existingDesign.Status == "InActive")
@@ -100,6 +105,19 @@ namespace Nailify.Capstone.Application.Services
                 {
                     NailDesignId = existingDesign.NailDesignId,
                     CategoryId = categoryId
+                });
+            }
+
+            existingDesign.NailDesignImages.Clear();
+            foreach (var imageUrl in request.ExistingImageUrls
+                .Concat(newImageUrls ?? new List<string>())
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .Distinct())
+            {
+                existingDesign.NailDesignImages.Add(new NailDesignImage
+                {
+                    NailDesignId = existingDesign.NailDesignId,
+                    ImageUrl = imageUrl
                 });
             }
 

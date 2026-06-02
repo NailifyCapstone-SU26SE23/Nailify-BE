@@ -11,11 +11,14 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public decimal Price { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public List<string> ImageUrls { get; set; } = new List<string>();
         public List<CategoryDto> Categories { get; set; } = new List<CategoryDto>();
 
         public void Mapping(Profile profile)
         {
             profile.CreateMap<NailDesign, NailDesignDto>()
+                .ForMember(dest => dest.ImageUrls,
+                    opt => opt.MapFrom(src => src.NailDesignImages.Select(image => image.ImageUrl)))
                 .ForMember(dest => dest.Categories,
                     opt => opt.MapFrom(src => src.NailCategories.Select(nc => nc.Category)));
         }

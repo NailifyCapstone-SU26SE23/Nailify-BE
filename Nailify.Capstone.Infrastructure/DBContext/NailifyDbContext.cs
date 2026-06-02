@@ -17,6 +17,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Category> Categories { get; set; }
         public DbSet<NailDesign> NailDesigns { get; set; }
         public DbSet<NailCategory> NailCategories { get; set; }
+        public DbSet<NailDesignImage> NailDesignImages { get; set; }
         public DbSet<SalonOperatingHour> SalonOperatingHours { get; set; }
         public DbSet<Salon> Salons { get; set; }
         public DbSet<NailArtist> NailArtists { get; set; }
@@ -67,6 +68,15 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<NailDesign>()
                 .Property(nd => nd.Price)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailDesignImage>()
+                .HasKey(ndi => ndi.NailDesignImageId);
+
+            modelBuilder.Entity<NailDesignImage>()
+                .HasOne(ndi => ndi.NailDesign)
+                .WithMany(nd => nd.NailDesignImages)
+                .HasForeignKey(ndi => ndi.NailDesignId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);

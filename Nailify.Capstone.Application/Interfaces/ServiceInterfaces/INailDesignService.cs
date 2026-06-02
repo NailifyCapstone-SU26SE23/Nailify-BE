@@ -12,8 +12,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             string? name = null,
             IEnumerable<int>? categoryIds = null);
         Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id);
-        Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request);
-        Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request);
+        Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, List<string>? imageUrls = null);
+        Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null);
         Task<ApiResult<bool>> DeleteNailDesignAsync(int id);
         Task<ApiResult<List<NailDesignDto>>> GetNailDesignsByCategoryAsync(int categoryId);
     }
