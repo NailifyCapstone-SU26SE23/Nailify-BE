@@ -51,7 +51,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToList();
             if (filterCategoryIds != null && filterCategoryIds.Any())
             {
-                query = query.Where(nd => nd.NailCategories.Any(nc => filterCategoryIds.Contains(nc.CategoryId)));
+                query = query.Where(nd =>
+                    filterCategoryIds.All(categoryId =>
+                        nd.NailCategories.Any(nc => nc.CategoryId == categoryId)));
             }
 
             var count = await query.CountAsync();
