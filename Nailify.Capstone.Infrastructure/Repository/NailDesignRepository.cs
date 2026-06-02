@@ -71,7 +71,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(nd => nd.NailDesignImages)
                 .Include(nd => nd.NailCategories)
                 .ThenInclude(nc => nc.Category)
-                .ThenInclude(c => c.CategoryType);
+                .ThenInclude(c => c.CategoryType)
+                .Include(nd => nd.NailVariants)
+                .ThenInclude(nv => nv.NailShape)
+                .Include(nd => nd.NailVariants)
+                .ThenInclude(nv => nv.NailSurface)
+                .Include(nd => nd.NailVariants)
+                .ThenInclude(nv => nv.NailComponents)
+                .ThenInclude(nc => nc.Component);
         }
     }
 }

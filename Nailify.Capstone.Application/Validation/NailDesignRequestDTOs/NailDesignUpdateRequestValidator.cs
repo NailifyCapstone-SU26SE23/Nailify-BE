@@ -8,18 +8,21 @@ namespace Nailify.Capstone.Application.Validation.NailDesignRequestDTOs
         public NailDesignUpdateRequestValidator()
         {
             RuleFor(x => x.NailDesignId)
-                .GreaterThan(0).WithMessage("ID mẫu nail không hợp lệ");
+                .GreaterThan(0).WithMessage("ID mau nail khong hop le");
 
             RuleFor(x => x.Name)
-                .NotEmpty().WithMessage("Tên mẫu nail không được để trống")
-                .MaximumLength(200).WithMessage("Tên mẫu nail không được vượt quá 200 ký tự");
+                .NotEmpty().WithMessage("Ten mau nail khong duoc de trong")
+                .MaximumLength(200).WithMessage("Ten mau nail khong duoc vuot qua 200 ky tu");
 
             RuleFor(x => x.Price)
-                .GreaterThan(0).WithMessage("Giá phải lớn hơn 0")
-                .LessThan(100000000).WithMessage("Giá không được vượt quá 100,000,000 VNĐ");
+                .GreaterThan(0).WithMessage("Gia phai lon hon 0")
+                .LessThan(100000000).WithMessage("Gia khong duoc vuot qua 100,000,000 VND");
 
             RuleFor(x => x.Description)
-                .MaximumLength(500).WithMessage("Mô tả không được vượt quá 500 ký tự");
+                .MaximumLength(500).WithMessage("Mo ta khong duoc vuot qua 500 ky tu");
+
+            RuleForEach(x => x.NailVariantIds)
+                .GreaterThan(0).WithMessage("ID bien the mong khong hop le");
         }
     }
 }

@@ -1,7 +1,9 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
@@ -19,12 +21,29 @@ namespace Nailify.Capstone.Presentation.Controllers
     public class NailDesignsController : ControllerBase
     {
         private readonly INailDesignService _nailDesignService;
+        private readonly INailVariantService _nailVariantService;
         private readonly CloudinaryService _cloudinaryService;
+        private readonly IValidator<NailVariantCreateRequest> _variantCreateValidator;
+        private readonly IValidator<NailVariantUpdateRequest> _variantUpdateValidator;
+        private readonly IValidator<NailDesignCreateRequest> _designCreateValidator;
+        private readonly IValidator<NailDesignUpdateRequest> _designUpdateValidator;
 
-        public NailDesignsController(INailDesignService nailDesignService, CloudinaryService cloudinaryService)
+        public NailDesignsController(
+            INailDesignService nailDesignService,
+            INailVariantService nailVariantService,
+            CloudinaryService cloudinaryService,
+            IValidator<NailVariantCreateRequest> variantCreateValidator,
+            IValidator<NailVariantUpdateRequest> variantUpdateValidator,
+            IValidator<NailDesignCreateRequest> designCreateValidator,
+            IValidator<NailDesignUpdateRequest> designUpdateValidator)
         {
             _nailDesignService = nailDesignService;
+            _nailVariantService = nailVariantService;
             _cloudinaryService = cloudinaryService;
+            _variantCreateValidator = variantCreateValidator;
+            _variantUpdateValidator = variantUpdateValidator;
+            _designCreateValidator = designCreateValidator;
+            _designUpdateValidator = designUpdateValidator;
         }
 
         /// <summary>
@@ -68,6 +87,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, List<IFormFile>? images)
         {
+            var validationResult = await _designCreateValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
+            }
+
             var uploadedImageUrls = new List<string>();
 
             try
@@ -99,6 +124,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Update([FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
         {
+            var validationResult = await _designUpdateValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
+            }
+
             var existingResult = await _nailDesignService.GetNailDesignByIdAsync(request.NailDesignId);
             if (!existingResult.IsSucceeded)
             {

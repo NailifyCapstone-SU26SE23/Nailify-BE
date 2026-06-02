@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string Status { get; set; } = string.Empty;
         public List<string> ImageUrls { get; set; } = new List<string>();
         public List<CategoryDto> Categories { get; set; } = new List<CategoryDto>();
+        public List<NailVariantDto> NailVariants { get; set; } = new List<NailVariantDto>();
 
         public void Mapping(Profile profile)
         {
@@ -20,7 +21,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
                 .ForMember(dest => dest.ImageUrls,
                     opt => opt.MapFrom(src => src.NailDesignImages.Select(image => image.ImageUrl)))
                 .ForMember(dest => dest.Categories,
-                    opt => opt.MapFrom(src => src.NailCategories.Select(nc => nc.Category)));
+                    opt => opt.MapFrom(src => src.NailCategories.Select(nc => nc.Category)))
+                .ForMember(dest => dest.NailVariants,
+                    opt => opt.MapFrom(src => src.NailVariants));
         }
     }
 

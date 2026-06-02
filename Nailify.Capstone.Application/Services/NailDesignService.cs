@@ -61,6 +61,12 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailDesignDto>($"Không tìm thấy danh mục: {string.Join(", ", invalidCategoryIds)}.");
             }
 
+            var invalidNailVariantIds = await GetInvalidNailVariantIdsAsync(request.NailVariantIds);
+            if (invalidNailVariantIds.Any())
+            {
+                return new ApiErrorResult<NailDesignDto>($"Khong tim thay bien the mong: {string.Join(", ", invalidNailVariantIds)}.");
+            }
+
             var design = _mapper.Map<NailDesign>(request);
             design.Status = "Active";
             design.NailCategories = request.CategoryIds
@@ -75,6 +81,7 @@ namespace Nailify.Capstone.Application.Services
 
             await _unitOfWork.NailDesignRepository.CreateAsync(design);
             await _unitOfWork.SaveChangesAsync();
+            await AssignNailVariantsAsync(design.NailDesignId, request.NailVariantIds);
 
             var createdDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(design.NailDesignId);
             var designDto = _mapper.Map<NailDesignDto>(createdDesign);
@@ -94,6 +101,12 @@ namespace Nailify.Capstone.Application.Services
             if (invalidCategoryIds.Any())
             {
                 return new ApiErrorResult<NailDesignDto>($"Không tìm thấy danh mục: {string.Join(", ", invalidCategoryIds)}.");
+            }
+
+            var invalidNailVariantIds = await GetInvalidNailVariantIdsAsync(request.NailVariantIds);
+            if (invalidNailVariantIds.Any())
+            {
+                return new ApiErrorResult<NailDesignDto>($"Khong tim thay bien the mong: {string.Join(", ", invalidNailVariantIds)}.");
             }
 
             _mapper.Map(request, existingDesign);
@@ -123,6 +136,7 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.NailDesignRepository.Update(existingDesign);
             await _unitOfWork.SaveChangesAsync();
+            await AssignNailVariantsAsync(existingDesign.NailDesignId, request.NailVariantIds);
 
             var updatedDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
             var designDto = _mapper.Map<NailDesignDto>(updatedDesign);
@@ -166,6 +180,46 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return invalidCategoryIds;
+        }
+
+        private async Task<List<int>> GetInvalidNailVariantIdsAsync(IEnumerable<int> nailVariantIds)
+        {
+            var requestedIds = nailVariantIds
+                .Where(nailVariantId => nailVariantId > 0)
+                .Distinct()
+                .ToList();
+            if (!requestedIds.Any())
+            {
+                return new List<int>();
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(requestedIds);
+            var existingIds = variants.Select(variant => variant.NailVariantId).ToHashSet();
+
+            return requestedIds
+                .Where(nailVariantId => !existingIds.Contains(nailVariantId))
+                .ToList();
+        }
+
+        private async Task AssignNailVariantsAsync(int nailDesignId, IEnumerable<int> nailVariantIds)
+        {
+            var requestedIds = nailVariantIds
+                .Where(nailVariantId => nailVariantId > 0)
+                .Distinct()
+                .ToList();
+            if (!requestedIds.Any())
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(requestedIds);
+            foreach (var variant in variants)
+            {
+                variant.NailDesignId = nailDesignId;
+                _unitOfWork.NailVariantRepository.Update(variant);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }

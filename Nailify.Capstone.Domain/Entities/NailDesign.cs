@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Domain.Entities
 
         public virtual ICollection<NailCategory> NailCategories { get; set; } = new List<NailCategory>();
         public virtual ICollection<NailDesignImage> NailDesignImages { get; set; } = new List<NailDesignImage>();
+        public virtual ICollection<NailVariant> NailVariants { get; set; } = new List<NailVariant>();
     }
 }

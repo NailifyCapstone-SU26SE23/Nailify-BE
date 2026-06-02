@@ -37,6 +37,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ISalonRepository, SalonRepository>();
             services.AddScoped<INailArtistRepository, NailArtistRepository>();
             services.AddScoped<IScheduleRepository, ScheduleRepository>();
+            services.AddScoped<IComponentRepository, ComponentRepository>();
+            services.AddScoped<INailShapeRepository, NailShapeRepository>();
+            services.AddScoped<INailSurfaceRepository, NailSurfaceRepository>();
+            services.AddScoped<INailVariantRepository, NailVariantRepository>();
+            services.AddScoped<INailComponentRepository, NailComponentRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
@@ -46,6 +51,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ISalonService, SalonService>();
             services.AddScoped<INailArtistService, NailArtistService>();
             services.AddScoped<IScheduleService, ScheduleService>();
+            services.AddScoped<IComponentService, ComponentService>();
+            services.AddScoped<INailShapeService, NailShapeService>();
+            services.AddScoped<INailSurfaceService, NailSurfaceService>();
+            services.AddScoped<INailVariantService, NailVariantService>();
+            services.AddScoped<INailComponentService, NailComponentService>();
             services.AddScoped<CloudinaryService>();
 
             // Đăng ký Cloudinary Configuration

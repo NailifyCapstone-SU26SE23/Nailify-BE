@@ -22,6 +22,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Salon> Salons { get; set; }
         public DbSet<NailArtist> NailArtists { get; set; }
         public DbSet<Schedule> Schedules { get; set; }
+        public DbSet<Component> Components { get; set; }
+        public DbSet<NailShape> NailShapes { get; set; }
+        public DbSet<NailSurface> NailSurfaces { get; set; }
+        public DbSet<NailVariant> NailVariants { get; set; }
+        public DbSet<NailComponent> NailComponents { get; set; }
         public static string GetConnectionString(string connectionStringName)
         {
             var config = new ConfigurationBuilder()
@@ -68,6 +73,83 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<NailDesign>()
                 .Property(nd => nd.Price)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Component>()
+                .HasKey(c => c.ComponentId);
+
+            modelBuilder.Entity<Component>()
+                .Property(c => c.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailShape>()
+                .HasKey(ns => ns.NailShapeId);
+
+            modelBuilder.Entity<NailShape>()
+                .Property(ns => ns.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailSurface>()
+                .HasKey(ns => ns.NailSurfaceId);
+
+            modelBuilder.Entity<NailSurface>()
+                .Property(ns => ns.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailVariant>()
+                .HasKey(nv => nv.NailVariantId);
+
+            modelBuilder.Entity<NailVariant>()
+                .Property(nv => nv.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailVariant>()
+                .Property(nv => nv.Precision)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailVariant>()
+                .HasOne(nv => nv.NailDesign)
+                .WithMany(nd => nd.NailVariants)
+                .HasForeignKey(nv => nv.NailDesignId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NailVariant>()
+                .HasOne(nv => nv.NailShape)
+                .WithMany(ns => ns.NailVariants)
+                .HasForeignKey(nv => nv.NailShapeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NailVariant>()
+                .HasOne(nv => nv.NailSurface)
+                .WithMany(ns => ns.NailVariants)
+                .HasForeignKey(nv => nv.NailSurfaceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NailComponent>()
+                .HasKey(nc => nc.NailComponentId);
+
+            modelBuilder.Entity<NailComponent>()
+                .Property(nc => nc.PosX)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailComponent>()
+                .Property(nc => nc.PosY)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailComponent>()
+                .Property(nc => nc.FingerIndex)
+                .HasComment("-1 = whole hand, 0-9 = specific finger index");
+
+            modelBuilder.Entity<NailComponent>()
+                .HasOne(nc => nc.NailVariant)
+                .WithMany(nv => nv.NailComponents)
+                .HasForeignKey(nc => nc.NailVariantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NailComponent>()
+                .HasOne(nc => nc.Component)
+                .WithMany(c => c.NailComponents)
+                .HasForeignKey(nc => nc.ComponentId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<NailDesignImage>()
                 .HasKey(ndi => ndi.NailDesignImageId);
