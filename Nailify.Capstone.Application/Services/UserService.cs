@@ -133,5 +133,38 @@ namespace Nailify.Capstone.Application.Services
             var dto = _mapper.Map<UserDto>(user);
             return new ApiSuccessResult<UserDto>(dto, "Đăng ký tài khoản thành công.");
         }
+
+        /// <summary>
+        /// nhóm chức năng quản lý thông tin cá nhân của người dùng, cho phép người dùng xem và cập nhật thông tin của chính họ.
+        /// 
+        public async Task<UserDto?> GetProfileAsync(Guid userId)
+        {
+            // tìm thông tin user  lấy từ Token
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active") return null;
+
+            // Sử dụng AutoMapper đã cấu hình để chuyển đổi thành UserDto trả về
+            return _mapper.Map<UserDto>(user);
+        }
+
+        public async Task<bool> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
+        {
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active") return false;
+
+            // thông tin cá nhân cho phép sửa
+            user.FirstName = request.FirstName;
+            user.LastName = request.LastName;
+            user.Phone = request.Phone;
+            if (!string.IsNullOrEmpty(request.AvatarUrl))
+            {
+                user.AvatarUrl = request.AvatarUrl;
+            }
+
+            _unitOfWork.UserRepository.Update(user);
+            var result = await _unitOfWork.SaveChangesAsync();
+
+            return result > 0;
+        }
     }
-}
+    }
