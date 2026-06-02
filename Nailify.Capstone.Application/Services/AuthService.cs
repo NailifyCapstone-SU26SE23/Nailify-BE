@@ -11,11 +11,14 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IJwtProvider _jwtProvider;
+        private readonly IPasswordHasher _passwordHasher;
 
-        public AuthService(IUnitOfWork unitOfWork, IJwtProvider jwtProvider)
+
+        public AuthService(IUnitOfWork unitOfWork, IJwtProvider jwtProvider, IPasswordHasher passwordHasher)
         {
             _unitOfWork = unitOfWork;
-            _jwtProvider = jwtProvider;
+            _jwtProvider = jwtProvider;       
+            _passwordHasher = passwordHasher;
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -25,7 +28,7 @@ namespace Nailify.Capstone.Application.Services
             if (user == null) return null;
 
             // 2. Đối chiếu mật khẩu băm thông qua BCrypt
-            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.Password);
+            bool isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.Password);
             if (!isPasswordValid) return null;
 
             // 3. Cấp Token
