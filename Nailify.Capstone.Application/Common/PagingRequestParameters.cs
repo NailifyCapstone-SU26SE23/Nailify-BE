@@ -31,6 +31,6 @@ namespace Nailify.Capstone.Application.Common
                 }
             }
         }
-        public string OrderBy { get; set; }
+        public string? OrderBy { get; set; }
     }
 }
