@@ -35,9 +35,11 @@ namespace Nailify.Capstone.Presentation.Middlewares
                 context.Response.ContentType = "application/json";
                 await context.Response.WriteAsync(JsonSerializer.Serialize(new
                 {
-                    message = "Lỗi 401: Yêu cầu đăng nhập để truy cập chức năng này!"
+                    isSucceeded = false,
+                    status = StatusCodes.Status401Unauthorized,
+                    message = "Yêu cầu đăng nhập để truy cập chức năng này!"
                 }));
-                return; // Cắt luồng request ngay lập tức, không cho chạy tiếp vào Controller
+                return;
             }
 
             var requiredRoles = roleAttribute.AllowedRoles;
@@ -57,7 +59,11 @@ namespace Nailify.Capstone.Presentation.Middlewares
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 context.Response.ContentType = "application/json";
 
-                var responseText = JsonSerializer.Serialize(new { message = "Lỗi 403: Bạn không có quyền truy cập vào chức năng này!" });
+                var responseText = JsonSerializer.Serialize(new 
+                {
+                    isSucceeded = false,
+                    status = StatusCodes.Status403Forbidden,
+                    message = "Bạn không có quyền truy cập vào chức năng này!" });
                 await context.Response.WriteAsync(responseText);
                 return;
             }
