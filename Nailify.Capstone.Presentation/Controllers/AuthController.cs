@@ -21,11 +21,25 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var result = await _authService.LoginAsync(request);
+
             if (result == null)
             {
-                return Unauthorized(new { message = "Tên đăng nhập hoặc mật khẩu không chính xác!" });
+                return Unauthorized(new
+                {
+                    isSucceeded = false,
+                    message = "Tên đăng nhập hoặc mật khẩu không chính xác!"
+                });
             }
-            return Ok(result);
+
+            return Ok(new
+            {
+                isSucceeded = true,
+                message = "Đăng nhập thành công.",
+                data = new
+                {
+                    token = result.Token
+                }
+            });
         }
     }
 }

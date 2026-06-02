@@ -10,6 +10,7 @@ using Nailify.Capstone.Infrastructure.Repository;
 using System.Reflection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 namespace Nailify.Capstone.Infrastructure.Configuration
@@ -43,7 +44,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
+                    NameClaimType = JwtRegisteredClaimNames.Email,
+                    RoleClaimType = "role"
                 };
             });
             // Cấu hình DbContext với PostgreSQL
