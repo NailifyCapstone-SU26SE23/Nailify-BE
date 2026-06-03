@@ -21,27 +21,18 @@ namespace Nailify.Capstone.Presentation.Controllers
     public class NailDesignsController : ControllerBase
     {
         private readonly INailDesignService _nailDesignService;
-        private readonly INailVariantService _nailVariantService;
         private readonly CloudinaryService _cloudinaryService;
-        private readonly IValidator<NailVariantCreateRequest> _variantCreateValidator;
-        private readonly IValidator<NailVariantUpdateRequest> _variantUpdateValidator;
         private readonly IValidator<NailDesignCreateRequest> _designCreateValidator;
         private readonly IValidator<NailDesignUpdateRequest> _designUpdateValidator;
 
         public NailDesignsController(
             INailDesignService nailDesignService,
-            INailVariantService nailVariantService,
             CloudinaryService cloudinaryService,
-            IValidator<NailVariantCreateRequest> variantCreateValidator,
-            IValidator<NailVariantUpdateRequest> variantUpdateValidator,
             IValidator<NailDesignCreateRequest> designCreateValidator,
             IValidator<NailDesignUpdateRequest> designUpdateValidator)
         {
             _nailDesignService = nailDesignService;
-            _nailVariantService = nailVariantService;
             _cloudinaryService = cloudinaryService;
-            _variantCreateValidator = variantCreateValidator;
-            _variantUpdateValidator = variantUpdateValidator;
             _designCreateValidator = designCreateValidator;
             _designUpdateValidator = designUpdateValidator;
         }
