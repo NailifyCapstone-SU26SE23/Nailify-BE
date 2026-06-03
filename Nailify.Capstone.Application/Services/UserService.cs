@@ -18,13 +18,16 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IPasswordHasher _passwordHasher;
 
         public UserService(
             IUnitOfWork unitOfWork,
-            IMapper mapper)
+            IMapper mapper,
+            IPasswordHasher passwordHasher)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _passwordHasher = passwordHasher;
         }
 
         public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null)
@@ -76,6 +79,9 @@ namespace Nailify.Capstone.Application.Services
             user.AvatarUrl = request.AvatarUrl ?? "default-avatar.png";
             user.Status = "Active";
 
+            
+            user.Password = _passwordHasher.HashPassword(request.Password);
+
             await _unitOfWork.UserRepository.CreateAsync(user);
             await _unitOfWork.SaveChangesAsync();
 
@@ -126,6 +132,9 @@ namespace Nailify.Capstone.Application.Services
             user.UserId = Guid.NewGuid();
             user.AvatarUrl = "default-avatar.png";
             user.Status = "Active";
+            user.Role = "Customer";
+
+            user.Password = _passwordHasher.HashPassword(request.Password);
 
             await _unitOfWork.UserRepository.CreateAsync(user);
             await _unitOfWork.SaveChangesAsync();
