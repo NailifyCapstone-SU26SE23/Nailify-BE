@@ -22,6 +22,9 @@ namespace Nailify.Capstone.Infrastructure
         private INailSurfaceRepository? _nailSurfaceRepository;
         private INailVariantRepository? _nailVariantRepository;
         private INailComponentRepository? _nailComponentRepository;
+        private ICustomerComponentRepository? _customerComponentRepository;
+        private ICustomerNailRepository? _customerNailRepository;
+        private ICustomerNailComponentRepository? _customerNailComponentRepository;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -43,6 +46,9 @@ namespace Nailify.Capstone.Infrastructure
         public INailSurfaceRepository NailSurfaceRepository => _nailSurfaceRepository ??= new NailSurfaceRepository(_context);
         public INailVariantRepository NailVariantRepository => _nailVariantRepository ??= new NailVariantRepository(_context);
         public INailComponentRepository NailComponentRepository => _nailComponentRepository ??= new NailComponentRepository(_context);
+        public ICustomerComponentRepository CustomerComponentRepository => _customerComponentRepository ??= new CustomerComponentRepository(_context);
+        public ICustomerNailRepository CustomerNailRepository => _customerNailRepository ??= new CustomerNailRepository(_context);
+        public ICustomerNailComponentRepository CustomerNailComponentRepository => _customerNailComponentRepository ??= new CustomerNailComponentRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

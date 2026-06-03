@@ -27,6 +27,9 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<NailSurface> NailSurfaces { get; set; }
         public DbSet<NailVariant> NailVariants { get; set; }
         public DbSet<NailComponent> NailComponents { get; set; }
+        public DbSet<CustomerComponent> CustomerComponents { get; set; }
+        public DbSet<CustomerNail> CustomerNails { get; set; }
+        public DbSet<CustomerNailComponent> CustomerNailComponents { get; set; }
         public static string GetConnectionString(string connectionStringName)
         {
             var config = new ConfigurationBuilder()
@@ -150,6 +153,88 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .WithMany(c => c.NailComponents)
                 .HasForeignKey(nc => nc.ComponentId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerComponent>()
+                .HasKey(cc => cc.CustomerComponentId);
+
+            modelBuilder.Entity<CustomerComponent>()
+                .Property(cc => cc.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CustomerComponent>()
+                .HasOne(cc => cc.User)
+                .WithMany()
+                .HasForeignKey(cc => cc.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNail>()
+                .HasKey(cn => cn.CustomerNailId);
+
+            modelBuilder.Entity<CustomerNail>()
+                .Property(cn => cn.Price)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CustomerNail>()
+                .HasOne(cn => cn.User)
+                .WithMany()
+                .HasForeignKey(cn => cn.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNail>()
+                .HasOne(cn => cn.NailShape)
+                .WithMany()
+                .HasForeignKey(cn => cn.NailShapeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNail>()
+                .HasOne(cn => cn.NailSurface)
+                .WithMany()
+                .HasForeignKey(cn => cn.NailSurfaceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNail>()
+                .HasOne(cn => cn.BasedOnNailVariant)
+                .WithMany()
+                .HasForeignKey(cn => cn.BasedOnNailVariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .HasKey(cnc => cnc.CustomerNailComponentId);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .Property(cnc => cnc.PosX)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .Property(cnc => cnc.PosY)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .Property(cnc => cnc.FingerIndex)
+                .HasComment("-1 = whole hand, 0-9 = specific finger index");
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .HasOne(cnc => cnc.CustomerNail)
+                .WithMany(cn => cn.CustomerNailComponents)
+                .HasForeignKey(cnc => cnc.CustomerNailId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .HasOne(cnc => cnc.Component)
+                .WithMany()
+                .HasForeignKey(cnc => cnc.ComponentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .HasOne(cnc => cnc.CustomerComponent)
+                .WithMany(cc => cc.CustomerNailComponents)
+                .HasForeignKey(cnc => cnc.CustomerComponentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNailComponent>()
+                .ToTable(table => table.HasCheckConstraint(
+                    "CK_CustomerNailComponent_OneComponent",
+                    "(\"ComponentId\" IS NOT NULL AND \"CustomerComponentId\" IS NULL) OR (\"ComponentId\" IS NULL AND \"CustomerComponentId\" IS NOT NULL)"));
 
             modelBuilder.Entity<NailDesignImage>()
                 .HasKey(ndi => ndi.NailDesignImageId);
