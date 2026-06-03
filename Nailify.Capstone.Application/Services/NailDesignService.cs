@@ -213,12 +213,39 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(requestedIds);
+            var affectedNailDesignIds = variants
+                .Select(variant => variant.NailDesignId)
+                .Append(nailDesignId)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
             foreach (var variant in variants)
             {
                 variant.NailDesignId = nailDesignId;
                 _unitOfWork.NailVariantRepository.Update(variant);
             }
 
+            await _unitOfWork.SaveChangesAsync();
+            foreach (var affectedNailDesignId in affectedNailDesignIds)
+            {
+                await UpdateNailDesignPriceRangeAsync(affectedNailDesignId);
+            }
+        }
+
+        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        {
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (nailDesign == null)
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
+            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
+
+            _unitOfWork.NailDesignRepository.Update(nailDesign);
             await _unitOfWork.SaveChangesAsync();
         }
     }

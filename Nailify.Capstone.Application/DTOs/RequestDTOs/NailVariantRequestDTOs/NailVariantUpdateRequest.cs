@@ -11,7 +11,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public int NailShapeId { get; set; }
         public int NailSurfaceId { get; set; }
         public int NailDesignId { get; set; }
-        public decimal Price { get; set; }
         public int? Duration { get; set; }
         public decimal? Precision { get; set; }
         public string ImageUrl { get; set; } = string.Empty;

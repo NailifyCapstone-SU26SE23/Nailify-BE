@@ -8,7 +8,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
     {
         public int NailDesignId { get; set; }
         public string Name { get; set; } = string.Empty;
-        public decimal Price { get; set; }
+        public decimal MinPrice { get; set; }
+        public decimal MaxPrice { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public List<string> ImageUrls { get; set; } = new List<string>();

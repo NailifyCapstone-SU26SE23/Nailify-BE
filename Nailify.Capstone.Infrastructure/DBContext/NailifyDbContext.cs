@@ -71,7 +71,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<NailDesign>()
-                .Property(nd => nd.Price)
+                .Property(nd => nd.MinPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailDesign>()
+                .Property(nd => nd.MaxPrice)
                 .HasPrecision(18, 2);
 
             modelBuilder.Entity<Component>()

@@ -50,6 +50,7 @@ namespace Nailify.Capstone.Application.Services
             var nailComponent = _mapper.Map<NailComponent>(request);
             await _unitOfWork.NailComponentRepository.CreateAsync(nailComponent);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailVariantAndDesignPriceAsync(request.NailVariantId);
 
             var createdNailComponent = await _unitOfWork.NailComponentRepository.GetNailComponentDetailAsync(nailComponent.NailComponentId);
             return new ApiSuccessResult<NailComponentDto>(_mapper.Map<NailComponentDto>(createdNailComponent), "Tạo thành phần móng thành công.");
@@ -63,6 +64,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailComponentDto>("Không tìm thấy thành phần móng.");
             }
 
+            var previousNailVariantId = nailComponent.NailVariantId;
             var validationError = await ValidateReferencesAsync(request.ComponentId, request.NailVariantId);
             if (validationError != null)
             {
@@ -72,6 +74,11 @@ namespace Nailify.Capstone.Application.Services
             _mapper.Map(request, nailComponent);
             _unitOfWork.NailComponentRepository.Update(nailComponent);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailVariantAndDesignPriceAsync(previousNailVariantId);
+            if (previousNailVariantId != request.NailVariantId)
+            {
+                await UpdateNailVariantAndDesignPriceAsync(request.NailVariantId);
+            }
 
             var updatedNailComponent = await _unitOfWork.NailComponentRepository.GetNailComponentDetailAsync(request.NailComponentId);
             return new ApiSuccessResult<NailComponentDto>(_mapper.Map<NailComponentDto>(updatedNailComponent), "Cập nhật thành phần móng thành công.");
@@ -85,10 +92,46 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<bool>("Không tìm thấy thành phần móng.");
             }
 
+            var nailVariantId = nailComponent.NailVariantId;
             _unitOfWork.NailComponentRepository.Delete(nailComponent);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailVariantAndDesignPriceAsync(nailVariantId);
 
             return new ApiSuccessResult<bool>(true, "Xóa thành phần móng thành công.");
+        }
+
+        private async Task UpdateNailVariantAndDesignPriceAsync(int nailVariantId)
+        {
+            var variantDetail = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(nailVariantId);
+            var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(nailVariantId);
+            if (variantDetail == null || variant == null)
+            {
+                return;
+            }
+
+            variant.Price = variantDetail.NailShape.Price
+                + variantDetail.NailSurface.Price
+                + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
+
+            _unitOfWork.NailVariantRepository.Update(variant);
+            await _unitOfWork.SaveChangesAsync();
+            await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
+        }
+
+        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        {
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (nailDesign == null)
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
+            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
+
+            _unitOfWork.NailDesignRepository.Update(nailDesign);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         private async Task<string?> ValidateReferencesAsync(int componentId, int nailVariantId)

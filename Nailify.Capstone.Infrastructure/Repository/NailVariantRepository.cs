@@ -58,6 +58,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
         }
 
+        public async Task<List<NailVariant>> GetNailVariantsByDesignIdAsync(int nailDesignId)
+        {
+            return await _dbSet
+                .Where(nv => nv.NailDesignId == nailDesignId)
+                .ToListAsync();
+        }
+
         private IQueryable<NailVariant> BuildNailVariantQuery()
         {
             return _dbSet

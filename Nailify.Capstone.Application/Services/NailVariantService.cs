@@ -49,8 +49,10 @@ namespace Nailify.Capstone.Application.Services
 
             var variant = _mapper.Map<NailVariant>(request);
             variant.ImageUrl = imageUrl ?? string.Empty;
+            variant.Price = await CalculateNailVariantPriceAsync(request.NailShapeId, request.NailSurfaceId);
             await _unitOfWork.NailVariantRepository.CreateAsync(variant);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
 
             var createdVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(variant.NailVariantId);
             return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(createdVariant), "Tạo biến thể móng thành công.");
@@ -64,6 +66,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể móng.");
             }
 
+            var previousNailDesignId = variant.NailDesignId;
             var validationError = await ValidateReferencesAsync(request.NailDesignId, request.NailShapeId, request.NailSurfaceId);
             if (validationError != null)
             {
@@ -71,8 +74,14 @@ namespace Nailify.Capstone.Application.Services
             }
 
             _mapper.Map(request, variant);
+            variant.Price = await CalculateNailVariantPriceAsync(request.NailShapeId, request.NailSurfaceId, request.NailVariantId);
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailDesignPriceRangeAsync(previousNailDesignId);
+            if (previousNailDesignId != variant.NailDesignId)
+            {
+                await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
+            }
 
             var updatedVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(request.NailVariantId);
             return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(updatedVariant), "Cập nhật biến thể móng thành công.");
@@ -86,10 +95,43 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<bool>("Không tìm thấy biến thể móng.");
             }
 
+            var nailDesignId = variant.NailDesignId;
             _unitOfWork.NailVariantRepository.Delete(variant);
             await _unitOfWork.SaveChangesAsync();
+            await UpdateNailDesignPriceRangeAsync(nailDesignId);
 
             return new ApiSuccessResult<bool>(true, "Xóa biến thể móng thành công.");
+        }
+
+        private async Task<decimal> CalculateNailVariantPriceAsync(int nailShapeId, int nailSurfaceId, int? nailVariantId = null)
+        {
+            var nailShape = await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId);
+            var nailSurface = await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId);
+            var componentPrice = 0m;
+
+            if (nailVariantId.HasValue)
+            {
+                var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(nailVariantId.Value);
+                componentPrice = variant?.NailComponents.Sum(nailComponent => nailComponent.Component.Price) ?? 0m;
+            }
+
+            return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+        }
+
+        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        {
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (nailDesign == null)
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
+            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
+
+            _unitOfWork.NailDesignRepository.Update(nailDesign);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         private async Task<string?> ValidateReferencesAsync(int nailDesignId, int nailShapeId, int nailSurfaceId)
