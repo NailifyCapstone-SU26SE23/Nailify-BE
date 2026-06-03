@@ -9,12 +9,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int NailDesignId { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
-        public decimal? Precision { get; set; }
-        public string ImageUrl { get; set; } = string.Empty;
-        public string Color { get; set; } = string.Empty;
-        public string Form { get; set; } = string.Empty;
-        public string Material { get; set; } = string.Empty;
-        public int? Speed { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;        
 
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;

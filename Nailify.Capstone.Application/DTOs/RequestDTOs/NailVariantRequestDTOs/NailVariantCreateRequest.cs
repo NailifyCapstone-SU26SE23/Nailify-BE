@@ -12,11 +12,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public int NailDesignId { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
-        public decimal? Precision { get; set; }
-        public string Color { get; set; } = string.Empty;
-        public string Form { get; set; } = string.Empty;
-        public string Material { get; set; } = string.Empty;
-        public int? Speed { get; set; }
 
         public void Mapping(Profile profile)
         {

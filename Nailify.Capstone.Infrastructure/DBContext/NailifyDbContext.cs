@@ -103,10 +103,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasPrecision(18, 2);
 
             modelBuilder.Entity<NailVariant>()
-                .Property(nv => nv.Precision)
-                .HasPrecision(18, 2);
-
-            modelBuilder.Entity<NailVariant>()
                 .HasOne(nv => nv.NailDesign)
                 .WithMany(nd => nd.NailVariants)
                 .HasForeignKey(nv => nv.NailDesignId)
