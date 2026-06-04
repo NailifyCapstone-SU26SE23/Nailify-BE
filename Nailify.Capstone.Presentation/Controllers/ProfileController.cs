@@ -75,9 +75,47 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
 
             return Ok(new {
-                isSucceeded = false,
+                isSucceeded = true,
                 status =200,
                 message = "Cập nhật trang cá nhân thành công tốt đẹp!" });
+        }
+
+        /// <summary>
+        /// Khách hàng tự truy xuất thông tin hồ sơ cá nhân tổng hợp (Gồm cả bảng User và Customer)
+        /// </summary>
+        [HttpGet("customers")]
+        //[HasRole("Customer")]
+        public async Task<IActionResult> GetMyCustomerProfile()
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
+            }
+
+            var result = await _userService.GetCustomerProfileAsync(Guid.Parse(userIdClaim));
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng tự cập nhật đặc điểm da và lối sống cá nhân phục vụ gợi ý móng mẫu thích hợp
+        /// </summary>
+        [HttpPut("customers/preferences")]
+        //[HasRole("Customer")]
+        public async Task<IActionResult> UpdateMyPreferences([FromBody] CustomerPreferencesUpdateRequest request)
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
+            }
+
+            var result = await _userService.UpdateCustomerPreferencesAsync(Guid.Parse(userIdClaim), request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
         }
     }
 }

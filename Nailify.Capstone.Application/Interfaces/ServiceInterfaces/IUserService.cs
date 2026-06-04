@@ -54,5 +54,12 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// Cho phép khách hàng đăng ký tài khoản tự động.
         /// </summary>
         Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request);
+
+        /// <summary>
+        /// Quản lý customer
+        /// </summary>
+        Task<ApiResult<CustomerProfileDto>> GetCustomerProfileAsync(Guid userId);
+        Task<ApiResult<bool>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
+        Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null);
     }
 }

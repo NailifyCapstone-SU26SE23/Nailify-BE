@@ -140,5 +140,17 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             return Ok(result);
         }
+
+        /// <summary>
+        /// Quản trị viên/Quản lý tìm kiếm và xem toàn bộ danh sách khách hàng kèm phân trang hệ thống.
+        /// </summary>
+        [HttpGet("customers")]
+        [HasRole("Admin", "Manager")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<CustomerProfileDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
+        {
+            var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm);
+            return Ok(result);
+        }
     }
 }

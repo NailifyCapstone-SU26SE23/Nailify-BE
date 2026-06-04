@@ -20,6 +20,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<SalonOperatingHour> SalonOperatingHours { get; set; }
         public DbSet<Salon> Salons { get; set; }
         public DbSet<NailArtist> NailArtists { get; set; }
+        public DbSet<Customer> Customers { get; set; }
         public DbSet<Schedule> Schedules { get; set; }
         public static string GetConnectionString(string connectionStringName)
         {
@@ -103,6 +104,22 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .WithMany(s => s.NailArtists)
                         .HasForeignKey(na => na.SalonId)
                         .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Customer>(entity =>
+            {
+                entity.HasKey(c => c.UserId);
+
+                entity.Property(c => c.LoyaltyPoint).HasDefaultValue(0);
+                entity.Property(c => c.SkinTone).HasDefaultValue(string.Empty).HasMaxLength(100);
+                entity.Property(c => c.Occupation).HasDefaultValue(string.Empty).HasMaxLength(250);
+                entity.Property(c => c.NailCondition).HasDefaultValue(string.Empty).HasMaxLength(500);
+                entity.Property(c => c.PersonaId).HasDefaultValue(string.Empty).HasMaxLength(100);
+
+                entity.HasOne(c => c.User)
+                      .WithOne() // Hoặc .WithOne(u => u.Customer) nếu khai báo Customer trong lớp User
+                      .HasForeignKey<Customer>(c => c.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
         }
     }
 }

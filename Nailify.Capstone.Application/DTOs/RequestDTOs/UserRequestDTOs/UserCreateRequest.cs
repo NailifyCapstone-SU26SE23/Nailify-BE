@@ -41,6 +41,9 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
         /// <example>default-avatar.png</example>
         public string? AvatarUrl { get; set; }
 
+        public string Role { get; set; }
+        public Guid? SalonId { get; set; }
+
         public void Mapping(Profile profile)
         {
             profile.CreateMap<UserCreateRequest, User>();
