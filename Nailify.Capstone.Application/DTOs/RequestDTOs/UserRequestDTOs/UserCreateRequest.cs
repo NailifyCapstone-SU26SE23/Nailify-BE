@@ -16,6 +16,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
         /// Mật khẩu đăng nhập (tối thiểu 6 ký tự).
         /// </summary>
         public string Password { get; set; }
+        public string ConfirmPassword { get; set; }
 
         /// <summary>
         /// Số điện thoại liên hệ (định dạng Việt Nam).
