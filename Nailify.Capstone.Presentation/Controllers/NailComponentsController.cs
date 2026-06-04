@@ -9,7 +9,7 @@ using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 namespace Nailify.Capstone.Presentation.Controllers
 {
     /// <summary>
-    /// API quản lý Nail Component.
+    /// API quản lý thành phần trên móng.
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]

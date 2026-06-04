@@ -1,11 +1,12 @@
-﻿// File: Nailify.Capstone.Presentation/Controllers/AuthController.cs
-using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
+﻿using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API phân quyền.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -17,6 +18,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             _authService = authService;
         }
 
+        /// <summary>
+        /// Đăng nhập.
+        /// </summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {

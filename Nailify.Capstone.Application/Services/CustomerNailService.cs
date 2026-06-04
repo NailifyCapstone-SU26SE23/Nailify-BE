@@ -39,15 +39,16 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerNailDto>(_mapper.Map<CustomerNailDto>(customerNail), "Lấy thông tin móng tùy chỉnh thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> CreateCustomerNailAsync(CustomerNailCreateRequest request, string? imageUrl = null)
+        public async Task<ApiResult<CustomerNailDto>> CreateCustomerNailAsync(CustomerNailCreateRequest request, string? imageUrl = null, Guid? userId = null)
         {
-            var validationError = await ValidateReferencesAsync(request.UserId, request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
+            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
             if (validationError != null)
             {
                 return new ApiErrorResult<CustomerNailDto>(validationError);
             }
 
             var customerNail = _mapper.Map<CustomerNail>(request);
+            customerNail.UserId = userId ?? Guid.Empty;
             customerNail.ImageUrl = imageUrl ?? string.Empty;
             customerNail.CreatedAt = DateTime.UtcNow;
             customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, null);
@@ -67,7 +68,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerNailDto>("Không tìm thấy móng tùy chỉnh.");
             }
 
-            var validationError = await ValidateReferencesAsync(request.UserId, request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
+            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
             if (validationError != null)
             {
                 return new ApiErrorResult<CustomerNailDto>(validationError);
@@ -126,13 +127,8 @@ namespace Nailify.Capstone.Application.Services
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
         }
 
-        private async Task<string?> ValidateReferencesAsync(Guid userId, int nailShapeId, int nailSurfaceId, int? basedOnNailVariantId)
+        private async Task<string?> ValidateReferencesAsync(int nailShapeId, int nailSurfaceId, int? basedOnNailVariantId)
         {
-            if (await _unitOfWork.UserRepository.GetByIdAsync(userId) == null)
-            {
-                return "Không tìm thấy người dùng.";
-            }
-
             if (await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId) == null)
             {
                 return "Không tìm thấy dáng móng.";

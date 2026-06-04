@@ -1,15 +1,11 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
-using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -155,7 +151,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xóa mẫu nail bằng cách chuyển trạng thái sang InActive.
+        /// Xóa mẫu nail.
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]

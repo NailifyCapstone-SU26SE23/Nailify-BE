@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerComponentRequestDTOs;
@@ -10,9 +9,12 @@ using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý thành phần móng của khách hàng.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class CustomerComponentsController : ControllerBase
+    public class CustomerComponentsController : BaseApiController
     {
         private readonly ICustomerComponentService _customerComponentService;
         private readonly CloudinaryService _cloudinaryService;
@@ -31,19 +33,25 @@ namespace Nailify.Capstone.Presentation.Controllers
             _updateValidator = updateValidator;
         }
 
+        /// <summary>
+        /// Lấy danh sách thành phần móng khách hàng với phân trang. 
+        /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<CustomerComponentDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPaged(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] Guid? userId = null,
             [FromQuery] string? name = null,
             [FromQuery] ComponentType? componentType = null)
         {
-            var result = await _customerComponentService.GetPagedCustomerComponentsAsync(pageNumber, pageSize, userId, name, componentType);
+            var currentUserId = GetCurrentUserId();
+            var result = await _customerComponentService.GetPagedCustomerComponentsAsync(pageNumber, pageSize, currentUserId, name, componentType);
             return Ok(result);
         }
 
+        /// <summary>
+        /// Lấy chi tiết thành phần móng khách hàng. 
+        /// </summary>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResult<CustomerComponentDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
@@ -53,12 +61,17 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
+        /// <summary>
+        /// Tạo thành phần trên móng khách hàng. 
+        /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<CustomerComponentDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] CustomerComponentCreateRequest request, IFormFile? image)
         {
+            var currentUserId = GetCurrentUserId();
+
             var validationResult = await _createValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
             {
@@ -69,7 +82,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             try
             {
                 uploadedImageUrl = await UploadImageAsync(image);
-                var result = await _customerComponentService.CreateCustomerComponentAsync(request, uploadedImageUrl);
+                var result = await _customerComponentService.CreateCustomerComponentAsync(request, uploadedImageUrl, currentUserId);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImageAsync(uploadedImageUrl);
@@ -85,6 +98,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        /// <summary>
+        /// Cập nhật thành phần trên móng khách hàng. 
+        /// </summary>
         [HttpPut]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<CustomerComponentDto>), StatusCodes.Status200OK)]
@@ -132,6 +148,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        /// <summary>
+        /// Xóa thành phần trên móng khách hàng. 
+        /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]

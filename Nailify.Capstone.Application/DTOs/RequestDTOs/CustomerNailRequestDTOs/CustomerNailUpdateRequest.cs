@@ -12,8 +12,8 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs
         public string ImageUrl { get; set; } = string.Empty;
         public int NailShapeId { get; set; }
         public int NailSurfaceId { get; set; }
-        public string CustomColor { get; set; } = string.Empty;
-        public string CustomMaterial { get; set; } = string.Empty;
+        public string? CustomColor { get; set; } 
+        public string? CustomMaterial { get; set; } 
         public int? Duration { get; set; }
         public bool IsFavorite { get; set; }
         public bool IsPublic { get; set; }

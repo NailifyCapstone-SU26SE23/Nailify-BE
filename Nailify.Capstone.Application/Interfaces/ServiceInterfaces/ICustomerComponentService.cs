@@ -9,7 +9,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<PagedList<CustomerComponentDto>>> GetPagedCustomerComponentsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, ComponentType? componentType = null);
         Task<ApiResult<CustomerComponentDto>> GetCustomerComponentByIdAsync(int id);
-        Task<ApiResult<CustomerComponentDto>> CreateCustomerComponentAsync(CustomerComponentCreateRequest request, string? imageUrl = null);
+        Task<ApiResult<CustomerComponentDto>> CreateCustomerComponentAsync(CustomerComponentCreateRequest request, string? imageUrl = null, Guid? userId = null);
         Task<ApiResult<CustomerComponentDto>> UpdateCustomerComponentAsync(CustomerComponentUpdateRequest request);
         Task<ApiResult<bool>> DeleteCustomerComponentAsync(int id);
     }

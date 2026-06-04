@@ -41,17 +41,12 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerComponentDto>(_mapper.Map<CustomerComponentDto>(customerComponent), "Lấy thông tin thành phần tùy chỉnh thành công.");
         }
 
-        public async Task<ApiResult<CustomerComponentDto>> CreateCustomerComponentAsync(CustomerComponentCreateRequest request, string? imageUrl = null)
+        public async Task<ApiResult<CustomerComponentDto>> CreateCustomerComponentAsync(CustomerComponentCreateRequest request, string? imageUrl = null, Guid? userId = null)
         {
-            if (await _unitOfWork.UserRepository.GetByIdAsync(request.UserId) == null)
-            {
-                return new ApiErrorResult<CustomerComponentDto>("Không tìm thấy người dùng.");
-            }
-
-            var customerComponent = _mapper.Map<CustomerComponent>(request);
+                        var customerComponent = _mapper.Map<CustomerComponent>(request);
             customerComponent.ImageUrl = imageUrl ?? string.Empty;
             customerComponent.CreatedAt = DateTime.UtcNow;
-
+            customerComponent.UserId = userId ?? Guid.Empty;
             await _unitOfWork.CustomerComponentRepository.CreateAsync(customerComponent);
             await _unitOfWork.SaveChangesAsync();
 
