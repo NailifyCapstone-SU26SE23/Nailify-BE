@@ -48,7 +48,9 @@ namespace Nailify.Capstone.Presentation.Middlewares
             // Quét xem trong danh sách quyền được phép, người dùng hiện tại có sở hữu quyền nào không
             foreach (var role in requiredRoles)
             {
-                if (user.IsInRole(role))
+                if (user.IsInRole(role) ||
+                    user.HasClaim(c => c.Type == "role" && c.Value.Equals(role, System.StringComparison.OrdinalIgnoreCase)) ||
+                    user.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role && c.Value.Equals(role, System.StringComparison.OrdinalIgnoreCase)))
                 {
                     hasPermission = true;
                     break; // Chỉ cần khớp 1 quyền là hợp lệ

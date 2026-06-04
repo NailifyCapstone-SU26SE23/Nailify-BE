@@ -84,7 +84,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự truy xuất thông tin hồ sơ cá nhân tổng hợp (Gồm cả bảng User và Customer)
         /// </summary>
         [HttpGet("customers")]
-        //[HasRole("Customer")]
+        [HasRole("Customer")]
         public async Task<IActionResult> GetMyCustomerProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -101,7 +101,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự cập nhật đặc điểm da và lối sống cá nhân phục vụ gợi ý móng mẫu thích hợp
         /// </summary>
         [HttpPut("customers/preferences")]
-        //[HasRole("Customer")]
+        [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyPreferences([FromBody] CustomerPreferencesUpdateRequest request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
