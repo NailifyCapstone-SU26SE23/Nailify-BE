@@ -15,7 +15,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
         /// <summary>
         /// Mật khẩu đăng nhập (tối thiểu 6 ký tự).
         /// </summary>
-        /// <example>SecurePass123</example>
         public string Password { get; set; }
 
         /// <summary>

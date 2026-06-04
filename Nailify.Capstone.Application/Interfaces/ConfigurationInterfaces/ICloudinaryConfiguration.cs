@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces
 {
-    internal class Class1
+    public interface ICloudinaryConfiguration
     {
+        string CloudName { get; set; }
+        string ApiKey { get; set; }
+        string ApiSecret { get; set; }
     }
 }

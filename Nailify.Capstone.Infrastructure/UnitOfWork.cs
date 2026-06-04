@@ -10,12 +10,29 @@ namespace Nailify.Capstone.Infrastructure
     {
         private readonly NailifyDbContext _context;
         private IUserRepository? _userRepository;
-
+        private ICategoryTypeRepository? _categoryTypeRepository;
+        private ICategoryRepository? _categoryRepository;
+        private INailDesignRepository? _nailDesignRepository;
+        private ISalonOperatingHourRepository? _salonOperatingHourRepository;
+        private ISalonRepository? _salonRepository;
+        private INailArtistRepository? _nailArtistRepository;
+        private IScheduleRepository? _scheduleRepository;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
         }
         public IUserRepository UserRepository => _userRepository ??= new UserRepository(_context);
+        public ICategoryTypeRepository CategoryTypeRepository => _categoryTypeRepository ??= new CategoryTypeRepository(_context);
+        public ICategoryRepository CategoryRepository => _categoryRepository ??= new CategoryRepository(_context);
+        public INailDesignRepository NailDesignRepository => _nailDesignRepository ??= new NailDesignRepository(_context);
+
+        public ISalonOperatingHourRepository SalonOperatingHourRepository => _salonOperatingHourRepository ??= new SalonOperatingHourRepository(_context);
+
+        public ISalonRepository SalonRepository => _salonRepository ??= new SalonRepository(_context);
+
+        public INailArtistRepository NailArtistRepository => _nailArtistRepository ??= new NailArtistRepository(_context);
+
+        public IScheduleRepository ScheduleRepository => _scheduleRepository ??= new ScheduleRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

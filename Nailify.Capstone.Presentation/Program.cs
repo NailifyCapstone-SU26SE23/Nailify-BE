@@ -1,7 +1,11 @@
 using Nailify.Capstone.Infrastructure.Configuration;
 using Nailify.Capstone.Presentation.Extensions;
+using Microsoft.OpenApi.Models;
+
+using Nailify.Capstone.Presentation.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -9,6 +13,30 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Nailify Capstone API", Version = "v1" });
 
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http, // Đặt kiểu là Http thay vì ApiKey
+        Scheme = "Bearer",                                       // Swagger sẽ tự hiểu và dán chữ "Bearer " trước token
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Vui lòng chỉ dán chuỗi Token JWT của bạn vào ô dưới đây (Không nhập chữ 'Bearer ')."
+    });
+
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
     // Đọc XML comment của tầng API hiện tại
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -29,6 +57,9 @@ builder.Services.AddInfrastructureToApplication(builder.Configuration);
 var app = builder.Build();
 
 app.ApplyMigrations();
+
+app.UseAuthentication();
+app.UseMiddleware<RoleAuthorizationMiddleware>();
 
 app.UseInfrastructure();
 
