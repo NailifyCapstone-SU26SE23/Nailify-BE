@@ -87,15 +87,15 @@ namespace Nailify.Capstone.Application.Services
 
             if(user.Role == "Staff_Artist")
             {
-                //if (request.SalonId == null || request.SalonId == Guid.Empty)
-                //{
-                //    return new ApiResult<UserDto>(false, "Lỗi nghiệp vụ: Tài khoản thợ làm móng (Staff_Artist) bắt buộc phải chỉ định cơ sở Salon làm việc.");
-                //}
+                if (request.SalonId == Guid.Empty)
+                {
+                    return new ApiResult<UserDto>(false, "Tài khoản thợ làm móng (Staff_Artist) bắt buộc phải chỉ định cơ sở Salon làm việc.");
+                }
                 var nailArtist = new NailArtist
                 {
                     NailArtistId = Guid.NewGuid(),
                     AccountId = user.UserId,       // Liên kết trực tiếp tài khoản vừa tạo ở trên
-                    SalonId = request.SalonId.Value, // Gán vào cơ sở chi nhánh
+                    SalonId = request.SalonId, // Gán vào cơ sở chi nhánh
                     Status = "Active"
                 };
 
