@@ -24,17 +24,17 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// <summary>
         /// Tên của người dùng.
         /// </summary>
-        public string FirstName { get; set; }
+        public string? FirstName { get; set; }
 
         /// <summary>
         /// Họ của người dùng.
         /// </summary>
-        public string LastName { get; set; }
+        public string? LastName { get; set; }
 
         /// <summary>
         /// Đường dẫn ảnh đại diện.
         /// </summary>
-        public string AvatarUrl { get; set; }
+        public string? AvatarUrl { get; set; }
 
         /// <summary>
         /// Trạng thái hoạt động (Active, InActive...).

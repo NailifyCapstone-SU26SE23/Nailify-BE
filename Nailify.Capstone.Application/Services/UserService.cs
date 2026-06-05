@@ -69,8 +69,8 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<UserDto>> CreateUserAsync(UserCreateRequest request)
         {
             //  hàm Validate chung
-            var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
-            if (validationError != null) return validationError;
+            //var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
+            //if (validationError != null) return validationError;
 
             var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
             if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã tồn tại trong hệ thống.");
@@ -122,14 +122,14 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request)
         {
             // hàm Validate chung
-            var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
-            if (validationError != null) return validationError;
+            //var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
+            //if (validationError != null) return validationError;
 
             var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
             if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã được sử dụng bởi tài khoản khác.");
 
             var user = _mapper.Map<User>(request);
-            user.AvatarUrl = "default-avatar.png"; // ảnh mặc định, khi nào vui thì thay
+            user.AvatarUrl = "https://res.cloudinary.com/dym0se5if/image/upload/v1780664698/user1_lmcxpp.png"; // ảnh mặc định, khi nào vui thì thay
 
             user = FinalizeUserSetup(user, request.Password, "Customer");
             await _unitOfWork.UserRepository.CreateAsync(user);
@@ -159,34 +159,21 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<UserDto>(dto, "Lấy thông tin hồ sơ tài khoản thành công.");
         }
 
-        public async Task<ApiResult<bool>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
+        public async Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
             if (user == null || user.Status != "Active")
-            {
-                // Trả về lỗi chuẩn hóa
-                return new ApiResult<bool>(false, "Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị khóa.");
-            }
+                return new ApiResult<UserDto>(false, "Không tìm thấy tài khoản.");
 
-            // thông tin cá nhân cho phép sửa
-            user.FirstName = request.FirstName;
-            user.LastName = request.LastName;
-            user.Phone = request.Phone;
-            if (!string.IsNullOrEmpty(request.AvatarUrl))
-            {
-                user.AvatarUrl = request.AvatarUrl;
-            }
+            // Dùng AutoMapper ánh xạ tự động thay vì gán tay
+            _mapper.Map(request, user);
 
             _unitOfWork.UserRepository.Update(user);
-            var result = await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
-            if (result > 0)
-            {
-                // Trả về thành công với data = true
-                return new ApiSuccessResult<bool>(true, "Cập nhật thông tin cá nhân thành công.");
-            }
-
-            return new ApiResult<bool>(false, "Cập nhật thông tin cá nhân thất bại.");
+            // Map lại sang DTO để trả về
+            var dto = _mapper.Map<UserDto>(user);
+            return new ApiSuccessResult<UserDto>(dto, "Cập nhật thông tin cá nhân thành công.");
         }
 
         // quản lý customer
@@ -210,13 +197,11 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ cá nhân khách hàng thành công.");
         }
 
-        public async Task<ApiResult<bool>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
+        public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
         {
             var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
             if (customer == null)
-            {
-                return new ApiResult<bool>(false, "Không tìm thấy thông tin hồ sơ khách hàng tương ứng.");
-            }
+                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy hồ sơ khách hàng.");
 
             //customer.SkinTone = request.SkinTone;
             //customer.Occupation = request.Occupation;
@@ -225,9 +210,11 @@ namespace Nailify.Capstone.Application.Services
             _mapper.Map(request, customer);
 
             _unitOfWork.CustomerRepository.Update(customer);
-            var result = await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<bool>(result > 0, "Cập nhật đặc điểm sở thích cá nhân thành công.");
+            var updatedProfileResult = await GetCustomerProfileAsync(userId);
+
+            return new ApiSuccessResult<CustomerProfileDto>(updatedProfileResult.Data, "Cập nhật đặc điểm sở thích cá nhân thành công.");
         }
 
         public async Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null)
@@ -267,14 +254,14 @@ namespace Nailify.Capstone.Application.Services
         /// hàm dùng chung, tránh duplicate
         /// </summary>
         /// <returns></returns>
-        private ApiResult<UserDto>? ValidateUserCredentials(string? email, string? password, string? confirmPassword)
-        {
-            if (string.IsNullOrWhiteSpace(email))
-                return new ApiResult<UserDto>(false, "Email không được để trống.");
-            if (password != confirmPassword)
-                return new ApiResult<UserDto>(false, "Mật khẩu và xác nhận mật khẩu không khớp.");
-            return null;
-        }
+        //private ApiResult<UserDto>? ValidateUserCredentials(string? email, string? password, string? confirmPassword)
+        //{
+        //    if (string.IsNullOrWhiteSpace(email))
+        //        return new ApiResult<UserDto>(false, "Email không được để trống.");
+        //    if (password != confirmPassword)
+        //        return new ApiResult<UserDto>(false, "Mật khẩu và xác nhận mật khẩu không khớp.");
+        //    return null;
+        //}
 
         private User FinalizeUserSetup(User user, string plainPassword, string role)
         {
@@ -307,10 +294,10 @@ namespace Nailify.Capstone.Application.Services
                 {
                     UserId = user.UserId,
                     LoyaltyPoint = 0,
-                    SkinTone = "Unknown",
-                    Occupation = "Unknown",
-                    NailCondition = "Unknown",
-                    PersonaId = Guid.NewGuid().ToString()
+                    //SkinTone = "Unknown",
+                    //Occupation = "Unknown",
+                    //NailCondition = "Unknown",
+                    //PersonaId = Guid.NewGuid().ToString()
                 };
                 await _unitOfWork.CustomerRepository.CreateAsync(customer);
             }

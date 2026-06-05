@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// API Xem thông tin cá nhân của người dùng đang đăng nhập
         /// </summary>
         [HttpGet]
-        [HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
+        //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
         public async Task<IActionResult> GetMyProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;

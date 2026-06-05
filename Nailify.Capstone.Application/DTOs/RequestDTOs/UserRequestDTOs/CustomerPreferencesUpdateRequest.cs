@@ -1,4 +1,5 @@
-﻿using Nailify.Capstone.Application.Interfaces.MappingInterface;
+﻿using AutoMapper;
+using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
@@ -9,5 +10,9 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
         public string Occupation { get; set; } = string.Empty;
         public string NailCondition { get; set; } = string.Empty;
         public string PersonaId { get; set; } = string.Empty;
+        public void Mapping(Profile profile)
+        {
+            profile.CreateMap<CustomerPreferencesUpdateRequest, Customer>();
+        }
     }
 }

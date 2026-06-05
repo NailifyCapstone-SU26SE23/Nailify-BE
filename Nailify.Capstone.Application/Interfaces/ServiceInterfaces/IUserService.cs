@@ -48,7 +48,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// <param name="userId"></param>
         /// <param name="request"></param>
         /// <returns></returns>
-        Task<ApiResult<bool>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
+        Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
 
         /// <summary>
         /// Cho phép khách hàng đăng ký tài khoản tự động.
@@ -59,7 +59,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// Quản lý customer
         /// </summary>
         Task<ApiResult<CustomerProfileDto>> GetCustomerProfileAsync(Guid userId);
-        Task<ApiResult<bool>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
+        Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
         Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null);
     }
 }
