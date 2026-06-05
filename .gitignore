@@ -403,3 +403,6 @@ FodyWeavers.xsd
 *.appsettings.json
 appsettings.json
 appsettings.Development.json
+
+AGENTS.md
+CLAUDE.md

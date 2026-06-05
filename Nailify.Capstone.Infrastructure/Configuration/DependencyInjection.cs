@@ -10,6 +10,10 @@ using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
 using System.Reflection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace Nailify.Capstone.Infrastructure.Configuration
 {
@@ -19,6 +23,35 @@ namespace Nailify.Capstone.Infrastructure.Configuration
           this IServiceCollection services,
           IConfiguration configuration)
         {
+            // cấu hình JWT Authentication
+            var jwtSection = configuration.GetSection("Jwt");
+            services.Configure<JwtOptions>(jwtSection); // Đăng ký để các class như JwtProvider có thể dùng IOptions
+
+            // Ánh xạ ngầm cấu hình ra dạng Object để nạp cho JwtBearer lúc Startup hệ thống
+            var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+
+            // 2. CẤU HÌNH XÁC THỰC SỬ DỤNG THUỘC TÍNH ĐỊNH DANH (Dùng jwtOptions thay vì configuration thô)
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtOptions.Issuer,
+                    ValidAudience = jwtOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
+                    NameClaimType = JwtRegisteredClaimNames.Email,
+                    RoleClaimType = "role"
+                };
+            });
+            // Cấu hình DbContext với PostgreSQL
             services.AddDbContext<NailifyDbContext>(options =>
                 options.UseNpgsql(
                     configuration.GetConnectionString("DefaultConnection"),
@@ -27,6 +60,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                 )
             );
 
+            //auth
+            services.AddScoped<IJwtProvider, JwtProvider>();
+            services.AddScoped<IAuthService, AuthService>();
             // Đăng ký Unit of Work & Repositories
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddScoped<IUserRepository, UserRepository>();
@@ -43,6 +79,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<INailDesignService, NailDesignService>();
+            services.AddScoped<IPasswordHasher, PasswordHasher>();
             services.AddScoped<ISalonService, SalonService>();
             services.AddScoped<INailArtistService, NailArtistService>();
             services.AddScoped<IScheduleService, ScheduleService>();

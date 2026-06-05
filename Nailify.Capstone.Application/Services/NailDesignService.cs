@@ -19,26 +19,26 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<List<NailDesignDto>>> GetAllNailDesignsAsync()
+        public async Task<ApiResult<PagedList<NailDesignDto>>> GetPagedNailDesignsAsync(
+            int pageNumber,
+            int pageSize,
+            string? name = null,
+            IEnumerable<int>? categoryIds = null)
         {
-            var designs = await _unitOfWork.NailDesignRepository.GetActiveNailDesignsAsync();
-            var designDtos = _mapper.Map<List<NailDesignDto>>(designs);
-
-            return new ApiSuccessResult<List<NailDesignDto>>(designDtos, "Lấy danh sách mẫu nail thành công.");
-        }
-
-        public async Task<ApiResult<PagedList<NailDesignDto>>> GetPagedNailDesignsAsync(int pageNumber, int pageSize)
-        {
-            var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(pageNumber, pageSize);
-            var mappedItems = _mapper.Map<List<NailDesignDto>>(pagedResult);
+            var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(
+                pageNumber,
+                pageSize,
+                name,
+                categoryIds);
+            var mappedItems = _mapper.Map<List<NailDesignDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<NailDesignDto>(
                 mappedItems,
-                pagedResult.GetMetaData().TotalItems,
+                pagedResult.MetaData.TotalItems,
                 pageNumber,
                 pageSize
             );
 
-            return new ApiSuccessResult<PagedList<NailDesignDto>>(resultPagedList, "Lấy danh sách mẫu nail phân trang thành công.");
+            return new ApiSuccessResult<PagedList<NailDesignDto>>(resultPagedList, "Lấy danh sách mẫu nail thành công.");
         }
 
         public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id)
@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Lấy thông tin mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request)
+        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, List<string>? imageUrls = null)
         {
             var invalidCategoryIds = await GetInvalidCategoryIdsAsync(request.CategoryIds);
             if (invalidCategoryIds.Any())
@@ -67,6 +67,11 @@ namespace Nailify.Capstone.Application.Services
                 .Distinct()
                 .Select(categoryId => new NailCategory { CategoryId = categoryId })
                 .ToList();
+            design.NailDesignImages = (imageUrls ?? new List<string>())
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .Distinct()
+                .Select(imageUrl => new NailDesignImage { ImageUrl = imageUrl })
+                .ToList();
 
             await _unitOfWork.NailDesignRepository.CreateAsync(design);
             await _unitOfWork.SaveChangesAsync();
@@ -77,7 +82,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Tạo mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request)
+        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
             if (existingDesign == null || existingDesign.Status == "InActive")
@@ -100,6 +105,19 @@ namespace Nailify.Capstone.Application.Services
                 {
                     NailDesignId = existingDesign.NailDesignId,
                     CategoryId = categoryId
+                });
+            }
+
+            existingDesign.NailDesignImages.Clear();
+            foreach (var imageUrl in request.ExistingImageUrls
+                .Concat(newImageUrls ?? new List<string>())
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .Distinct())
+            {
+                existingDesign.NailDesignImages.Add(new NailDesignImage
+                {
+                    NailDesignId = existingDesign.NailDesignId,
+                    ImageUrl = imageUrl
                 });
             }
 

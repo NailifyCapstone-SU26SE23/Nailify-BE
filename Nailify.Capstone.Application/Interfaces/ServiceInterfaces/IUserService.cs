@@ -37,6 +37,20 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<bool>> DeleteUserAsync(Guid id);
 
         /// <summary>
+        /// lấy tài khoản người dùng hiện tại (dành cho khách hàng tự quản lý thông tin cá nhân).
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns></returns>
+        Task<UserDto?> GetProfileAsync(Guid userId);
+        /// <summary>
+        /// tự cập nhật tài khoản
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        Task<bool> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
+
+        /// <summary>
         /// Cho phép khách hàng đăng ký tài khoản tự động.
         /// </summary>
         Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request);
