@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using AutoMapper;
+using Nailify.Capstone.Application.Interfaces.MappingInterface;
+using Nailify.Capstone.Domain.Entities;
+using System;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 {
-    public class CustomerProfileDto
+    public class CustomerProfileDto : IMapFrom<User>, IMapFrom<Customer>
     {
         public Guid UserId { get; set; }
         public string Email { get; set; } = string.Empty;
@@ -23,5 +22,12 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string Occupation { get; set; } = string.Empty;
         public string NailCondition { get; set; } = string.Empty;
         public string PersonaId { get; set; } = string.Empty;
+
+        // mapping
+        public void Mapping(Profile profile)
+        {
+            profile.CreateMap<User, CustomerProfileDto>();
+            profile.CreateMap<Customer, CustomerProfileDto>();
+        }
     }
 }

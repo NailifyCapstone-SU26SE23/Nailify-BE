@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Nailify.Capstone.Application.Interfaces.MappingInterface;
+using Nailify.Capstone.Domain.Entities;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
 {
-    public class CustomerPreferencesUpdateRequest
+    public class CustomerPreferencesUpdateRequest : IMapFrom<Customer>
     {
         public string SkinTone { get; set; } = string.Empty;
         public string Occupation { get; set; } = string.Empty;

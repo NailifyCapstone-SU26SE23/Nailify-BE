@@ -75,7 +75,8 @@ namespace Nailify.Capstone.Application.Services
             var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
             if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã tồn tại trong hệ thống.");
 
-            var user = InitializeBaseUser(request.Email, request.Password, request.AvatarUrl, request.Role ?? "Customer");
+            var user = _mapper.Map<User>(request);
+            user = FinalizeUserSetup(user, request.Password, request.Role ?? "Customer");
             await _unitOfWork.UserRepository.CreateAsync(user);
 
             //  hàm xử lý Role
@@ -127,7 +128,10 @@ namespace Nailify.Capstone.Application.Services
             var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
             if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã được sử dụng bởi tài khoản khác.");
 
-            var user = InitializeBaseUser(request.Email, request.Password, null, "Customer");
+            var user = _mapper.Map<User>(request);
+            user.AvatarUrl = "default-avatar.png"; // ảnh mặc định, khi nào vui thì thay
+
+            user = FinalizeUserSetup(user, request.Password, "Customer");
             await _unitOfWork.UserRepository.CreateAsync(user);
 
             //  hàm xử lý Role
@@ -141,20 +145,28 @@ namespace Nailify.Capstone.Application.Services
         /// <summary>
         /// nhóm chức năng quản lý thông tin cá nhân của người dùng, cho phép người dùng xem và cập nhật thông tin của chính họ.
         /// 
-        public async Task<UserDto?> GetProfileAsync(Guid userId)
+        public async Task<ApiResult<UserDto>> GetProfileAsync(Guid userId)
         {
-            // tìm thông tin user  lấy từ Token
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Status != "Active") return null;
+            if (user == null || user.Status != "Active")
+            {
+                return new ApiResult<UserDto>(false, "Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.");
+            }
 
-            // Sử dụng AutoMapper đã cấu hình để chuyển đổi thành UserDto trả về
-            return _mapper.Map<UserDto>(user);
+            // ánh xạ tự động qua AutoMapper
+            var dto = _mapper.Map<UserDto>(user);
+
+            return new ApiSuccessResult<UserDto>(dto, "Lấy thông tin hồ sơ tài khoản thành công.");
         }
 
-        public async Task<bool> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
+        public async Task<ApiResult<bool>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Status != "Active") return false;
+            if (user == null || user.Status != "Active")
+            {
+                // Trả về lỗi chuẩn hóa
+                return new ApiResult<bool>(false, "Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị khóa.");
+            }
 
             // thông tin cá nhân cho phép sửa
             user.FirstName = request.FirstName;
@@ -168,7 +180,13 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.UserRepository.Update(user);
             var result = await _unitOfWork.SaveChangesAsync();
 
-            return result > 0;
+            if (result > 0)
+            {
+                // Trả về thành công với data = true
+                return new ApiSuccessResult<bool>(true, "Cập nhật thông tin cá nhân thành công.");
+            }
+
+            return new ApiResult<bool>(false, "Cập nhật thông tin cá nhân thất bại.");
         }
 
         // quản lý customer
@@ -181,26 +199,30 @@ namespace Nailify.Capstone.Application.Services
 
             var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
 
-            // Tái sử dụng hàm Mapping DTO
-            var profileDto = MapToCustomerProfileDto(user, customer);
+            //  hàm Mapping DTO
+            var profileDto = _mapper.Map<CustomerProfileDto>(user);
+
+            if (customer != null)
+            {
+                _mapper.Map(customer, profileDto);
+            }
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ cá nhân khách hàng thành công.");
         }
 
         public async Task<ApiResult<bool>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
         {
-            // Tìm kiếm hồ sơ đặc thù trong phân hệ Customer
             var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
             if (customer == null)
             {
                 return new ApiResult<bool>(false, "Không tìm thấy thông tin hồ sơ khách hàng tương ứng.");
             }
 
-            // Cập nhật các đặc điểm phục vụ động cơ gợi ý móng nghệ thuật
-            customer.SkinTone = request.SkinTone;
-            customer.Occupation = request.Occupation;
-            customer.NailCondition = request.NailCondition;
-            customer.PersonaId = request.PersonaId;
+            //customer.SkinTone = request.SkinTone;
+            //customer.Occupation = request.Occupation;
+            //customer.NailCondition = request.NailCondition;
+            //customer.PersonaId = request.PersonaId;
+            _mapper.Map(request, customer);
 
             _unitOfWork.CustomerRepository.Update(customer);
             var result = await _unitOfWork.SaveChangesAsync();
@@ -226,8 +248,14 @@ namespace Nailify.Capstone.Application.Services
             foreach (var user in pagedUsers.Items)
             {
                 var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(user.UserId);
-                // 3. Tái sử dụng hàm Mapping DTO trong vòng lặp
-                customerProfiles.Add(MapToCustomerProfileDto(user, customer));
+
+                var profileDto = _mapper.Map<CustomerProfileDto>(user);
+
+                if (customer != null)
+                {
+                    _mapper.Map(customer, profileDto);
+                }
+                customerProfiles.Add(profileDto);
             }
 
             var resultPagedList = new PagedList<CustomerProfileDto>(customerProfiles, pagedUsers.MetaData.TotalItems, pageNumber, pageSize);
@@ -248,17 +276,13 @@ namespace Nailify.Capstone.Application.Services
             return null;
         }
 
-        private User InitializeBaseUser(string email, string password, string? avatarUrl, string role)
+        private User FinalizeUserSetup(User user, string plainPassword, string role)
         {
-            return new User
-            {
-                UserId = Guid.NewGuid(),
-                Email = email,
-                Password = _passwordHasher.HashPassword(password),
-                AvatarUrl = avatarUrl ?? "default-avatar.png",
-                Status = "Active",
-                Role = role
-            };
+            user.UserId = Guid.NewGuid();
+            user.Password = _passwordHasher.HashPassword(plainPassword); // Băm mật khẩu
+            user.Status = "Active";
+            user.Role = role;
+            return user;
         }
 
         private async Task<string?> CreateRoleSpecificEntityAsync(User user, Guid? salonId)
@@ -292,31 +316,13 @@ namespace Nailify.Capstone.Application.Services
             }
             else if (user.Role != "Admin" && user.Role != "Manager")
             {
-                return "Vai trò không tồn tại trong hệ thống.";
+                return "Vai trò sẽ được cập nhật trong tương lai.";
             }
 
             return null; // Không có lỗi
         }
 
-        private CustomerProfileDto MapToCustomerProfileDto(User user, Customer? customer)
-        {
-            return new CustomerProfileDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                Phone = user.Phone,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                AvatarUrl = user.AvatarUrl,
-                Status = user.Status,
-                Role = user.Role,
-                LoyaltyPoint = customer?.LoyaltyPoint ?? 0,
-                SkinTone = customer?.SkinTone ?? string.Empty,
-                Occupation = customer?.Occupation ?? string.Empty,
-                NailCondition = customer?.NailCondition ?? string.Empty,
-                PersonaId = customer?.PersonaId ?? string.Empty
-            };
-        }
+        
     }
 
 }

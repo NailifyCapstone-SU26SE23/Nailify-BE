@@ -41,14 +41,14 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        Task<UserDto?> GetProfileAsync(Guid userId);
+        Task<ApiResult<UserDto>> GetProfileAsync(Guid userId);
         /// <summary>
         /// tự cập nhật tài khoản
         /// </summary>
         /// <param name="userId"></param>
         /// <param name="request"></param>
         /// <returns></returns>
-        Task<bool> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
+        Task<ApiResult<bool>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
 
         /// <summary>
         /// Cho phép khách hàng đăng ký tài khoản tự động.
