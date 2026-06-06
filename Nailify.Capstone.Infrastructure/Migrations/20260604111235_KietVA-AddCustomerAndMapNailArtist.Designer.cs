@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604111235_KietVA-AddCustomerAndMapNailArtist")]
+    partial class KietVAAddCustomerAndMapNailArtist
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -80,24 +83,28 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasDefaultValue(0);
 
                     b.Property<string>("NailCondition")
+                        .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasDefaultValue("");
 
                     b.Property<string>("Occupation")
+                        .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)")
                         .HasDefaultValue("");
 
                     b.Property<string>("PersonaId")
+                        .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasDefaultValue("");
 
                     b.Property<string>("SkinTone")
+                        .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -187,28 +194,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.ToTable("NailDesigns");
                 });
 
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesignImage", b =>
-                {
-                    b.Property<int>("NailDesignImageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NailDesignImageId"));
-
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("NailDesignId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("NailDesignImageId");
-
-                    b.HasIndex("NailDesignId");
-
-                    b.ToTable("NailDesignImages");
-                });
-
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
                 {
                     b.Property<Guid>("SalonId")
@@ -228,9 +213,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
-                    b.Property<Guid?>("ManagerId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -244,9 +226,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("SalonId");
-
-                    b.HasIndex("ManagerId")
-                        .IsUnique();
 
                     b.ToTable("Salons");
                 });
@@ -315,6 +294,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AvatarUrl")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Email")
@@ -409,27 +389,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailDesign");
                 });
 
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesignImage", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
-                        .WithMany("NailDesignImages")
-                        .HasForeignKey("NailDesignId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NailDesign");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "Manager")
-                        .WithOne()
-                        .HasForeignKey("Nailify.Capstone.Domain.Entities.Salon", "ManagerId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Manager");
-                });
-
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.SalonOperatingHour", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
@@ -470,8 +429,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesign", b =>
                 {
                     b.Navigation("NailCategories");
-
-                    b.Navigation("NailDesignImages");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>

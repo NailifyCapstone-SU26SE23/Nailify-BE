@@ -1,13 +1,16 @@
+using Microsoft.OpenApi.Models;
 using Nailify.Capstone.Infrastructure.Configuration;
 using Nailify.Capstone.Presentation.Extensions;
-using Microsoft.OpenApi.Models;
-
+using Nailify.Capstone.Presentation.Filters;
 using Nailify.Capstone.Presentation.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ValidationFilter>();
+}); 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

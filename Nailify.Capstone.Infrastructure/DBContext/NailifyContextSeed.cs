@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -11,19 +12,20 @@ namespace Nailify.Capstone.Infrastructure.DBContext
 {
     public class NailifyContextSeed
     {
-        public static async Task SeedProductAsync(NailifyDbContext nailifyDbContext, ILogger logger)
+        public static async Task SeedProductAsync(NailifyDbContext nailifyDbContext, ILogger logger, IPasswordHasher passwordHasher)
         {
 
-            if (!nailifyDbContext.Users.Any())
+            if (!nailifyDbContext.Users.Any(u => u.Email == "admin@nailify.com"))
             {
                 nailifyDbContext.Users.Add(new User
                 {
-                    Email = "admin@stemotion.com",
-                    Password = "123456",
+                    Email = "admin@nailify.com",
+                    Password = passwordHasher.HashPassword("123456"),
                     FirstName = "System",
                     LastName = "Admin",
                     Phone = "0966340303",
-                    AvatarUrl = "default-avatar.png", // Thêm avatarUrl để tránh lỗi NOT NULL constraint
+                    AvatarUrl = "default-avatar.png",
+                    Role = "Admin",
                     Status = "Active",
                 });
                 await nailifyDbContext.SaveChangesAsync();

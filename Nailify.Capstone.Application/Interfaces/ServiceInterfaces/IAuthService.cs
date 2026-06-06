@@ -1,9 +1,7 @@
-﻿using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
+using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
@@ -11,5 +9,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface IAuthService
     {
         Task<AuthResponse?> LoginAsync(LoginRequest request);
+        Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request);
     }
 }
