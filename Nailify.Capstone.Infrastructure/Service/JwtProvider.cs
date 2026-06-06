@@ -11,7 +11,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace Nailify.Capstone.Infrastructure.Repository
+namespace Nailify.Capstone.Infrastructure.Service
 {
     public class JwtProvider : IJwtProvider
     {

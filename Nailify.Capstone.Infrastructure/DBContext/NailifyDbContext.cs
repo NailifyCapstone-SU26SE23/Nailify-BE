@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Nailify.Capstone.Domain.Entities;
 
@@ -81,6 +81,12 @@ namespace Nailify.Capstone.Infrastructure.DBContext
 
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);
+
+            modelBuilder.Entity<Salon>()
+                .HasOne(s => s.Manager)
+                .WithOne()
+                .HasForeignKey<Salon>(s => s.ManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalonOperatingHour>()
                 .HasKey(soh => soh.OperatingHourId);

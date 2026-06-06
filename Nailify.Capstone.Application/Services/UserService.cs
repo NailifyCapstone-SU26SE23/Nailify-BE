@@ -11,9 +11,6 @@ using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.Services
 {
-    /// <summary>
-    /// Nghiệp vụ xử lý User sử dụng IUnitOfWork.UserRepository và tự động Mapping DTO.
-    /// </summary>
     public class UserService : IUserService
     {
         private readonly IUnitOfWork _unitOfWork;
@@ -29,7 +26,7 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
             _passwordHasher = passwordHasher;
         }
-
+        #region Account Management
         public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>>? predicate = null;
@@ -44,14 +41,14 @@ namespace Nailify.Capstone.Application.Services
             var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
-            var resultPagedList = new PagedList<UserDto>(
+            var response = new PagedList<UserDto>(
                 mappedItems,
                 pagedResult.MetaData.TotalItems,
                 pageNumber,
                 pageSize
             );
 
-            return new ApiSuccessResult<PagedList<UserDto>>(resultPagedList, "Lấy danh sách người dùng thành công.");
+            return new ApiSuccessResult<PagedList<UserDto>>(response, "Lấy danh sách người dùng thành công.");
         }
 
         public async Task<ApiResult<UserDto>> GetUserByIdAsync(Guid id)
@@ -62,26 +59,29 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiResult<UserDto>(false, "Không tìm thấy thông tin người dùng.");
             }
 
-            var dto = _mapper.Map<UserDto>(user);
-            return new ApiSuccessResult<UserDto>(dto, "Lấy thông tin người dùng thành công.");
+            var response = _mapper.Map<UserDto>(user);
+            return new ApiSuccessResult<UserDto>(response, "Lấy thông tin người dùng thành công.");
         }
 
         public async Task<ApiResult<UserDto>> CreateUserAsync(UserCreateRequest request)
         {
-            //  hàm Validate chung
-            //var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
-            //if (validationError != null) return validationError;
-
-            var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
+            var isEmailExisted = await _unitOfWork.UserRepository.ExistsAsync(u => u.Email.ToLower() == request.Email.Trim().ToLower());
             if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã tồn tại trong hệ thống.");
 
             var user = _mapper.Map<User>(request);
-            user = FinalizeUserSetup(user, request.Password, request.Role ?? "Customer");
+            user.Password = _passwordHasher.HashPassword(request.Password);
+            user.Status = "Active";
             await _unitOfWork.UserRepository.CreateAsync(user);
 
-            //  hàm xử lý Role
-            var roleError = await CreateRoleSpecificEntityAsync(user, request.SalonId);
-            if (roleError != null) return new ApiResult<UserDto>(false, roleError);
+            if (user.Role == "Customer")
+            {
+                var customer = new Customer
+                {
+                    User = user,
+                    LoyaltyPoint = 0
+                };
+                await _unitOfWork.CustomerRepository.CreateAsync(customer);
+            }
 
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<UserDto>(_mapper.Map<UserDto>(user), "Tạo tài khoản người dùng thành công.");
@@ -100,8 +100,8 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.UserRepository.Update(user);
             await _unitOfWork.SaveChangesAsync();
 
-            var dto = _mapper.Map<UserDto>(user);
-            return new ApiSuccessResult<UserDto>(dto, "Cập nhật thông tin người dùng thành công.");
+            var response = _mapper.Map<UserDto>(user);
+            return new ApiSuccessResult<UserDto>(response, "Cập nhật thông tin người dùng thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteUserAsync(Guid id)
@@ -115,48 +115,7 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.UserRepository.Delete(user);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<bool>(true, "Xóa thông tin người dùng thành công.");
-        }
-
-        // đăng kí tk cho khách
-        public async Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request)
-        {
-            // hàm Validate chung
-            //var validationError = ValidateUserCredentials(request.Email, request.Password, request.ConfirmPassword);
-            //if (validationError != null) return validationError;
-
-            var isEmailExisted = await _unitOfWork.UserRepository.GetUserByEmailAsync(request.Email) != null;
-            if (isEmailExisted) return new ApiResult<UserDto>(false, "Địa chỉ email đã được sử dụng bởi tài khoản khác.");
-
-            var user = _mapper.Map<User>(request);
-            user.AvatarUrl = "https://res.cloudinary.com/dym0se5if/image/upload/v1780664698/user1_lmcxpp.png"; // ảnh mặc định, khi nào vui thì thay
-
-            user = FinalizeUserSetup(user, request.Password, "Customer");
-            await _unitOfWork.UserRepository.CreateAsync(user);
-
-            //  hàm xử lý Role
-            var roleError = await CreateRoleSpecificEntityAsync(user, null);
-            if (roleError != null) return new ApiResult<UserDto>(false, roleError);
-
-            await _unitOfWork.SaveChangesAsync();
-            return new ApiSuccessResult<UserDto>(_mapper.Map<UserDto>(user), "Đăng ký tài khoản thành công.");
-        }
-
-        /// <summary>
-        /// nhóm chức năng quản lý thông tin cá nhân của người dùng, cho phép người dùng xem và cập nhật thông tin của chính họ.
-        /// 
-        public async Task<ApiResult<UserDto>> GetProfileAsync(Guid userId)
-        {
-            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Status != "Active")
-            {
-                return new ApiResult<UserDto>(false, "Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.");
-            }
-
-            // ánh xạ tự động qua AutoMapper
-            var dto = _mapper.Map<UserDto>(user);
-
-            return new ApiSuccessResult<UserDto>(dto, "Lấy thông tin hồ sơ tài khoản thành công.");
+            return new ApiSuccessResult<bool>(true, "Vô hiệu hóa tài khoản người dùng thành công.");
         }
 
         public async Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
@@ -165,58 +124,36 @@ namespace Nailify.Capstone.Application.Services
             if (user == null || user.Status != "Active")
                 return new ApiResult<UserDto>(false, "Không tìm thấy tài khoản.");
 
-            // Dùng AutoMapper ánh xạ tự động thay vì gán tay
             _mapper.Map(request, user);
 
             _unitOfWork.UserRepository.Update(user);
             await _unitOfWork.SaveChangesAsync();
 
-            // Map lại sang DTO để trả về
-            var dto = _mapper.Map<UserDto>(user);
-            return new ApiSuccessResult<UserDto>(dto, "Cập nhật thông tin cá nhân thành công.");
+            var response = _mapper.Map<UserDto>(user);
+            return new ApiSuccessResult<UserDto>(response, "Cập nhật thông tin cá nhân thành công.");
         }
-
-        // quản lý customer
-
-        public async Task<ApiResult<CustomerProfileDto>> GetCustomerProfileAsync(Guid userId)
-        {
-            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Status != "Active")
-                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.");
-
-            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
-
-            //  hàm Mapping DTO
-            var profileDto = _mapper.Map<CustomerProfileDto>(user);
-
-            if (customer != null)
-            {
-                _mapper.Map(customer, profileDto);
-            }
-
-            return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ cá nhân khách hàng thành công.");
-        }
-
+        #endregion Account Management
+        #region Customer Management
         public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
         {
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Role != "Customer")
+                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy khách hàng.");
+
             var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
             if (customer == null)
                 return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy hồ sơ khách hàng.");
 
-            //customer.SkinTone = request.SkinTone;
-            //customer.Occupation = request.Occupation;
-            //customer.NailCondition = request.NailCondition;
-            //customer.PersonaId = request.PersonaId;
             _mapper.Map(request, customer);
 
             _unitOfWork.CustomerRepository.Update(customer);
             await _unitOfWork.SaveChangesAsync();
 
-            var updatedProfileResult = await GetCustomerProfileAsync(userId);
+            var profileDto = _mapper.Map<CustomerProfileDto>(user);
+            _mapper.Map(customer, profileDto);
 
-            return new ApiSuccessResult<CustomerProfileDto>(updatedProfileResult.Data, "Cập nhật đặc điểm sở thích cá nhân thành công.");
+            return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Cập nhật đặc điểm sở thích cá nhân thành công.");
         }
-
         public async Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>> predicate = u => u.Role == "Customer";
@@ -248,70 +185,82 @@ namespace Nailify.Capstone.Application.Services
             var resultPagedList = new PagedList<CustomerProfileDto>(customerProfiles, pagedUsers.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<CustomerProfileDto>>(resultPagedList, "Lấy danh sách khách hàng phân trang thành công.");
         }
-
-
-        /// <summary>
-        /// hàm dùng chung, tránh duplicate
-        /// </summary>
-        /// <returns></returns>
-        //private ApiResult<UserDto>? ValidateUserCredentials(string? email, string? password, string? confirmPassword)
-        //{
-        //    if (string.IsNullOrWhiteSpace(email))
-        //        return new ApiResult<UserDto>(false, "Email không được để trống.");
-        //    if (password != confirmPassword)
-        //        return new ApiResult<UserDto>(false, "Mật khẩu và xác nhận mật khẩu không khớp.");
-        //    return null;
-        //}
-
-        private User FinalizeUserSetup(User user, string plainPassword, string role)
+        public async Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId)
         {
-            user.UserId = Guid.NewGuid();
-            user.Password = _passwordHasher.HashPassword(plainPassword); // Băm mật khẩu
-            user.Status = "Active";
-            user.Role = role;
-            return user;
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Role != "Customer")
+            {
+                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy khách hàng.");
+            }
+
+            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
+            var profileDto = _mapper.Map<CustomerProfileDto>(user);
+
+            if (customer != null)
+            {
+                _mapper.Map(customer, profileDto);
+            }
+
+            return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ khách hàng thành công.");
         }
 
-        private async Task<string?> CreateRoleSpecificEntityAsync(User user, Guid? salonId)
+        public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerProfileByAdminAsync(Guid userId, CustomerProfileUpdateRequest request)
         {
-            if (user.Role == "Staff_Artist")
+            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
+            if (customer == null)
             {
-                if (salonId == null || salonId == Guid.Empty)
-                    return "Tài khoản thợ làm móng (Staff_Artist) bắt buộc phải chỉ định cơ sở Salon làm việc.";
-
-                var nailArtist = new NailArtist
-                {
-                    NailArtistId = Guid.NewGuid(),
-                    AccountId = user.UserId,
-                    SalonId = salonId.Value,
-                    Status = "Active"
-                };
-                await _unitOfWork.NailArtistRepository.CreateAsync(nailArtist);
-            }
-            else if (user.Role == "Customer")
-            {
-                var customer = new Customer
-                {
-                    UserId = user.UserId,
-                    LoyaltyPoint = 0,
-                    //SkinTone = "Unknown",
-                    //Occupation = "Unknown",
-                    //NailCondition = "Unknown",
-                    //PersonaId = Guid.NewGuid().ToString()
-                };
-                await _unitOfWork.CustomerRepository.CreateAsync(customer);
-            }
-            else if (user.Role != "Admin" && user.Role != "Manager")
-            {
-                return "Vai trò sẽ được cập nhật trong tương lai.";
+                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy hồ sơ khách hàng.");
             }
 
-            return null; // Không có lỗi
+            var user = (await _unitOfWork.UserRepository.GetByIdAsync(userId))!;
+
+            // Cập nhật thông tin bảng User
+            _mapper.Map(request, user);
+            _unitOfWork.UserRepository.Update(user);
+
+            // Cập nhật thông tin bảng Customer
+            _mapper.Map(request, customer);
+            _unitOfWork.CustomerRepository.Update(customer);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var response = _mapper.Map<CustomerProfileDto>(user);
+            _mapper.Map(customer, response);
+
+            return new ApiSuccessResult<CustomerProfileDto>(response, "Cập nhật hồ sơ khách hàng thành công.");
         }
 
-        
+        public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerSelfProfileAsync(Guid userId, CustomerSelfProfileUpdateRequest request)
+        {
+            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
+            if (customer == null)
+            {
+                return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy hồ sơ khách hàng.");
+            }
+
+            var user = (await _unitOfWork.UserRepository.GetByIdAsync(userId))!;
+            if (user.Status != "Active")
+            {
+                return new ApiResult<CustomerProfileDto>(false, "Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+
+            // Cập nhật thông tin User
+            _mapper.Map(request, user);
+            _unitOfWork.UserRepository.Update(user);
+
+            // Cập nhật thông tin Customer
+            _mapper.Map(request, customer);
+            _unitOfWork.CustomerRepository.Update(customer);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var profileDto = _mapper.Map<CustomerProfileDto>(user);
+            _mapper.Map(customer, profileDto);
+
+            return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Cập nhật hồ sơ cá nhân thành công.");
+        }
+        #endregion Customer Management
     }
-
 }
 
 

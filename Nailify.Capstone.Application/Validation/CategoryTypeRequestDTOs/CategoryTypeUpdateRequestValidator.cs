@@ -17,5 +17,5 @@ namespace Nailify.Capstone.Application.Validation.CategoryTypeRequestDTOs
             RuleFor(x => x.Status)
                 .NotEmpty().WithMessage("Trạng thái không được để trống");
         }
-    }
+    } 
 }

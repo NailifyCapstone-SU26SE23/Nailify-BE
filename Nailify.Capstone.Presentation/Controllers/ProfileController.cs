@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -33,11 +33,17 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             var userId = Guid.Parse(userIdClaim);
 
-            var result = await _userService.GetProfileAsync(userId);
+            var result = await _userService.GetUserByIdAsync(userId);
 
             if (!result.IsSucceeded)
             {
-                return BadRequest(result);
+                return NotFound(result);
+            }
+
+            // Kiểm tra tài khoản còn Active không
+            if (result.Data?.Status == "InActive")
+            {
+                return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa." });
             }
 
             return Ok(result);
@@ -83,7 +89,11 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
             }
 
-            var result = await _userService.GetCustomerProfileAsync(Guid.Parse(userIdClaim));
+            var result = await _userService.GetCustomerProfileByIdAsync(Guid.Parse(userIdClaim));
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
             return Ok(result);
         }
 
@@ -101,6 +111,47 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
 
             var result = await _userService.UpdateCustomerPreferencesAsync(Guid.Parse(userIdClaim), request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng tự cập nhật đầy đủ hồ sơ và đặc điểm da/lối sống cá nhân (Persona).
+        /// </summary>
+        [HttpPut("customers")]
+        [HasRole("Customer")]
+        public async Task<IActionResult> UpdateMyCustomerProfile([FromBody] CustomerSelfProfileUpdateRequest request)
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
+            }
+
+            var result = await _userService.UpdateCustomerSelfProfileAsync(Guid.Parse(userIdClaim), request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Người dùng tự vô hiệu hóa tài khoản của chính mình.
+        /// </summary>
+        [HttpDelete]
+        public async Task<IActionResult> DeleteMyAccount()
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
+            }
+
+            var result = await _userService.DeleteUserAsync(Guid.Parse(userIdClaim));
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);

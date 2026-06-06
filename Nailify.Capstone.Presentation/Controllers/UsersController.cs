@@ -124,24 +124,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Đăng ký tài khoản khách hàng mới.
-        /// </summary>
-        /// <param name="request">Thông tin đăng ký tài khoản khách hàng.</param>
-        /// <returns>Thông tin người dùng đăng ký thành công.</returns>
-        [HttpPost("register")]
-        [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Register([FromBody] UserRegisterRequest request)
-        {
-            var result = await _userService.RegisterAsync(request);
-            if (!result.IsSucceeded)
-            {
-                return BadRequest(result);
-            }
-            return Ok(result);
-        }
-
-        /// <summary>
         /// Quản trị viên/Quản lý tìm kiếm và xem toàn bộ danh sách khách hàng kèm phân trang hệ thống.
         /// </summary>
         [HttpGet("customers")]
@@ -150,6 +132,66 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
         {
             var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Xem chi tiết thông tin khách hàng (bao gồm cả sở thích và điểm tích lũy).
+        /// </summary>
+        /// <param name="id">ID của khách hàng.</param>
+        [HttpGet("customers/{id}")]
+        [HasRole("Admin", "Manager")]
+        [ProducesResponseType(typeof(ApiResult<CustomerProfileDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetCustomerById(Guid id)
+        {
+            var result = await _userService.GetCustomerProfileByIdAsync(id);
+            if (!result.IsSucceeded)
+            {
+                return NotFound(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Cập nhật chi tiết hồ sơ khách hàng (bao gồm cả điểm tích lũy và sở thích) dành cho Admin/Manager.
+        /// </summary>
+        /// <param name="id">ID của khách hàng.</param>
+        /// <param name="request">Thông tin cập nhật mới.</param>
+        [HttpPut("customers/{id}")]
+        [HasRole("Admin", "Manager")]
+        [ProducesResponseType(typeof(ApiResult<CustomerProfileDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateCustomer(Guid id, [FromBody] CustomerProfileUpdateRequest request)
+        {
+            var result = await _userService.UpdateCustomerProfileByAdminAsync(id, request);
+            if (!result.IsSucceeded)
+            {
+                if (result.Message.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
+                {
+                    return NotFound(result);
+                }
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Xóa/Vô hiệu hóa tài khoản khách hàng dành cho Admin/Manager.
+        /// </summary>
+        /// <param name="id">ID của khách hàng.</param>
+        [HttpDelete("customers/{id}")]
+        [HasRole("Admin", "Manager")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteCustomer(Guid id)
+        {
+            var result = await _userService.DeleteUserAsync(id);
+            if (!result.IsSucceeded)
+            {
+                return NotFound(result);
+            }
             return Ok(result);
         }
     }
