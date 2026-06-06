@@ -103,10 +103,14 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa biến thể móng thành công.");
         }
 
-        private async Task<decimal> CalculateNailVariantPriceAsync(int nailShapeId, int nailSurfaceId, int? nailVariantId = null)
+        private async Task<decimal> CalculateNailVariantPriceAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)
         {
-            var nailShape = await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId);
-            var nailSurface = await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId);
+            var nailShape = nailShapeId.HasValue
+                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
+                : null;
+            var nailSurface = nailSurfaceId.HasValue
+                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
+                : null;
             var componentPrice = 0m;
 
             if (nailVariantId.HasValue)
@@ -134,7 +138,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private async Task<string?> ValidateReferencesAsync(int nailDesignId, int nailShapeId, int nailSurfaceId)
+        private async Task<string?> ValidateReferencesAsync(int nailDesignId, int? nailShapeId, int? nailSurfaceId)
         {
             var design = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
             if (design == null || design.Status == "InActive")
@@ -142,12 +146,12 @@ namespace Nailify.Capstone.Application.Services
                 return "Không tìm thấy mẫu nail.";
             }
 
-            if (await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId) == null)
+            if (nailShapeId.HasValue && await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) == null)
             {
                 return "Không tìm thấy dáng móng.";
             }
 
-            if (await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId) == null)
+            if (nailSurfaceId.HasValue && await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
             {
                 return "Không tìm thấy bề mặt móng.";
             }

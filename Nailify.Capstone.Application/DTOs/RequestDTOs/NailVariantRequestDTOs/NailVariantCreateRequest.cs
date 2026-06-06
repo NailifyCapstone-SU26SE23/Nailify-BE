@@ -7,10 +7,11 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
     public class NailVariantCreateRequest : IMapFrom<NailVariant>
     {
         public string Name { get; set; } = string.Empty;
-        public int NailShapeId { get; set; }
-        public int NailSurfaceId { get; set; }
+        public int? NailShapeId { get; set; }
+        public int? NailSurfaceId { get; set; }
         public int NailDesignId { get; set; }
         public int? Duration { get; set; }
+        public string ColorJson { get; set; } = string.Empty;
 
         public void Mapping(Profile profile)
         {

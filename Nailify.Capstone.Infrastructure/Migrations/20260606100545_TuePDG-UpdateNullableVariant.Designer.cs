@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260606100545_TuePDG-UpdateNullableVariant")]
+    partial class TuePDGUpdateNullableVariant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -453,10 +456,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NailVariantId"));
-
-                    b.Property<string>("ColorJson")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<int?>("Duration")
                         .HasColumnType("integer");
