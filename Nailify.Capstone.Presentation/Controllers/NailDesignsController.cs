@@ -4,6 +4,10 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Infrastructure.Service;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -15,31 +19,26 @@ namespace Nailify.Capstone.Presentation.Controllers
     public class NailDesignsController : ControllerBase
     {
         private readonly INailDesignService _nailDesignService;
+        private readonly CloudinaryService _cloudinaryService;
 
-        public NailDesignsController(INailDesignService nailDesignService)
+        public NailDesignsController(INailDesignService nailDesignService, CloudinaryService cloudinaryService)
         {
             _nailDesignService = nailDesignService;
+            _cloudinaryService = cloudinaryService;
         }
 
         /// <summary>
-        /// Lấy danh sách tất cả mẫu nail.
+        /// Lấy danh sách mẫu nail phân trang, hỗ trợ lọc theo tên và danh mục.
         /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResult<List<NailDesignDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
-        {
-            var result = await _nailDesignService.GetAllNailDesignsAsync();
-            return Ok(result);
-        }
-
-        /// <summary>
-        /// Lấy danh sách mẫu nail phân trang.
-        /// </summary>
-        [HttpGet("paged")]
         [ProducesResponseType(typeof(ApiResult<PagedList<NailDesignDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null,
+            [FromQuery] List<int>? categoryIds = null)
         {
-            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize);
+            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds);
             return Ok(result);
         }
 
@@ -64,34 +63,73 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Tạo mẫu nail mới.
         /// </summary>
         [HttpPost]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] NailDesignCreateRequest request)
+        public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, List<IFormFile>? images)
         {
-            var result = await _nailDesignService.CreateNailDesignAsync(request);
-            if (!result.IsSucceeded)
-            {
-                return BadRequest(result);
-            }
+            var uploadedImageUrls = new List<string>();
 
-            return Ok(result);
+            try
+            {
+                uploadedImageUrls = await UploadImagesAsync(images);
+                var result = await _nailDesignService.CreateNailDesignAsync(request, uploadedImageUrls);
+                if (!result.IsSucceeded)
+                {
+                    await DeleteImagesAsync(uploadedImageUrls);
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                await DeleteImagesAsync(uploadedImageUrls);
+                return BadRequest(new ApiResult<object>(false, $"Tạo mẫu nail thất bại khi tải ảnh: {ex.Message}"));
+            }
         }
 
         /// <summary>
         /// Cập nhật mẫu nail.
         /// </summary>
         [HttpPut]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update([FromBody] NailDesignUpdateRequest request)
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Update([FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
         {
-            var result = await _nailDesignService.UpdateNailDesignAsync(request);
-            if (!result.IsSucceeded)
+            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(request.NailDesignId);
+            if (!existingResult.IsSucceeded)
             {
-                return BadRequest(result);
+                return NotFound(existingResult);
             }
 
-            return Ok(result);
+            var uploadedImageUrls = new List<string>();
+
+            try
+            {
+                uploadedImageUrls = await UploadImagesAsync(images);
+                var result = await _nailDesignService.UpdateNailDesignAsync(request, uploadedImageUrls);
+                if (!result.IsSucceeded)
+                {
+                    await DeleteImagesAsync(uploadedImageUrls);
+                    return BadRequest(result);
+                }
+
+                var keptImageUrls = request.ExistingImageUrls.Distinct().ToList();
+                var removedImageUrls = existingResult.Data.ImageUrls
+                    .Except(keptImageUrls)
+                    .ToList();
+                await DeleteImagesAsync(removedImageUrls);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                await DeleteImagesAsync(uploadedImageUrls);
+                return BadRequest(new ApiResult<object>(false, $"Cập nhật mẫu nail thất bại khi tải ảnh: {ex.Message}"));
+            }
         }
 
         /// <summary>
@@ -102,12 +140,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(int id)
         {
+            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(id);
+            if (!existingResult.IsSucceeded)
+            {
+                return NotFound(existingResult);
+            }
+
             var result = await _nailDesignService.DeleteNailDesignAsync(id);
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
             }
 
+            await DeleteImagesAsync(existingResult.Data.ImageUrls);
             return Ok(result);
         }
 
@@ -120,6 +165,33 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _nailDesignService.GetNailDesignsByCategoryAsync(categoryId);
             return Ok(result);
+        }
+
+        private async Task<List<string>> UploadImagesAsync(List<IFormFile>? images)
+        {
+            var validImages = images?
+                .Where(image => image != null && image.Length > 0)
+                .ToList() ?? new List<IFormFile>();
+
+            if (!validImages.Any())
+            {
+                return new List<string>();
+            }
+
+            return await _cloudinaryService.UploadMultipleImagesAsync(validImages);
+        }
+
+        private async Task DeleteImagesAsync(IEnumerable<string>? imageUrls)
+        {
+            var urls = imageUrls?
+                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+                .Distinct()
+                .ToList() ?? new List<string>();
+
+            if (urls.Any())
+            {
+                await _cloudinaryService.DeleteMultipleImagesAsync(urls);
+            }
         }
     }
 }

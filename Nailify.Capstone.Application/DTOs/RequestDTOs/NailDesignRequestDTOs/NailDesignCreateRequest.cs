@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs
         {
             profile.CreateMap<NailDesignCreateRequest, NailDesign>()
                 .ForMember(dest => dest.NailCategories, opt => opt.Ignore())
+                .ForMember(dest => dest.NailDesignImages, opt => opt.Ignore())
                 .ForMember(dest => dest.Status, opt => opt.Ignore());
         }
     }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602094005_TuePDG-AddNailImage")]
+    partial class TuePDGAddNailImage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -67,49 +70,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasKey("CategoryTypeId");
 
                     b.ToTable("CategoryTypes");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("LoyaltyPoint")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("NailCondition")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasDefaultValue("");
-
-                    b.Property<string>("Occupation")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)")
-                        .HasDefaultValue("");
-
-                    b.Property<string>("PersonaId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasDefaultValue("");
-
-                    b.Property<string>("SkinTone")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasDefaultValue("");
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("Customers");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
@@ -335,10 +295,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -357,17 +313,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CategoryType");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
-                        .WithOne()
-                        .HasForeignKey("Nailify.Capstone.Domain.Entities.Customer", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>

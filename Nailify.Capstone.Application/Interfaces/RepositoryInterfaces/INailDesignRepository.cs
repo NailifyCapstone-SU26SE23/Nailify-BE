@@ -8,6 +8,10 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<NailDesign>> GetNailDesignsByCategoryAsync(int categoryId);
         Task<NailDesign?> GetNailDesignWithCategoriesAsync(int nailDesignId);
         Task<List<NailDesign>> GetActiveNailDesignsAsync();
-        Task<PagedList<NailDesign>> GetPagedActiveNailDesignsAsync(int pageNumber, int pageSize);
+        Task<PagedList<NailDesign>> GetPagedActiveNailDesignsAsync(
+            int pageNumber,
+            int pageSize,
+            string? name = null,
+            IEnumerable<int>? categoryIds = null);
     }
 }
