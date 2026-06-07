@@ -10,6 +10,7 @@ namespace Nailify.Capstone.Infrastructure
     {
         private readonly NailifyDbContext _context;
         private IUserRepository? _userRepository;
+        private ICustomerRepository? _customerRepository;
         private ICategoryTypeRepository? _categoryTypeRepository;
         private ICategoryRepository? _categoryRepository;
         private INailDesignRepository? _nailDesignRepository;
@@ -30,6 +31,7 @@ namespace Nailify.Capstone.Infrastructure
             _context = context;
         }
         public IUserRepository UserRepository => _userRepository ??= new UserRepository(_context);
+        public ICustomerRepository CustomerRepository => _customerRepository ??= new CustomerRepository(_context);
         public ICategoryTypeRepository CategoryTypeRepository => _categoryTypeRepository ??= new CategoryTypeRepository(_context);
         public ICategoryRepository CategoryRepository => _categoryRepository ??= new CategoryRepository(_context);
         public INailDesignRepository NailDesignRepository => _nailDesignRepository ??= new NailDesignRepository(_context);

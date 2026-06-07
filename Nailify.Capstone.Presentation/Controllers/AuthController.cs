@@ -1,5 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using System.Threading.Tasks;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -16,6 +21,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         public AuthController(IAuthService authService)
         {
             _authService = authService;
+        }
+
+        [HttpPost("register")]
+        [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Register([FromBody] UserRegisterRequest request)
+        {
+            var result = await _authService.RegisterAsync(request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
         }
 
         /// <summary>
@@ -41,7 +59,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 message = "Đăng nhập thành công.",
                 data = new
                 {
-                    token = result.Token
+                    token = result.Token,
                 }
             });
         }

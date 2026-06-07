@@ -1,4 +1,4 @@
-﻿
+
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 {
     public class AuthResponse

@@ -252,6 +252,45 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("LoyaltyPoint")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("NailCondition")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("Occupation")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("PersonaId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("SkinTone")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("Customers");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
                 {
                     b.Property<Guid>("NailArtistId")
@@ -512,6 +551,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid?>("ManagerId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -525,6 +567,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("SalonId");
+
+                    b.HasIndex("ManagerId")
+                        .IsUnique();
 
                     b.ToTable("Salons");
                 });
@@ -593,7 +638,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AvatarUrl")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Email")
@@ -709,6 +753,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("CustomerNail");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("Nailify.Capstone.Domain.Entities.Customer", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.User", "Account")
@@ -800,6 +855,16 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailShape");
 
                     b.Navigation("NailSurface");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "Manager")
+                        .WithOne()
+                        .HasForeignKey("Nailify.Capstone.Domain.Entities.Salon", "ManagerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Manager");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.SalonOperatingHour", b =>

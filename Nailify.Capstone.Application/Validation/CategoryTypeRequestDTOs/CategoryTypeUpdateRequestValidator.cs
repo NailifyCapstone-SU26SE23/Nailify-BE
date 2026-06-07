@@ -14,5 +14,5 @@ namespace Nailify.Capstone.Application.Validation.CategoryTypeRequestDTOs
             RuleFor(x => x.Status)
                 .NotEmpty().WithMessage("Trang thai khong duoc de trong");
         }
-    }
+    } 
 }
