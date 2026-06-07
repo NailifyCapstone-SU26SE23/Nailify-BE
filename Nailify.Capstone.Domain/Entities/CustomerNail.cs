@@ -1,0 +1,26 @@
+namespace Nailify.Capstone.Domain.Entities
+{
+    public class CustomerNail
+    {
+        public int CustomerNailId { get; set; }
+        public Guid UserId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public int NailShapeId { get; set; }
+        public int NailSurfaceId { get; set; }
+        public decimal Price { get; set; }
+        public string CustomColor { get; set; } = string.Empty;
+        public string CustomMaterial { get; set; } = string.Empty;
+        public int? Duration { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsFavorite { get; set; }
+        public bool IsPublic { get; set; }
+        public int? BasedOnNailVariantId { get; set; }
+
+        public virtual User User { get; set; } = null!;
+        public virtual NailShape NailShape { get; set; } = null!;
+        public virtual NailSurface NailSurface { get; set; } = null!;
+        public virtual NailVariant? BasedOnNailVariant { get; set; }
+        public virtual ICollection<CustomerNailComponent> CustomerNailComponents { get; set; } = new List<CustomerNailComponent>();
+    }
+}

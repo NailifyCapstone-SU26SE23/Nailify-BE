@@ -9,6 +9,9 @@ using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API phân quyền.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -33,6 +36,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Đăng nhập.
+        /// </summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {

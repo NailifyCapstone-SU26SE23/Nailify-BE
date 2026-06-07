@@ -57,9 +57,22 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddInfrastructureToApplication(builder.Configuration);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5174")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 app.ApplyMigrations();
+
+app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
 app.UseMiddleware<RoleAuthorizationMiddleware>();
