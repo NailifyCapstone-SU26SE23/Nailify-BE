@@ -1,5 +1,6 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
+using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -20,7 +21,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
 
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<UserRegisterRequest, User>();
+            profile.CreateMap<UserRegisterRequest, User>().IgnoreAllNonExisting();
         }
     }
 }
