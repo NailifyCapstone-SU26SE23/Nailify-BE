@@ -8,7 +8,6 @@ namespace Nailify.Capstone.Domain.Entities
         public decimal MaxPrice { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = "Active";
-
         public virtual ICollection<NailCategory> NailCategories { get; set; } = new List<NailCategory>();
         public virtual ICollection<NailDesignImage> NailDesignImages { get; set; } = new List<NailDesignImage>();
         public virtual ICollection<NailVariant> NailVariants { get; set; } = new List<NailVariant>();

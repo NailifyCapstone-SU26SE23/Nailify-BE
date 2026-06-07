@@ -16,5 +16,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual NailSurface NailSurface { get; set; } = null!;
         public virtual NailDesign NailDesign { get; set; } = null!;
         public virtual ICollection<NailComponent> NailComponents { get; set; } = new List<NailComponent>();
+        public virtual ICollection<NailRequiredSkill> NailRequiredSkills { get; set; } = new List<NailRequiredSkill>();
     }
 }

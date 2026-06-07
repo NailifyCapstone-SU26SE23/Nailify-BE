@@ -31,6 +31,9 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<CustomerComponent> CustomerComponents { get; set; }
         public DbSet<CustomerNail> CustomerNails { get; set; }
         public DbSet<CustomerNailComponent> CustomerNailComponents { get; set; }
+        public DbSet<SkillType> SkillTypes { get; set; }
+        public DbSet<NailArtistSkill> NailArtistSkills { get; set; }
+        public DbSet<NailRequiredSkill> NailRequiredSkills { get; set; }
         public static string GetConnectionString(string connectionStringName)
         {
             var config = new ConfigurationBuilder()
@@ -303,6 +306,41 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .HasForeignKey<Customer>(c => c.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
             });
+
+            modelBuilder.Entity<SkillType>()
+                        .HasKey(st => st.SkillTypeId);
+
+            modelBuilder.Entity<NailArtistSkill>()
+                        .HasKey(nas => nas.NailArtistSkillId);
+            modelBuilder.Entity<NailArtistSkill>()
+                        .HasIndex(nas => new { nas.NailArtistId, nas.SkillTypeId })
+                        .IsUnique(); // Mỗi thợ chỉ có 1 record/skill
+            modelBuilder.Entity<NailArtistSkill>()
+                        .HasOne(nas => nas.NailArtist)
+                        .WithMany(na => na.NailArtistSkills)
+                        .HasForeignKey(nas => nas.NailArtistId)
+                        .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<NailArtistSkill>()
+                        .HasOne(nas => nas.SkillType)
+                        .WithMany(st => st.NailArtistSkills)
+                        .HasForeignKey(nas => nas.SkillTypeId)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NailRequiredSkill>()
+                        .HasKey(nrs => nrs.NailRequiredSkillId);
+            modelBuilder.Entity<NailRequiredSkill>()
+                        .HasIndex(nrs => new { nrs.NailDesignId, nrs.SkillTypeId })
+                        .IsUnique(); // Mỗi design chỉ yêu cầu 1 level/skill
+            modelBuilder.Entity<NailRequiredSkill>()
+                        .HasOne(nrs => nrs.NailDesign)
+                        .WithMany(nd => nd.NailRequiredSkills)
+                        .HasForeignKey(nrs => nrs.NailDesignId)
+                        .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<NailRequiredSkill>()
+                        .HasOne(nrs => nrs.SkillType)
+                        .WithMany(st => st.NailRequiredSkills)
+                        .HasForeignKey(nrs => nrs.SkillTypeId)
+                        .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

@@ -15,5 +15,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual User Account { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
+
+        public virtual ICollection<NailArtistSkill> NailArtistSkills { get; set; }
     }
 }
