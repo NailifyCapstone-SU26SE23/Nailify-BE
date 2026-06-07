@@ -41,6 +41,11 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerNailDto>> CreateCustomerNailAsync(CustomerNailCreateRequest request, string? imageUrl = null, Guid? userId = null)
         {
+            if (!userId.HasValue || userId.Value == Guid.Empty || await _unitOfWork.UserRepository.GetByIdAsync(userId.Value) == null)
+            {
+                return new ApiErrorResult<CustomerNailDto>("Khong tim thay nguoi dung.");
+            }
+
             var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
             if (validationError != null)
             {
@@ -48,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var customerNail = _mapper.Map<CustomerNail>(request);
-            customerNail.UserId = userId ?? Guid.Empty;
+            customerNail.UserId = userId.Value;
             customerNail.ImageUrl = imageUrl ?? string.Empty;
             customerNail.CreatedAt = DateTime.UtcNow;
             customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, null);
@@ -60,7 +65,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerNailDto>(_mapper.Map<CustomerNailDto>(createdCustomerNail), "Tạo móng tùy chỉnh thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> UpdateCustomerNailAsync(int id, CustomerNailUpdateRequest request)
+        public async Task<ApiResult<CustomerNailDto>> UpdateCustomerNailAsync(int id, CustomerNailUpdateRequest request, string? imageUrl = null)
         {
             var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
             if (customerNail == null)
@@ -75,6 +80,11 @@ namespace Nailify.Capstone.Application.Services
             }
 
             _mapper.Map(request, customerNail);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                customerNail.ImageUrl = imageUrl;
+            }
+
             customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, id);
 
             _unitOfWork.CustomerNailRepository.Update(customerNail);

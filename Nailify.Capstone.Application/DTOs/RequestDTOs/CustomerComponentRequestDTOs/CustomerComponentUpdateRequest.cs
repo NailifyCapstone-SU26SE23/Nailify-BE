@@ -6,9 +6,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerComponentRequest
 {
     public class CustomerComponentUpdateRequest : IMapFrom<CustomerComponent>
     {
-        public Guid UserId { get; set; }
         public string Name { get; set; } = string.Empty;
-        public string ImageUrl { get; set; } = string.Empty;
         public ComponentType ComponentType { get; set; }
         public decimal? Price { get; set; }
         public string CustomDataJson { get; set; } = string.Empty;

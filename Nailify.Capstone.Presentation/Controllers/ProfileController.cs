@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Presentation.Middlewares;
 namespace Nailify.Capstone.Presentation.Controllers
 {
     /// <summary>

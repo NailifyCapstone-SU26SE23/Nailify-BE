@@ -112,6 +112,9 @@ namespace Nailify.Capstone.Application.Services
             variant.Price = variantDetail.NailShape.Price
                 + variantDetail.NailSurface.Price
                 + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
+            variant.Duration = (variantDetail.NailShape.Duration ?? 0)
+                + (variantDetail.NailSurface.Duration ?? 0)
+                + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
 
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();

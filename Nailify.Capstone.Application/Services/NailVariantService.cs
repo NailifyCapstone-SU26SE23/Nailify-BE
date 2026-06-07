@@ -50,6 +50,7 @@ namespace Nailify.Capstone.Application.Services
             var variant = _mapper.Map<NailVariant>(request);
             variant.ImageUrl = imageUrl ?? string.Empty;
             variant.Price = await CalculateNailVariantPriceAsync(request.NailShapeId, request.NailSurfaceId);
+            variant.Duration = await CalculateNailVariantDurationAsync(request.NailShapeId, request.NailSurfaceId);
             await _unitOfWork.NailVariantRepository.CreateAsync(variant);
             await _unitOfWork.SaveChangesAsync();
             await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
@@ -75,6 +76,7 @@ namespace Nailify.Capstone.Application.Services
 
             _mapper.Map(request, variant);
             variant.Price = await CalculateNailVariantPriceAsync(request.NailShapeId, request.NailSurfaceId, id);
+            variant.Duration = await CalculateNailVariantDurationAsync(request.NailShapeId, request.NailSurfaceId, id);
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
             await UpdateNailDesignPriceRangeAsync(previousNailDesignId);
@@ -120,6 +122,25 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+        }
+
+        private async Task<int?> CalculateNailVariantDurationAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)
+        {
+            var nailShape = nailShapeId.HasValue
+                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
+                : null;
+            var nailSurface = nailSurfaceId.HasValue
+                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
+                : null;
+            var componentDuration = 0;
+
+            if (nailVariantId.HasValue)
+            {
+                var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(nailVariantId.Value);
+                componentDuration = variant?.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0) ?? 0;
+            }
+
+            return (nailShape?.Duration ?? 0) + (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
         private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)

@@ -7,7 +7,6 @@ namespace Nailify.Capstone.Application.Validation.CustomerComponentRequestDTOs
     {
         public CustomerComponentUpdateRequestValidator()
         {
-            RuleFor(x => x.UserId).NotEmpty();
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
             RuleFor(x => x.Price).GreaterThanOrEqualTo(0).When(x => x.Price.HasValue);
         }

@@ -49,7 +49,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<ComponentDto>(_mapper.Map<ComponentDto>(component), "Tạo thành phần thành công.");
         }
 
-        public async Task<ApiResult<ComponentDto>> UpdateComponentAsync(int id, ComponentUpdateRequest request)
+        public async Task<ApiResult<ComponentDto>> UpdateComponentAsync(int id, ComponentUpdateRequest request, string? imageUrl = null)
         {
             var component = await _unitOfWork.ComponentRepository.GetByIdAsync(id);
             if (component == null)
@@ -58,8 +58,14 @@ namespace Nailify.Capstone.Application.Services
             }
 
             _mapper.Map(request, component);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                component.ImageUrl = imageUrl;
+            }
+
             _unitOfWork.ComponentRepository.Update(component);
             await _unitOfWork.SaveChangesAsync();
+            await RecalculateAffectedNailVariantsAsync(id);
 
             return new ApiSuccessResult<ComponentDto>(_mapper.Map<ComponentDto>(component), "Cập nhật thành phần thành công.");
         }
@@ -76,6 +82,48 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             return new ApiSuccessResult<bool>(true, "Xóa thành phần thành công.");
+        }
+
+        private async Task RecalculateAffectedNailVariantsAsync(int componentId)
+        {
+            var variants = await _unitOfWork.NailVariantRepository.GetAllNailVariantsAsync();
+            var affectedVariants = variants
+                .Where(variant => variant.NailComponents.Any(nailComponent => nailComponent.ComponentId == componentId))
+                .ToList();
+
+            foreach (var variant in affectedVariants)
+            {
+                variant.Price = (variant.NailShape?.Price ?? 0m)
+                    + (variant.NailSurface?.Price ?? 0m)
+                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
+                variant.Duration = (variant.NailShape?.Duration ?? 0)
+                    + (variant.NailSurface?.Duration ?? 0)
+                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
+
+                _unitOfWork.NailVariantRepository.Update(variant);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            foreach (var nailDesignId in affectedVariants.Select(variant => variant.NailDesignId).Distinct())
+            {
+                await UpdateNailDesignPriceRangeAsync(nailDesignId);
+            }
+        }
+
+        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        {
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (nailDesign == null)
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
+            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
+
+            _unitOfWork.NailDesignRepository.Update(nailDesign);
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }

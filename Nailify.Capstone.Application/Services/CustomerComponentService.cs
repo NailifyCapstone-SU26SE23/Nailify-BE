@@ -43,17 +43,22 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerComponentDto>> CreateCustomerComponentAsync(CustomerComponentCreateRequest request, string? imageUrl = null, Guid? userId = null)
         {
-                        var customerComponent = _mapper.Map<CustomerComponent>(request);
+            if (!userId.HasValue || userId.Value == Guid.Empty || await _unitOfWork.UserRepository.GetByIdAsync(userId.Value) == null)
+            {
+                return new ApiErrorResult<CustomerComponentDto>("Khong tim thay nguoi dung.");
+            }
+
+            var customerComponent = _mapper.Map<CustomerComponent>(request);
             customerComponent.ImageUrl = imageUrl ?? string.Empty;
             customerComponent.CreatedAt = DateTime.UtcNow;
-            customerComponent.UserId = userId ?? Guid.Empty;
+            customerComponent.UserId = userId.Value;
             await _unitOfWork.CustomerComponentRepository.CreateAsync(customerComponent);
             await _unitOfWork.SaveChangesAsync();
 
             return new ApiSuccessResult<CustomerComponentDto>(_mapper.Map<CustomerComponentDto>(customerComponent), "Tạo thành phần tùy chỉnh thành công.");
         }
 
-        public async Task<ApiResult<CustomerComponentDto>> UpdateCustomerComponentAsync(int id, CustomerComponentUpdateRequest request)
+        public async Task<ApiResult<CustomerComponentDto>> UpdateCustomerComponentAsync(int id, CustomerComponentUpdateRequest request, string? imageUrl = null)
         {
             var customerComponent = await _unitOfWork.CustomerComponentRepository.GetByIdAsync(id);
             if (customerComponent == null)
@@ -61,12 +66,12 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerComponentDto>("Không tìm thấy thành phần tùy chỉnh.");
             }
 
-            if (await _unitOfWork.UserRepository.GetByIdAsync(request.UserId) == null)
+            _mapper.Map(request, customerComponent);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
             {
-                return new ApiErrorResult<CustomerComponentDto>("Không tìm thấy người dùng.");
+                customerComponent.ImageUrl = imageUrl;
             }
 
-            _mapper.Map(request, customerComponent);
             _unitOfWork.CustomerComponentRepository.Update(customerComponent);
             await _unitOfWork.SaveChangesAsync();
             await RecalculateAffectedCustomerNailsAsync(id);

@@ -9,6 +9,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailSurfaceRequestDTOs
         public string Name { get; set; } = string.Empty;
         public string ShaderParam { get; set; } = string.Empty;
         public decimal Price { get; set; }
+        public int? Duration { get; set; }
 
         public void Mapping(Profile profile)
         {

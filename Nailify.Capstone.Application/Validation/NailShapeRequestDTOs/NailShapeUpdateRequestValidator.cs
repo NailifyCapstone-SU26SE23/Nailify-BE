@@ -9,6 +9,7 @@ namespace Nailify.Capstone.Application.Validation.NailShapeRequestDTOs
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
             RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
+            RuleFor(x => x.Duration).GreaterThanOrEqualTo(0).When(x => x.Duration.HasValue);
         }
     }
 }

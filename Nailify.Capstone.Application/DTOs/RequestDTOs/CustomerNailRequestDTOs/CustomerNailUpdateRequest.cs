@@ -6,9 +6,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs
 {
     public class CustomerNailUpdateRequest : IMapFrom<CustomerNail>
     {
-        public Guid UserId { get; set; }
         public string Name { get; set; } = string.Empty;
-        public string ImageUrl { get; set; } = string.Empty;
         public int NailShapeId { get; set; }
         public int NailSurfaceId { get; set; }
         public string? CustomColor { get; set; } 

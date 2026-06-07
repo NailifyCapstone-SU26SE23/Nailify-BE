@@ -9,5 +9,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string Name { get; set; } = string.Empty;
         public string ShaderParam { get; set; } = string.Empty;
         public decimal Price { get; set; }
+        public int? Duration { get; set; }
     }
 }

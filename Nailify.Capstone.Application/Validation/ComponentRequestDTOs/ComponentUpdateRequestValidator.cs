@@ -8,8 +8,8 @@ namespace Nailify.Capstone.Application.Validation.ComponentRequestDTOs
         public ComponentUpdateRequestValidator()
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-            RuleFor(x => x.ImageUrl).MaximumLength(500);
             RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
+            RuleFor(x => x.Duration).GreaterThanOrEqualTo(0).When(x => x.Duration.HasValue);
             RuleFor(x => x.ComponentType).IsInEnum();
         }
     }

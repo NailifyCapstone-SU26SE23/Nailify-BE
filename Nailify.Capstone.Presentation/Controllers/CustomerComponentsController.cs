@@ -123,11 +123,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             try
             {
                 uploadedImageUrl = await UploadImageAsync(image);
-                request.ImageUrl = string.IsNullOrWhiteSpace(uploadedImageUrl)
-                    ? existingResult.Data.ImageUrl
-                    : uploadedImageUrl;
 
-                var result = await _customerComponentService.UpdateCustomerComponentAsync(id, request);
+                var result = await _customerComponentService.UpdateCustomerComponentAsync(id, request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImageAsync(uploadedImageUrl);

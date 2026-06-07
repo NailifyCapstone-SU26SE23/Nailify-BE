@@ -10,14 +10,14 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public int? NailShapeId { get; set; }
         public int? NailSurfaceId { get; set; }
         public int NailDesignId { get; set; }
-        public int? Duration { get; set; }
         public string ImageUrl { get; set; } = string.Empty;        
         public string ColorJson { get; set; } = string.Empty;
 
         public void Mapping(Profile profile)
         {
             profile.CreateMap<NailVariantUpdateRequest, NailVariant>()
-                .ForMember(dest => dest.NailVariantId, opt => opt.Ignore());
+                .ForMember(dest => dest.NailVariantId, opt => opt.Ignore())
+                .ForMember(dest => dest.Duration, opt => opt.Ignore());
         }
     }
 }
