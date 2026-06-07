@@ -31,6 +31,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
 
             // 2. CẤU HÌNH XÁC THỰC SỬ DỤNG THUỘC TÍNH ĐỊNH DANH (Dùng jwtOptions thay vì configuration thô)
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -66,6 +67,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             // Đăng ký Unit of Work & Repositories
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<ICustomerRepository, CustomerRepository>();
             services.AddScoped<ICategoryTypeRepository, CategoryTypeRepository>();
             services.AddScoped<ICategoryRepository, CategoryRepository>();
             services.AddScoped<INailDesignRepository, NailDesignRepository>();

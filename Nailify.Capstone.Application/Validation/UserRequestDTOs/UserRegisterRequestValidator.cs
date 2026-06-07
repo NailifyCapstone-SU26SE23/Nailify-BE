@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using System;
 using System.Collections.Generic;

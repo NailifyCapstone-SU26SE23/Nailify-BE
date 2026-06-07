@@ -8,17 +8,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
 {
     public class UserRepository : GenericRepository<User>, IUserRepository
     {
-        private readonly NailifyDbContext _context;
-
         public UserRepository(NailifyDbContext context) : base(context)
         {
-            _context = context;
         }
 
         public async Task<User?> GetUserByEmailAsync(string email)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower() && u.Status == "Active");
+            return await FindByCondition(u => u.Email.ToLower() == email.Trim().ToLower() && u.Status == "Active").FirstOrDefaultAsync();
         }
-       
     }
 }
