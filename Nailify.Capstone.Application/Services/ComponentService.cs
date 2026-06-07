@@ -49,9 +49,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<ComponentDto>(_mapper.Map<ComponentDto>(component), "Tạo thành phần thành công.");
         }
 
-        public async Task<ApiResult<ComponentDto>> UpdateComponentAsync(ComponentUpdateRequest request)
+        public async Task<ApiResult<ComponentDto>> UpdateComponentAsync(int id, ComponentUpdateRequest request)
         {
-            var component = await _unitOfWork.ComponentRepository.GetByIdAsync(request.ComponentId);
+            var component = await _unitOfWork.ComponentRepository.GetByIdAsync(id);
             if (component == null)
             {
                 return new ApiErrorResult<ComponentDto>("Không tìm thấy thành phần.");

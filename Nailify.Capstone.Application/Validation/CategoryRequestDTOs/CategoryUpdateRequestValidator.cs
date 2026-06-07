@@ -7,18 +7,15 @@ namespace Nailify.Capstone.Application.Validation.CategoryRequestDTOs
     {
         public CategoryUpdateRequestValidator()
         {
-            RuleFor(x => x.CategoryId)
-                .GreaterThan(0).WithMessage("ID danh mục không hợp lệ");
-
             RuleFor(x => x.Name)
-                .NotEmpty().WithMessage("Tên danh mục không được để trống")
-                .MaximumLength(200).WithMessage("Tên danh mục không được vượt quá 200 ký tự");
+                .NotEmpty().WithMessage("Ten danh muc khong duoc de trong")
+                .MaximumLength(200).WithMessage("Ten danh muc khong duoc vuot qua 200 ky tu");
 
             RuleFor(x => x.CategoryTypeId)
-                .GreaterThan(0).WithMessage("ID loại danh mục không hợp lệ");
+                .GreaterThan(0).WithMessage("ID loai danh muc khong hop le");
 
             RuleFor(x => x.Status)
-                .NotEmpty().WithMessage("Trạng thái không được để trống");
+                .NotEmpty().WithMessage("Trang thai khong duoc de trong");
         }
     }
 }

@@ -6,7 +6,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
 {
     public class NailVariantUpdateRequest : IMapFrom<NailVariant>
     {
-        public int NailVariantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public int? NailShapeId { get; set; }
         public int? NailSurfaceId { get; set; }
@@ -17,7 +16,8 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
 
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<NailVariantUpdateRequest, NailVariant>();
+            profile.CreateMap<NailVariantUpdateRequest, NailVariant>()
+                .ForMember(dest => dest.NailVariantId, opt => opt.Ignore());
         }
     }
 }

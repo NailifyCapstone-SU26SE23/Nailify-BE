@@ -6,7 +6,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ComponentRequestDTOs
 {
     public class ComponentUpdateRequest : IMapFrom<Component>
     {
-        public int ComponentId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public ComponentType ComponentType { get; set; }
@@ -14,7 +13,8 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ComponentRequestDTOs
 
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<ComponentUpdateRequest, Component>();
+            profile.CreateMap<ComponentUpdateRequest, Component>()
+                .ForMember(dest => dest.ComponentId, opt => opt.Ignore());
         }
     }
 }

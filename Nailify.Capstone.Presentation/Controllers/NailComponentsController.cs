@@ -73,10 +73,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật thành phần trên móng.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [ProducesResponseType(typeof(ApiResult<NailComponentDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update([FromBody] NailComponentUpdateRequest request)
+        public async Task<IActionResult> Update(int id, [FromBody] NailComponentUpdateRequest request)
         {
             var validationResult = await _updateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -84,7 +84,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
             }
 
-            var result = await _nailComponentService.UpdateNailComponentAsync(request);
+            var result = await _nailComponentService.UpdateNailComponentAsync(id, request);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
 

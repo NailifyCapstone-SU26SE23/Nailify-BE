@@ -105,11 +105,11 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật thành phần.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<ComponentDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update([FromForm] ComponentUpdateRequest request, IFormFile? image)
+        public async Task<IActionResult> Update(int id, [FromForm] ComponentUpdateRequest request, IFormFile? image)
         {
             var validationResult = await _updateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -117,7 +117,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
             }
 
-            var existingResult = await _componentService.GetComponentByIdAsync(request.ComponentId);
+            var existingResult = await _componentService.GetComponentByIdAsync(id);
             if (!existingResult.IsSucceeded)
             {
                 return NotFound(existingResult);
@@ -131,7 +131,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                     ? existingResult.Data.ImageUrl
                     : uploadedImageUrl;
 
-                var result = await _componentService.UpdateComponentAsync(request);
+                var result = await _componentService.UpdateComponentAsync(id, request);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImageAsync(uploadedImageUrl);

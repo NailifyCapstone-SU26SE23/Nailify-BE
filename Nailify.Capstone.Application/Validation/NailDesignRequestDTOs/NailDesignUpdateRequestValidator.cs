@@ -7,9 +7,6 @@ namespace Nailify.Capstone.Application.Validation.NailDesignRequestDTOs
     {
         public NailDesignUpdateRequestValidator()
         {
-            RuleFor(x => x.NailDesignId)
-                .GreaterThan(0).WithMessage("ID mau nail khong hop le");
-
             RuleFor(x => x.Name)
                 .NotEmpty().WithMessage("Ten mau nail khong duoc de trong")
                 .MaximumLength(200).WithMessage("Ten mau nail khong duoc vuot qua 200 ky tu");

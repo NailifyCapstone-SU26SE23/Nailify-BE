@@ -7,7 +7,6 @@ namespace Nailify.Capstone.Application.Validation.CustomerNailRequestDTOs
     {
         public CustomerNailUpdateRequestValidator()
         {
-            RuleFor(x => x.CustomerNailId).GreaterThan(0);
             RuleFor(x => x.UserId).NotEmpty();
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
             RuleFor(x => x.NailShapeId).GreaterThan(0);

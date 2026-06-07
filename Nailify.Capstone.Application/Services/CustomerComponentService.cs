@@ -53,9 +53,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerComponentDto>(_mapper.Map<CustomerComponentDto>(customerComponent), "Tạo thành phần tùy chỉnh thành công.");
         }
 
-        public async Task<ApiResult<CustomerComponentDto>> UpdateCustomerComponentAsync(CustomerComponentUpdateRequest request)
+        public async Task<ApiResult<CustomerComponentDto>> UpdateCustomerComponentAsync(int id, CustomerComponentUpdateRequest request)
         {
-            var customerComponent = await _unitOfWork.CustomerComponentRepository.GetByIdAsync(request.CustomerComponentId);
+            var customerComponent = await _unitOfWork.CustomerComponentRepository.GetByIdAsync(id);
             if (customerComponent == null)
             {
                 return new ApiErrorResult<CustomerComponentDto>("Không tìm thấy thành phần tùy chỉnh.");
@@ -69,7 +69,7 @@ namespace Nailify.Capstone.Application.Services
             _mapper.Map(request, customerComponent);
             _unitOfWork.CustomerComponentRepository.Update(customerComponent);
             await _unitOfWork.SaveChangesAsync();
-            await RecalculateAffectedCustomerNailsAsync(request.CustomerComponentId);
+            await RecalculateAffectedCustomerNailsAsync(id);
 
             return new ApiSuccessResult<CustomerComponentDto>(_mapper.Map<CustomerComponentDto>(customerComponent), "Cập nhật thành phần tùy chỉnh thành công.");
         }

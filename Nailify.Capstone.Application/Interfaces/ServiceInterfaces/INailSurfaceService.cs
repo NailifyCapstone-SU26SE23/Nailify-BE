@@ -9,7 +9,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null);
         Task<ApiResult<NailSurfaceDto>> GetNailSurfaceByIdAsync(int id);
         Task<ApiResult<NailSurfaceDto>> CreateNailSurfaceAsync(NailSurfaceCreateRequest request);
-        Task<ApiResult<NailSurfaceDto>> UpdateNailSurfaceAsync(NailSurfaceUpdateRequest request);
+        Task<ApiResult<NailSurfaceDto>> UpdateNailSurfaceAsync(int id, NailSurfaceUpdateRequest request);
         Task<ApiResult<bool>> DeleteNailSurfaceAsync(int id);
     }
 }

@@ -6,7 +6,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerComponentRequest
 {
     public class CustomerComponentUpdateRequest : IMapFrom<CustomerComponent>
     {
-        public int CustomerComponentId { get; set; }
         public Guid UserId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
@@ -18,6 +17,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerComponentRequest
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CustomerComponentUpdateRequest, CustomerComponent>()
+                .ForMember(dest => dest.CustomerComponentId, opt => opt.Ignore())
                 .ForMember(dest => dest.CustomerNailComponents, opt => opt.Ignore())
                 .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
         }

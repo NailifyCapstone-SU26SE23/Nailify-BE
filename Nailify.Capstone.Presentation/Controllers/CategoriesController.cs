@@ -73,12 +73,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật danh mục.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [ProducesResponseType(typeof(ApiResult<CategoryDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update([FromBody] CategoryUpdateRequest request)
+        public async Task<IActionResult> Update(int id, [FromBody] CategoryUpdateRequest request)
         {
-            var result = await _categoryService.UpdateCategoryAsync(request);
+            var result = await _categoryService.UpdateCategoryAsync(id, request);
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);

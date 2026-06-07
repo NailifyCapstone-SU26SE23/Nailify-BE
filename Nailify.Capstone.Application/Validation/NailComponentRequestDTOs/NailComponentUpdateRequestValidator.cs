@@ -7,7 +7,6 @@ namespace Nailify.Capstone.Application.Validation.NailComponentRequestDTOs
     {
         public NailComponentUpdateRequestValidator()
         {
-            RuleFor(x => x.NailComponentId).GreaterThan(0);
             RuleFor(x => x.ComponentId).GreaterThan(0);
             RuleFor(x => x.NailVariantId).GreaterThan(0);
             RuleFor(x => x.FingerIndex).InclusiveBetween(-1, 9);

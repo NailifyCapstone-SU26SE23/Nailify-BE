@@ -89,9 +89,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Tạo mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null)
+        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, List<string>? newImageUrls = null)
         {
-            var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
+            var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             if (existingDesign == null || existingDesign.Status == "InActive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
@@ -138,7 +138,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             await AssignNailVariantsAsync(existingDesign.NailDesignId, request.NailVariantIds);
 
-            var updatedDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
+            var updatedDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             var designDto = _mapper.Map<NailDesignDto>(updatedDesign);
 
             return new ApiSuccessResult<NailDesignDto>(designDto, "Cập nhật mẫu nail thành công.");

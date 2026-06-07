@@ -104,12 +104,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật mẫu nail.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Update([FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
         {
             var validationResult = await _designUpdateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -117,7 +117,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
             }
 
-            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(request.NailDesignId);
+            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(id);
             if (!existingResult.IsSucceeded)
             {
                 return NotFound(existingResult);
@@ -128,7 +128,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             try
             {
                 uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.UpdateNailDesignAsync(request, uploadedImageUrls);
+                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrls);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImagesAsync(uploadedImageUrls);

@@ -56,9 +56,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailComponentDto>(_mapper.Map<NailComponentDto>(createdNailComponent), "Tạo thành phần móng thành công.");
         }
 
-        public async Task<ApiResult<NailComponentDto>> UpdateNailComponentAsync(NailComponentUpdateRequest request)
+        public async Task<ApiResult<NailComponentDto>> UpdateNailComponentAsync(int id, NailComponentUpdateRequest request)
         {
-            var nailComponent = await _unitOfWork.NailComponentRepository.GetByIdAsync(request.NailComponentId);
+            var nailComponent = await _unitOfWork.NailComponentRepository.GetByIdAsync(id);
             if (nailComponent == null)
             {
                 return new ApiErrorResult<NailComponentDto>("Không tìm thấy thành phần móng.");
@@ -80,7 +80,7 @@ namespace Nailify.Capstone.Application.Services
                 await UpdateNailVariantAndDesignPriceAsync(request.NailVariantId);
             }
 
-            var updatedNailComponent = await _unitOfWork.NailComponentRepository.GetNailComponentDetailAsync(request.NailComponentId);
+            var updatedNailComponent = await _unitOfWork.NailComponentRepository.GetNailComponentDetailAsync(id);
             return new ApiSuccessResult<NailComponentDto>(_mapper.Map<NailComponentDto>(updatedNailComponent), "Cập nhật thành phần móng thành công.");
         }
 

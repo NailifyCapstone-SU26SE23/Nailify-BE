@@ -49,15 +49,20 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailShapeDto>(_mapper.Map<NailShapeDto>(shape), "Tạo dáng móng thành công.");
         }
 
-        public async Task<ApiResult<NailShapeDto>> UpdateNailShapeAsync(NailShapeUpdateRequest request)
+        public async Task<ApiResult<NailShapeDto>> UpdateNailShapeAsync(int id, NailShapeUpdateRequest request, string? imageUrl = null)
         {
-            var shape = await _unitOfWork.NailShapeRepository.GetByIdAsync(request.NailShapeId);
+            var shape = await _unitOfWork.NailShapeRepository.GetByIdAsync(id);
             if (shape == null)
             {
                 return new ApiErrorResult<NailShapeDto>("Không tìm thấy dáng móng.");
             }
 
             _mapper.Map(request, shape);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                shape.ImageUrl = imageUrl;
+            }
+
             _unitOfWork.NailShapeRepository.Update(shape);
             await _unitOfWork.SaveChangesAsync();
 

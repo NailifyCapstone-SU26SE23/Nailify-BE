@@ -72,9 +72,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CategoryDto>(categoryDto, "Tạo danh mục thành công.");
         }
 
-        public async Task<ApiResult<CategoryDto>> UpdateCategoryAsync(CategoryUpdateRequest request)
+        public async Task<ApiResult<CategoryDto>> UpdateCategoryAsync(int id, CategoryUpdateRequest request)
         {
-            var category = await _unitOfWork.CategoryRepository.GetByIdAsync(request.CategoryId);
+            var category = await _unitOfWork.CategoryRepository.GetByIdAsync(id);
             if (category == null)
             {
                 return new ApiErrorResult<CategoryDto>("Không tìm thấy danh mục.");

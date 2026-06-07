@@ -136,17 +136,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật mẫu nail khách hàng.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update([FromForm] CustomerNailUpdateRequest request, IFormFile? image)
+        public async Task<IActionResult> Update(int id, [FromForm] CustomerNailUpdateRequest request, IFormFile? image)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
-
-                var existingResult = await _customerNailService.GetCustomerNailByIdAsync(request.CustomerNailId);
+                var existingResult = await _customerNailService.GetCustomerNailByIdAsync(id);
                 if (!existingResult.IsSucceeded)
                 {
                     return NotFound(existingResult);
@@ -171,7 +170,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                         ? existingResult.Data.ImageUrl
                         : uploadedImageUrl;
 
-                    var result = await _customerNailService.UpdateCustomerNailAsync(request);
+                    var result = await _customerNailService.UpdateCustomerNailAsync(id, request);
                     if (!result.IsSucceeded)
                     {
                         await DeleteImageAsync(uploadedImageUrl);

@@ -7,7 +7,6 @@ namespace Nailify.Capstone.Application.Validation.ComponentRequestDTOs
     {
         public ComponentUpdateRequestValidator()
         {
-            RuleFor(x => x.ComponentId).GreaterThan(0);
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
             RuleFor(x => x.ImageUrl).MaximumLength(500);
             RuleFor(x => x.Price).GreaterThanOrEqualTo(0);

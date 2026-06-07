@@ -48,9 +48,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailSurfaceDto>(_mapper.Map<NailSurfaceDto>(surface), "Tạo bề mặt móng thành công.");
         }
 
-        public async Task<ApiResult<NailSurfaceDto>> UpdateNailSurfaceAsync(NailSurfaceUpdateRequest request)
+        public async Task<ApiResult<NailSurfaceDto>> UpdateNailSurfaceAsync(int id, NailSurfaceUpdateRequest request)
         {
-            var surface = await _unitOfWork.NailSurfaceRepository.GetByIdAsync(request.NailSurfaceId);
+            var surface = await _unitOfWork.NailSurfaceRepository.GetByIdAsync(id);
             if (surface == null)
             {
                 return new ApiErrorResult<NailSurfaceDto>("Không tìm thấy bề mặt móng.");
