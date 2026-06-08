@@ -404,8 +404,6 @@ FodyWeavers.xsd
 appsettings.json
 appsettings.Development.json
 
-AGENTS.md
-CLAUDE.md
 /.claude/skills/gitnexus/gitnexus-cli/SKILL.md
 /CLAUDE.md
 /AGENTS.md

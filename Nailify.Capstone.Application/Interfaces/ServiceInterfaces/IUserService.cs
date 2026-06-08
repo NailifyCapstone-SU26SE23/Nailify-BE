@@ -18,8 +18,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// </summary>
         /// <param name="userId"></param>
         /// <param name="request"></param>
+        /// <param name="avatarUrl"></param>
         /// <returns></returns>
-        Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request);
+        Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request, string? avatarUrl = null);
         Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
         Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null);
         Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId);

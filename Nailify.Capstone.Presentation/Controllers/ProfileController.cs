@@ -1,21 +1,28 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
+using System.IdentityModel.Tokens.Jwt;
 namespace Nailify.Capstone.Presentation.Controllers
 {
     /// <summary>
     /// API quản lý trang cá nhân.
     /// </summary>
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class ProfileController : BaseApiController
     {
         private readonly IUserService _userService;
+        private readonly CloudinaryService _cloudinaryService;
 
-        public ProfileController(IUserService userService)
+        public ProfileController(IUserService userService, CloudinaryService cloudinaryService)
         {
             _userService = userService;
+            _cloudinaryService = cloudinaryService;
         }
 
         /// <summary>
@@ -25,7 +32,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
         public async Task<IActionResult> GetMyProfile()
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh." });
@@ -53,9 +61,11 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// API cập nhật thông tin người dùng.
         /// </summary>
         [HttpPut]
-        public async Task<IActionResult> UpdateMyProfile([FromBody] ProfileUpdateRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdateMyProfile([FromForm] ProfileUpdateRequest request, IFormFile? image)
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Không tìm thấy thông tin định danh trong Token!" });
@@ -63,17 +73,35 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             var userId = Guid.Parse(userIdClaim);
 
-            // Gọi hàm và nhận về ApiResult<bool>
-            var result = await _userService.UpdateProfileAsync(userId, request);
-
-            // Nếu thất bại (IsSucceeded = false), trả về mã 4 xị và xỉn 
-            if (!result.IsSucceeded)
+            var existingResult = await _userService.GetUserByIdAsync(userId);
+            if (!existingResult.IsSucceeded)
             {
-                return BadRequest(result);
+                return NotFound(existingResult);
             }
 
-            // Nếu thành công, trả về mã 200 thì ngon
-            return Ok(result);
+            var uploadedAvatarUrl = string.Empty;
+            try
+            {
+                uploadedAvatarUrl = await UploadImageAsync(image);
+                var result = await _userService.UpdateProfileAsync(userId, request, uploadedAvatarUrl);
+                if (!result.IsSucceeded)
+                {
+                    await DeleteImageAsync(uploadedAvatarUrl);
+                    return BadRequest(result);
+                }
+
+                if (!string.IsNullOrWhiteSpace(uploadedAvatarUrl))
+                {
+                    await DeleteImageAsync(existingResult.Data.AvatarUrl);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                await DeleteImageAsync(uploadedAvatarUrl);
+                return BadRequest(new { isSucceeded = false, message = $"Cap nhat profile that bai khi tai avatar: {ex.Message}" });
+            }
         }
 
         /// <summary>
@@ -83,7 +111,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HasRole("Customer")]
         public async Task<IActionResult> GetMyCustomerProfile()
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
@@ -104,7 +133,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyPreferences([FromBody] CustomerPreferencesUpdateRequest request)
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
@@ -125,7 +155,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyCustomerProfile([FromBody] CustomerSelfProfileUpdateRequest request)
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
@@ -145,7 +176,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpDelete]
         public async Task<IActionResult> DeleteMyAccount()
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Mã token không hợp lệ hoặc thiếu thông tin định danh cá nhân." });
@@ -157,6 +189,24 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(result);
             }
             return Ok(result);
+        }
+
+        private async Task<string> UploadImageAsync(IFormFile? image)
+        {
+            if (image == null || image.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return await _cloudinaryService.UploadImageAsync(image);
+        }
+
+        private async Task DeleteImageAsync(string? imageUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                await _cloudinaryService.DeleteImageAsync(imageUrl);
+            }
         }
     }
 }
