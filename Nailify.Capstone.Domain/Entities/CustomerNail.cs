@@ -6,11 +6,10 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid UserId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
-        public int NailShapeId { get; set; }
-        public int NailSurfaceId { get; set; }
+        public int? NailShapeId { get; set; }
+        public int? NailSurfaceId { get; set; }
         public decimal Price { get; set; }
-        public string CustomColor { get; set; } = string.Empty;
-        public string CustomMaterial { get; set; } = string.Empty;
+        public string? CustomColor { get; set; }
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsFavorite { get; set; }

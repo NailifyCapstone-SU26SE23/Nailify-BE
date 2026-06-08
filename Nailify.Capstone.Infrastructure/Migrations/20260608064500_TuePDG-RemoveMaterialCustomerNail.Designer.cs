@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608064500_TuePDG-RemoveMaterialCustomerNail")]
+    partial class TuePDGRemoveMaterialCustomerNail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -193,6 +196,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CustomColor")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int?>("Duration")
@@ -208,10 +212,10 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
-                    b.Property<int?>("NailShapeId")
+                    b.Property<int>("NailShapeId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("NailSurfaceId")
+                    b.Property<int>("NailSurfaceId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Name")
@@ -715,12 +719,14 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailShape", "NailShape")
                         .WithMany()
                         .HasForeignKey("NailShapeId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailSurface", "NailSurface")
                         .WithMany()
                         .HasForeignKey("NailSurfaceId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
                         .WithMany()

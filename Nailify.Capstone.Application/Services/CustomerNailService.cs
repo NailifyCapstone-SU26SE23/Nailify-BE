@@ -43,13 +43,7 @@ namespace Nailify.Capstone.Application.Services
         {
             if (!userId.HasValue || userId.Value == Guid.Empty || await _unitOfWork.UserRepository.GetByIdAsync(userId.Value) == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Khong tim thay nguoi dung.");
-            }
-
-            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
-            if (validationError != null)
-            {
-                return new ApiErrorResult<CustomerNailDto>(validationError);
+                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy người dùng.");
             }
 
             var customerNail = _mapper.Map<CustomerNail>(request);
@@ -121,10 +115,10 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private async Task<decimal> CalculateCustomerNailPriceAsync(int nailShapeId, int nailSurfaceId, int? customerNailId)
+        private async Task<decimal> CalculateCustomerNailPriceAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId)
         {
-            var nailShape = await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId);
-            var nailSurface = await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId);
+            var nailShape = nailShapeId.HasValue ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) : null;
+            var nailSurface = nailSurfaceId.HasValue ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) : null;
             var componentPrice = 0m;
 
             if (customerNailId.HasValue)
@@ -137,14 +131,14 @@ namespace Nailify.Capstone.Application.Services
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
         }
 
-        private async Task<string?> ValidateReferencesAsync(int nailShapeId, int nailSurfaceId, int? basedOnNailVariantId)
+        private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId, int? basedOnNailVariantId)
         {
-            if (await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId) == null)
+            if (!nailShapeId.HasValue || await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) == null)
             {
                 return "Không tìm thấy dáng móng.";
             }
 
-            if (await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId) == null)
+            if (!nailSurfaceId.HasValue || await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
             {
                 return "Không tìm thấy bề mặt móng.";
             }
