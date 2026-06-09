@@ -67,7 +67,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerNailDto>("Không tìm thấy móng tùy chỉnh.");
             }
 
-            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId, request.BasedOnNailVariantId);
+            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId);
             if (validationError != null)
             {
                 return new ApiErrorResult<CustomerNailDto>(validationError);
@@ -131,7 +131,7 @@ namespace Nailify.Capstone.Application.Services
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
         }
 
-        private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId, int? basedOnNailVariantId)
+        private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId)
         {
             if (!nailShapeId.HasValue || await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) == null)
             {
@@ -141,11 +141,6 @@ namespace Nailify.Capstone.Application.Services
             if (!nailSurfaceId.HasValue || await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
             {
                 return "Không tìm thấy bề mặt móng.";
-            }
-
-            if (basedOnNailVariantId.HasValue && await _unitOfWork.NailVariantRepository.GetByIdAsync(basedOnNailVariantId.Value) == null)
-            {
-                return "Không tìm thấy biến thể móng gốc.";
             }
 
             return null;

@@ -405,8 +405,8 @@ appsettings.json
 appsettings.Development.json
 
 /.claude/skills/gitnexus/gitnexus-cli/SKILL.md
-/CLAUDE.md
-/AGENTS.md
+CLAUDE.md
+AGENTS.md
 /.claude/skills/gitnexus/gitnexus-debugging/SKILL.md
 /.claude/skills/gitnexus/gitnexus-guide/SKILL.md
 /.claude/skills/gitnexus/gitnexus-exploring/SKILL.md

@@ -10,7 +10,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string Name { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public ComponentType ComponentType { get; set; }
-        public decimal? Price { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsPublic { get; set; }
     }

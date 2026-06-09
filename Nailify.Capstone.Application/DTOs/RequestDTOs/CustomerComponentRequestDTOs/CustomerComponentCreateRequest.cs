@@ -8,7 +8,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerComponentRequest
     {
         public string Name { get; set; } = string.Empty;
         public ComponentType ComponentType { get; set; }
-        public decimal? Price { get; set; }
         public bool IsPublic { get; set; } = false;
 
         public void Mapping(Profile profile)

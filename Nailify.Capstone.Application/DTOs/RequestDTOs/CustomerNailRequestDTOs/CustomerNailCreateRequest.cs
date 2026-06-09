@@ -13,8 +13,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs
         public int? Duration { get; set; }
         public bool IsFavorite { get; set; }
         public bool IsPublic { get; set; }
-        public int? BasedOnNailVariantId { get; set; }
-
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CustomerNailCreateRequest, CustomerNail>()

@@ -57,7 +57,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return _dbSet
                 .Include(nail => nail.NailShape)
                 .Include(nail => nail.NailSurface)
-                .Include(nail => nail.BasedOnNailVariant)
                 .Include(nail => nail.CustomerNailComponents)
                 .ThenInclude(component => component.Component)
                 .Include(nail => nail.CustomerNailComponents)

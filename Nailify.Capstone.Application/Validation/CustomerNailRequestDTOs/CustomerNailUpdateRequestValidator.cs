@@ -8,7 +8,6 @@ namespace Nailify.Capstone.Application.Validation.CustomerNailRequestDTOs
         public CustomerNailUpdateRequestValidator()
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-            RuleFor(x => x.BasedOnNailVariantId).GreaterThan(0).When(x => x.BasedOnNailVariantId.HasValue);
         }
     }
 }
