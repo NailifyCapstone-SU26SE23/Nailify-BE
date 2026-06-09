@@ -51,7 +51,7 @@ namespace Nailify.Capstone.Application.Services
             customerNail.ImageUrl = imageUrl ?? string.Empty;
             customerNail.CreatedAt = DateTime.UtcNow;
             customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, null);
-
+            customerNail.Duration = await CalculateCustomerNailDurationAsync(request.NailShapeId, request.NailSurfaceId);
             await _unitOfWork.CustomerNailRepository.CreateAsync(customerNail);
             await _unitOfWork.SaveChangesAsync();
 
@@ -80,7 +80,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, id);
-
+            customerNail.Duration = await CalculateCustomerNailDurationAsync(request.NailShapeId, request.NailSurfaceId, id);
             _unitOfWork.CustomerNailRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
 
@@ -104,13 +104,18 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task RecalculateCustomerNailPriceAsync(int customerNailId)
         {
+            var customerNailDetail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId);
+
             var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customerNailId);
-            if (customerNail == null)
+            if (customerNail == null || customerNailDetail == null)
             {
                 return;
             }
 
             customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, customerNailId);
+            customerNail.Duration = (customerNailDetail.NailShape?.Duration ?? 0)
+              + (customerNailDetail.NailSurface?.Duration ?? 0)
+              + customerNailDetail.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0);
             _unitOfWork.CustomerNailRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
         }
@@ -129,6 +134,25 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+        }
+
+        private async Task<int?> CalculateCustomerNailDurationAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId = null)
+        {
+            var nailShape = nailShapeId.HasValue
+                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
+                : null;
+            var nailSurface = nailSurfaceId.HasValue
+                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
+                : null;
+            var componentDuration = 0;
+
+            if (customerNailId.HasValue)
+            {
+                var nailComponent = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId.Value);
+                componentDuration = nailComponent?.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0) ?? 0;
+            }
+
+            return (nailShape?.Duration ?? 0) + (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
         private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId)
