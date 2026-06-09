@@ -206,6 +206,25 @@ namespace Nailify.Capstone.Application.Services
             .OrderBy(x => x.StartTime)
             .ToList();
 
+            var timeSlots = new List<TimeSlotResponseDTO>();
+            var currentStart = schedule.ShiftStart;
+            var slotInterval = TimeSpan.FromMinutes(30);
+
+            while (currentStart + slotInterval <= schedule.ShiftEnd)
+            {
+                var currentEnd = currentStart + slotInterval;
+                bool isAvailable = !busySlots.Any(busy => currentStart < busy.EndTime && currentEnd > busy.StartTime);
+
+                timeSlots.Add(new TimeSlotResponseDTO
+                {
+                    StartTime = currentStart,
+                    EndTime = currentEnd,
+                    IsAvailable = isAvailable
+                });
+
+                currentStart = currentEnd;
+            }
+
             var response = new ArtistAvailabilityResponseDTO
             {
                 NailArtistId = artist.NailArtistId,
@@ -214,7 +233,8 @@ namespace Nailify.Capstone.Application.Services
                 AvailabilityStatus = "Working",
                 ShiftStart = schedule.ShiftStart,
                 ShiftEnd = schedule.ShiftEnd,
-                BusySlots = busySlots
+                BusySlots = busySlots,
+                TimeSlots = timeSlots
             };
             return new ApiSuccessResult<ArtistAvailabilityResponseDTO>(response, "Lấy thông tin slot làm việc thành công.");
         }

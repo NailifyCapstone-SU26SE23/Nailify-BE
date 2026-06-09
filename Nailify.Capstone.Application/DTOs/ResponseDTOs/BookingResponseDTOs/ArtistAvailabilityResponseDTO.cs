@@ -16,5 +16,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public TimeSpan ShiftStart { get; set; }
         public TimeSpan ShiftEnd { get; set; }
         public List<BusyTimeSlotResponseDto> BusySlots { get; set; } = new();
+        public List<TimeSlotResponseDTO> TimeSlots { get; set; } = new();
     }
 }
