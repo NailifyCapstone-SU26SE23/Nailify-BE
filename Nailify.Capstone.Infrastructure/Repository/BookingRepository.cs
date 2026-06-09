@@ -74,33 +74,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime)
         {
-            var range = GetDateRangeUtc(date);
-            return await ExistsAsync(x =>
-                                         x.NailArtistId == artistId &&
-                                         x.BookingDate >= range.start &&
-                                         x.BookingDate <= range.end &&
-                                         x.Status != "Cancelled" &&
-                                         x.Status != "Rejected" &&
-                                        (
-                                            (x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime)
-                                        )
-                                    );
+            var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
+            return bookings.Any(x => x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
         }
 
         public async Task<bool> HasBookingConflictExcludingCurrentAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid currentBookingId)
         {
-            var range = GetDateRangeUtc(date);
-            return await ExistsAsync(x =>
-                                         x.BookingId != currentBookingId &&
-                                         x.NailArtistId == artistId &&
-                                         x.BookingDate >= range.start &&
-                                         x.BookingDate <= range.end &&
-                                         x.Status != "Cancelled" &&
-                                         x.Status != "Rejected" &&
-                                        (
-                                            (x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime)
-                                        )
-                                    );
+            var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
+            return bookings.Any(x => x.BookingId != currentBookingId && x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
         }
     }
 }
