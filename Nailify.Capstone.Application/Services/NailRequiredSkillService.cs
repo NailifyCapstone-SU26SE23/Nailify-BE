@@ -50,7 +50,7 @@ namespace Nailify.Capstone.Application.Services
                 {
                     var newRequiredSkill = _mapper.Map<NailRequiredSkill>(req);
                     newRequiredSkill.NailRequiredSkillId = Guid.NewGuid();
-                    newRequiredSkill.NailDesignId = designId;
+                    newRequiredSkill.NailVariantId = designId;
                     await _unitOfWork.NailRequiredSkillRepository.CreateAsync(newRequiredSkill);
                 }
             }

@@ -34,6 +34,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<SkillType> SkillTypes { get; set; }
         public DbSet<NailArtistSkill> NailArtistSkills { get; set; }
         public DbSet<NailRequiredSkill> NailRequiredSkills { get; set; }
+        public DbSet<Booking> Bookings { get; set; }
+        public DbSet<BookingItem> BookingItems { get; set; }
+        public DbSet<BookingHistory> BookingHistories { get; set; }
+        public DbSet<Services> Services { get; set; }
         public static string GetConnectionString(string connectionStringName)
         {
             var config = new ConfigurationBuilder()
@@ -216,6 +220,68 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<CustomerNailComponent>()
                 .Property(cnc => cnc.FingerIndex)
                 .HasComment("-1 = whole hand, 0-9 = specific finger index");
+            /*
+            modelBuilder.Entity<Booking>().HasKey(b => b.BookingId);
+            modelBuilder.Entity<Booking>()
+                        .Property(b => b.TotalPrice)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<BookingItem>()
+                        .Property(bi => bi.Price)
+                        .HasPrecision(18, 2);
+            */
+            modelBuilder.Entity<Booking>(entity =>
+            {
+                entity.HasKey(b => b.BookingId);
+                entity.Property(b => b.TotalPrice).HasPrecision(18, 2);
+            });
+
+            modelBuilder.Entity<Services>(entity =>
+            {
+                entity.HasKey(s => s.ServiceId);
+                entity.Property(s => s.Price).HasPrecision(18, 2);
+            });
+
+            modelBuilder.Entity<BookingItem>(entity =>
+            {
+                entity.HasKey(bi => bi.BookingItemId);
+                entity.Property(bi => bi.Price).HasPrecision(18, 2);
+                // Thiết lập các mối quan hệ khóa ngoại
+                entity.HasOne(bi => bi.Booking)
+                      .WithMany(b => b.BookingItems)
+                      .HasForeignKey(bi => bi.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(bi => bi.Service)
+                      .WithMany(s => s.BookingItems)
+                      .HasForeignKey(bi => bi.ServiceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(bi => bi.NailVariant)
+                      .WithMany()
+                      .HasForeignKey(bi => bi.NailVariantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<BookingHistory>(entity =>
+            {
+                entity.HasKey(bh => bh.BookingHistoryId);
+
+                entity.HasOne(bh => bh.Booking)
+                      .WithMany(b => b.BookingHistories)
+                      .HasForeignKey(bh => bh.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+            /*
+            modelBuilder.Entity<BookingItem>().HasKey(bi => bi.BookingItemId);
+            modelBuilder.Entity<BookingHistory>().HasKey(bh => bh.BookingHistoryId);
+            modelBuilder.Entity<BookingItem>()
+                .HasOne(bi => bi.Booking)
+                .WithMany() 
+                .HasForeignKey(bi => bi.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Services>()
+                .Property(s => s.Price)
+                .HasPrecision(18, 2);
+            */
 
             modelBuilder.Entity<CustomerNailComponent>()
                 .HasOne(cnc => cnc.CustomerNail)
@@ -329,18 +395,24 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<NailRequiredSkill>()
                         .HasKey(nrs => nrs.NailRequiredSkillId);
             modelBuilder.Entity<NailRequiredSkill>()
-                        .HasIndex(nrs => new { nrs.NailDesignId, nrs.SkillTypeId })
+                        .HasIndex(nrs => new { nrs.NailVariantId, nrs.SkillTypeId })
                         .IsUnique(); // Mỗi design chỉ yêu cầu 1 level/skill
             modelBuilder.Entity<NailRequiredSkill>()
-                        .HasOne(nrs => nrs.NailDesign)
-                        .WithMany(nd => nd.NailRequiredSkills)
-                        .HasForeignKey(nrs => nrs.NailDesignId)
+                        .HasOne(nrs => nrs.NailVariant)
+                        .WithMany(nv => nv.NailRequiredSkills)
+                        .HasForeignKey(nrs => nrs.NailVariantId)
                         .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<NailRequiredSkill>()
                         .HasOne(nrs => nrs.SkillType)
                         .WithMany(st => st.NailRequiredSkills)
                         .HasForeignKey(nrs => nrs.SkillTypeId)
                         .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<BookingItem>()
+                        .HasOne(bi => bi.CustomerNail)
+                        .WithMany()
+                        .HasForeignKey(bi => bi.CustomerNailId)
+                        .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

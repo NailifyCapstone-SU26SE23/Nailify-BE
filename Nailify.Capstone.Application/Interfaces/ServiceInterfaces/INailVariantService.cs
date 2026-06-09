@@ -11,5 +11,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null);
         Task<ApiResult<NailVariantDto>> UpdateNailVariantAsync(int id, NailVariantUpdateRequest request);
         Task<ApiResult<bool>> DeleteNailVariantAsync(int id);
+        Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId);
     }
 }

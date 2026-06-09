@@ -73,5 +73,48 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(nv => nv.NailComponents)
                 .ThenInclude(nc => nc.Component);
         }
+
+        public List<int> GetDistinctVariantIdsAsync(IEnumerable<BookingItem> items)
+        {
+            return items?
+                .Where(x => x.NailVariantId.HasValue)
+                .Select(x => x.NailVariantId!.Value)
+                .Distinct()
+                .ToList() ?? new List<int>();
+        }
+
+        public async Task<List<NailVariant>> GetNailVariantsCapableByArtistAsync(Guid artistId)
+        {
+            var artistSkills = await _context.NailArtistSkills
+                .Where(nas => nas.NailArtistId == artistId)
+                .ToListAsync();
+
+            var artistSkillDict = artistSkills.ToDictionary(nas => nas.SkillTypeId, nas => nas.Level);
+
+            var allVariants = await BuildNailVariantQuery()
+                .Include(nv => nv.NailRequiredSkills)
+                .ToListAsync();
+
+            var capableVariants = new List<NailVariant>();
+            foreach (var variant in allVariants)
+            {
+                bool isCapable = true;
+                foreach (var reqSkill in variant.NailRequiredSkills)
+                {
+                    if (!artistSkillDict.TryGetValue(reqSkill.SkillTypeId, out var level) || level < reqSkill.RequiredLevel)
+                    {
+                        isCapable = false;
+                        break;
+                    }
+                }
+
+                if (isCapable)
+                {
+                    capableVariants.Add(variant);
+                }
+            }
+
+            return capableVariants;
+        }
     }
 }

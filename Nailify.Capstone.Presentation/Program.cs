@@ -4,6 +4,8 @@ using Nailify.Capstone.Presentation.Extensions;
 using Nailify.Capstone.Presentation.Filters;
 using Nailify.Capstone.Presentation.Middlewares;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 

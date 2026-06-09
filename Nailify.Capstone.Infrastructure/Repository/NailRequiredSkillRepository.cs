@@ -17,12 +17,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
         }
 
         public async Task<NailRequiredSkill> GetByNailDesignAndSkillAsync(int nailDesignId, Guid skillTypeId)
-          => await FindByCondition(x => x.NailDesignId == nailDesignId && x.SkillTypeId == skillTypeId)
+          => await FindByCondition(x => x.NailVariantId == nailDesignId && x.SkillTypeId == skillTypeId)
                                   .Include(x => x.SkillType)
                                   .FirstOrDefaultAsync();
 
         public Task<List<NailRequiredSkill>> GetSkillsByDesignIdAsync(int designId)
-           => FindByCondition(x => x.NailDesignId == designId)
+           => FindByCondition(x => x.NailVariantId == designId)
                              .Include(x => x.SkillType)
                              .ToListAsync();
     }

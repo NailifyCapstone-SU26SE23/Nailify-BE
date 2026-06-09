@@ -86,6 +86,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ISkillTypeRepository, SkillTypeRepository>();
             services.AddScoped<INailArtistSkillRepository, NailArtistSkillRepository>();
             services.AddScoped<INailRequiredSkillRepository, NailRequiredSkillRepository>();
+            services.AddScoped<IBookingRepository, BookingRepository>();
+            services.AddScoped<IBookingItemRepository, BookingItemRepository>();
+            services.AddScoped<IBookingHistoryRepository, BookingHistoryRepository>();
+            services.AddScoped<IServicesRepository, ServicesRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
@@ -108,7 +112,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailArtistSkillService, NailArtistSkillService>();
             services.AddScoped<INailRequiredSkillService, NailRequiredSkillService>();
             services.AddScoped<CloudinaryService>();
-
+            services.AddScoped<IQRService, QRService>();
+            services.AddScoped<IBookingService, BookingService>();
+            services.AddScoped<IServicesService, ServicesService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();

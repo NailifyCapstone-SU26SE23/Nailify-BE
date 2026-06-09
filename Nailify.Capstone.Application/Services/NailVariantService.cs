@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -178,6 +178,20 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return null;
+        }
+
+        public async Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId)
+        {
+            var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(artistId);
+            if (artist == null)
+            {
+                return new ApiErrorResult<List<NailVariantDto>>("Không tìm thấy thợ nail.");
+            }
+
+            var capableVariants = await _unitOfWork.NailVariantRepository.GetNailVariantsCapableByArtistAsync(artistId);
+            var response = _mapper.Map<List<NailVariantDto>>(capableVariants);
+
+            return new ApiSuccessResult<List<NailVariantDto>>(response, "Lấy danh sách mẫu móng thợ có thể thực hiện thành công.");
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.SkillTypeResponseDTOs
     public class NailRequiredSkillResponseDTO : IMapFrom<NailRequiredSkill>
     {
         public Guid NailRequiredSkillId { get; set; }
-        public int NailDesignId { get; set; }
+        public int NailVariantId { get; set; }
         public Guid SkillTypeId { get; set; }
         public string SkillTypeName { get; set; } = string.Empty;
         public int RequiredLevel { get; set; }
