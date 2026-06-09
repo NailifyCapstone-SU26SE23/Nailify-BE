@@ -16,8 +16,6 @@ namespace Nailify.Capstone.Application.Validation.UserRequestDTOs
             RuleFor(x => x.NailCondition)
                 .NotEmpty().WithMessage("Tình trạng móng (NailCondition) không được để trống.");
 
-            RuleFor(x => x.PersonaId)
-                .NotEmpty().WithMessage("Chỉ số định danh phong cách (PersonaId) không được để trống.");
         }
     }
 }

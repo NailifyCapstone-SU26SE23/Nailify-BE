@@ -14,7 +14,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public int NailSurfaceId { get; set; }
         public decimal Price { get; set; }
         public string CustomColor { get; set; } = string.Empty;
-        public string CustomMaterial { get; set; } = string.Empty;
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsFavorite { get; set; }
