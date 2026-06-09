@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Security.Claims;
-using System.Threading.Tasks;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Presentation.Middlewares;
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý trang cá nhân.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class ProfileController : ControllerBase
+    public class ProfileController : BaseApiController
     {
         private readonly IUserService _userService;
 
@@ -19,7 +19,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// API Xem thông tin cá nhân của người dùng đang đăng nhập
+        /// Lấy thông tin người dùng.
         /// </summary>
         [HttpGet]
         //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
@@ -50,7 +50,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// API Cập nhật thông tin cá nhân của người dùng đang đăng nhập
+        /// API cập nhật thông tin người dùng.
         /// </summary>
         [HttpPut]
         public async Task<IActionResult> UpdateMyProfile([FromBody] ProfileUpdateRequest request)

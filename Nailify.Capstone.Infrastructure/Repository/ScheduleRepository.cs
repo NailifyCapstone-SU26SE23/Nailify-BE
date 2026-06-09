@@ -13,6 +13,19 @@ namespace Nailify.Capstone.Infrastructure.Repository
     {
         public ScheduleRepository(NailifyDbContext context) : base(context) { }
 
+        public async Task<Schedule?> GetScheduleByArtistAndDateAsync(Guid artistId, DateTime date)
+        {
+            var localDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
+            var startOfDayUtc = DateTime.SpecifyKind(localDate.AddHours(-7), DateTimeKind.Utc);
+            var endOfDayUtc = startOfDayUtc.AddDays(1).AddTicks(-1);
+
+            return await FindByCondition(x => x.NailArtistId == artistId 
+                                              && x.WorkDate >= startOfDayUtc 
+                                              && x.WorkDate <= endOfDayUtc 
+                                              && (x.Status == "Available" || x.Status == "Active"))
+                                  .FirstOrDefaultAsync();
+        }
+
         public async Task<IEnumerable<Schedule>> GetSchedulesByArtistIdAsync(Guid artistId, DateTime? startDate, DateTime? endDate)
         {
             var query = FindByCondition(s => s.NailArtistId == artistId);

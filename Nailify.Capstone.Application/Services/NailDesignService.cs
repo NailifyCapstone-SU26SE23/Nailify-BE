@@ -61,6 +61,12 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailDesignDto>($"Không tìm thấy danh mục: {string.Join(", ", invalidCategoryIds)}.");
             }
 
+            var invalidNailVariantIds = await GetInvalidNailVariantIdsAsync(request.NailVariantIds);
+            if (invalidNailVariantIds.Any())
+            {
+                return new ApiErrorResult<NailDesignDto>($"Khong tim thay bien the mong: {string.Join(", ", invalidNailVariantIds)}.");
+            }
+
             var design = _mapper.Map<NailDesign>(request);
             design.Status = "Active";
             design.NailCategories = request.CategoryIds
@@ -75,6 +81,7 @@ namespace Nailify.Capstone.Application.Services
 
             await _unitOfWork.NailDesignRepository.CreateAsync(design);
             await _unitOfWork.SaveChangesAsync();
+            await AssignNailVariantsAsync(design.NailDesignId, request.NailVariantIds);
 
             var createdDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(design.NailDesignId);
             var designDto = _mapper.Map<NailDesignDto>(createdDesign);
@@ -82,9 +89,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Tạo mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null)
+        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, List<string>? newImageUrls = null)
         {
-            var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
+            var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             if (existingDesign == null || existingDesign.Status == "InActive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
@@ -94,6 +101,12 @@ namespace Nailify.Capstone.Application.Services
             if (invalidCategoryIds.Any())
             {
                 return new ApiErrorResult<NailDesignDto>($"Không tìm thấy danh mục: {string.Join(", ", invalidCategoryIds)}.");
+            }
+
+            var invalidNailVariantIds = await GetInvalidNailVariantIdsAsync(request.NailVariantIds);
+            if (invalidNailVariantIds.Any())
+            {
+                return new ApiErrorResult<NailDesignDto>($"Khong tim thay bien the mong: {string.Join(", ", invalidNailVariantIds)}.");
             }
 
             _mapper.Map(request, existingDesign);
@@ -123,8 +136,9 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.NailDesignRepository.Update(existingDesign);
             await _unitOfWork.SaveChangesAsync();
+            await AssignNailVariantsAsync(existingDesign.NailDesignId, request.NailVariantIds);
 
-            var updatedDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(request.NailDesignId);
+            var updatedDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             var designDto = _mapper.Map<NailDesignDto>(updatedDesign);
 
             return new ApiSuccessResult<NailDesignDto>(designDto, "Cập nhật mẫu nail thành công.");
@@ -166,6 +180,73 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return invalidCategoryIds;
+        }
+
+        private async Task<List<int>> GetInvalidNailVariantIdsAsync(IEnumerable<int> nailVariantIds)
+        {
+            var requestedIds = nailVariantIds
+                .Where(nailVariantId => nailVariantId > 0)
+                .Distinct()
+                .ToList();
+            if (!requestedIds.Any())
+            {
+                return new List<int>();
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(requestedIds);
+            var existingIds = variants.Select(variant => variant.NailVariantId).ToHashSet();
+
+            return requestedIds
+                .Where(nailVariantId => !existingIds.Contains(nailVariantId))
+                .ToList();
+        }
+
+        private async Task AssignNailVariantsAsync(int nailDesignId, IEnumerable<int> nailVariantIds)
+        {
+            var requestedIds = nailVariantIds
+                .Where(nailVariantId => nailVariantId > 0)
+                .Distinct()
+                .ToList();
+            if (!requestedIds.Any())
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(requestedIds);
+            var affectedNailDesignIds = variants
+                .Select(variant => variant.NailDesignId)
+                .Append(nailDesignId)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            foreach (var variant in variants)
+            {
+                variant.NailDesignId = nailDesignId;
+                _unitOfWork.NailVariantRepository.Update(variant);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            foreach (var affectedNailDesignId in affectedNailDesignIds)
+            {
+                await UpdateNailDesignPriceRangeAsync(affectedNailDesignId);
+            }
+        }
+
+        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        {
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (nailDesign == null)
+            {
+                return;
+            }
+
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
+            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
+
+            _unitOfWork.NailDesignRepository.Update(nailDesign);
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }

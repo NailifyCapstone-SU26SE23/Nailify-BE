@@ -1,13 +1,11 @@
-using Microsoft.AspNetCore.Http;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -20,11 +18,19 @@ namespace Nailify.Capstone.Presentation.Controllers
     {
         private readonly INailDesignService _nailDesignService;
         private readonly CloudinaryService _cloudinaryService;
+        private readonly IValidator<NailDesignCreateRequest> _designCreateValidator;
+        private readonly IValidator<NailDesignUpdateRequest> _designUpdateValidator;
 
-        public NailDesignsController(INailDesignService nailDesignService, CloudinaryService cloudinaryService)
+        public NailDesignsController(
+            INailDesignService nailDesignService,
+            CloudinaryService cloudinaryService,
+            IValidator<NailDesignCreateRequest> designCreateValidator,
+            IValidator<NailDesignUpdateRequest> designUpdateValidator)
         {
             _nailDesignService = nailDesignService;
             _cloudinaryService = cloudinaryService;
+            _designCreateValidator = designCreateValidator;
+            _designUpdateValidator = designUpdateValidator;
         }
 
         /// <summary>
@@ -68,6 +74,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, List<IFormFile>? images)
         {
+            var validationResult = await _designCreateValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
+            }
+
             var uploadedImageUrls = new List<string>();
 
             try
@@ -92,14 +104,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Cập nhật mẫu nail.
         /// </summary>
-        [HttpPut]
+        [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Update([FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
         {
-            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(request.NailDesignId);
+            var validationResult = await _designUpdateValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
+            }
+
+            var existingResult = await _nailDesignService.GetNailDesignByIdAsync(id);
             if (!existingResult.IsSucceeded)
             {
                 return NotFound(existingResult);
@@ -110,7 +128,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             try
             {
                 uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.UpdateNailDesignAsync(request, uploadedImageUrls);
+                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrls);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImagesAsync(uploadedImageUrls);
@@ -133,7 +151,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xóa mẫu nail bằng cách chuyển trạng thái sang InActive.
+        /// Xóa mẫu nail.
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]

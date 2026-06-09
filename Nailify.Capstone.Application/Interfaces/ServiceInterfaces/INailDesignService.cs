@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             IEnumerable<int>? categoryIds = null);
         Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id);
         Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, List<string>? imageUrls = null);
-        Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(NailDesignUpdateRequest request, List<string>? newImageUrls = null);
+        Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, List<string>? newImageUrls = null);
         Task<ApiResult<bool>> DeleteNailDesignAsync(int id);
         Task<ApiResult<List<NailDesignDto>>> GetNailDesignsByCategoryAsync(int categoryId);
     }
