@@ -611,10 +611,10 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
 
-            if (booking.CustomerId != customerId)
-            {
-                return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
-            }
+            // if (booking.CustomerId != customerId)
+            // {
+            //     return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
+            // }
 
             if (booking.Status != "Pending" && booking.Status != "Approved")
             {
