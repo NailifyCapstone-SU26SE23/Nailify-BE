@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
     {
         public Guid SalonId { get; set; }
         public DateTime BookingDate { get; set; }
-        public TimeSpan ExpectedTime { get; set; }
+        public TimeSpan StartTime { get; set; }
         public Guid? NailArtistId { get; set; }
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
         public void Mapping(Profile profile)

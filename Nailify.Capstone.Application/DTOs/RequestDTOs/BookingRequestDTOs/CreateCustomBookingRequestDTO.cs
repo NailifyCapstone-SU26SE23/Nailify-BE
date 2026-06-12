@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Interfaces.MappingInterface;
+using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -13,6 +13,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public Guid SalonId { get; set; }
         public int CustomerNailId { get; set; }
         public DateTime BookingDate { get; set; }
-        public TimeSpan ExpectedTime { get; set; }
+        public TimeSpan StartTime { get; set; }
     }
 }

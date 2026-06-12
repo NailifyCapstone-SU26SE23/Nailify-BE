@@ -14,7 +14,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid SalonId { get; set; }
         public Guid? NailArtistId { get; set; }
         public DateTime BookingDate { get; set; }
-        public TimeSpan ExpectedTime { get; set; }
+        public TimeSpan StartTime { get; set; }
         public decimal TotalPrice { get; set; }
         public string Status { get; set; }
         public string Price { get; set; }

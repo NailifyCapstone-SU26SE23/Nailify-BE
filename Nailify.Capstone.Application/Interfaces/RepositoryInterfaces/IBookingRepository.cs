@@ -15,5 +15,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<Booking>> GetBookingsBySalonAsync(Guid salonId);
         Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime);
         Task<bool> HasBookingConflictExcludingCurrentAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid currentBookingId);
+        Task<IEnumerable<Booking>> GetBookingsByArtistAsync(Guid artistId);
     }
 }
