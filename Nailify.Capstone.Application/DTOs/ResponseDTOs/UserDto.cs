@@ -40,5 +40,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// Trạng thái hoạt động (Active, InActive...).
         /// </summary>
         public string Status { get; set; }
+        public string Role { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -172,6 +172,22 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
 
             await DeleteImageAsync(existingResult.Data.ImageUrl);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Lấy danh sách mẫu móng thợ có thể thực hiện.
+        /// </summary>
+        [HttpGet("capable-by-artist/{artistId}")]
+        [ProducesResponseType(typeof(ApiResult<List<NailVariantDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetCapableNailVariants(Guid artistId)
+        {
+            var result = await _nailVariantService.GetCapableNailVariantsAsync(artistId);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
             return Ok(result);
         }
 

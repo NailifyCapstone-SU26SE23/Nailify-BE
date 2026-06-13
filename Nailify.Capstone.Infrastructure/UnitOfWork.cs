@@ -26,6 +26,13 @@ namespace Nailify.Capstone.Infrastructure
         private ICustomerComponentRepository? _customerComponentRepository;
         private ICustomerNailRepository? _customerNailRepository;
         private ICustomerNailComponentRepository? _customerNailComponentRepository;
+        private ISkillTypeRepository? _skillTypeRepository;
+        private INailArtistSkillRepository? _nailArtistSkillRepository;
+        private INailRequiredSkillRepository? _nailRequiredSkillRepository;
+        private IBookingRepository? _bookingRepository;
+        private IBookingItemRepository? _bookingItemRepository;
+        private IBookingHistoryRepository? _bookingHistoryRepository;
+        private IServicesRepository? _servicesRepository;   
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -51,6 +58,20 @@ namespace Nailify.Capstone.Infrastructure
         public ICustomerComponentRepository CustomerComponentRepository => _customerComponentRepository ??= new CustomerComponentRepository(_context);
         public ICustomerNailRepository CustomerNailRepository => _customerNailRepository ??= new CustomerNailRepository(_context);
         public ICustomerNailComponentRepository CustomerNailComponentRepository => _customerNailComponentRepository ??= new CustomerNailComponentRepository(_context);
+
+        public ISkillTypeRepository SkillTypeRepository => _skillTypeRepository ??= new SkillTypeRepository(_context);
+
+        public INailArtistSkillRepository NailArtistSkillRepository => _nailArtistSkillRepository ??= new NailArtistSkillRepository(_context);
+
+        public INailRequiredSkillRepository NailRequiredSkillRepository => _nailRequiredSkillRepository ??= new NailRequiredSkillRepository(_context);
+
+        public IBookingRepository BookingRepository => _bookingRepository ??= new BookingRepository(_context);
+
+        public IBookingItemRepository BookingItemRepository => _bookingItemRepository ??= new BookingItemRepository(_context);
+
+        public IBookingHistoryRepository BookingHistoryRepository => _bookingHistoryRepository ??= new BookingHistoryRepository(_context);
+
+        public IServicesRepository ServicesRepository => _servicesRepository ??= new ServicesRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

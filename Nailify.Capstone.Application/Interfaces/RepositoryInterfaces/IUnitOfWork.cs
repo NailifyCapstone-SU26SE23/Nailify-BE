@@ -25,6 +25,13 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         ICustomerComponentRepository CustomerComponentRepository { get; }
         ICustomerNailRepository CustomerNailRepository { get; }
         ICustomerNailComponentRepository CustomerNailComponentRepository { get; }
+        ISkillTypeRepository SkillTypeRepository { get; }
+        INailArtistSkillRepository NailArtistSkillRepository { get; }
+        INailRequiredSkillRepository NailRequiredSkillRepository { get; }
+        IBookingRepository BookingRepository { get; }
+        IBookingItemRepository BookingItemRepository { get; }
+        IBookingHistoryRepository BookingHistoryRepository { get; }
+        IServicesRepository ServicesRepository { get; }
         Task<int> SaveChangesAsync();
     }
 }
