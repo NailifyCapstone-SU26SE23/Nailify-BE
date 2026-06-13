@@ -11,6 +11,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int? Duration { get; set; }
         public string ImageUrl { get; set; } = string.Empty;        
         public string ColorJson { get; set; } = string.Empty;
+        public string Status { get; set; } = "Active";
 
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;

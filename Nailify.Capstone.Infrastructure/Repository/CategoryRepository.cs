@@ -18,7 +18,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(c => c.CategoryType)
                 .Include(c => c.NailCategories)
                 .ThenInclude(nc => nc.NailDesign)
-                .FirstOrDefaultAsync(c => c.CategoryId == categoryId);
+                .FirstOrDefaultAsync(c => c.CategoryId == categoryId && c.Status == "Active");
         }
 
         public async Task<PagedList<Category>> GetPagedCategoriesAsync(

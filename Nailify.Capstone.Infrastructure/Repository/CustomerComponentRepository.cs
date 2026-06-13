@@ -14,7 +14,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<PagedList<CustomerComponent>> GetPagedCustomerComponentsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, ComponentType? componentType = null)
         {
-            var query = _dbSet.AsQueryable();
+            var query = _dbSet
+                .Where(component => component.Status == "Active")
+                .AsQueryable();
 
             if (userId.HasValue)
             {

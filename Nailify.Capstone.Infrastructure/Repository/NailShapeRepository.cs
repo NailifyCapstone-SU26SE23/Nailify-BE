@@ -14,12 +14,16 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<List<NailShape>> GetAllNailShapesAsync()
         {
-            return await _dbSet.ToListAsync();
+            return await _dbSet
+                .Where(ns => ns.Status == "Active")
+                .ToListAsync();
         }
 
         public async Task<PagedList<NailShape>> GetPagedNailShapesAsync(int pageNumber, int pageSize, string? name = null)
         {
-            var query = _dbSet.AsQueryable();
+            var query = _dbSet
+                .Where(ns => ns.Status == "Active")
+                .AsQueryable();
             if (!string.IsNullOrWhiteSpace(name))
             {
                 var normalizedName = name.Trim().ToLower();

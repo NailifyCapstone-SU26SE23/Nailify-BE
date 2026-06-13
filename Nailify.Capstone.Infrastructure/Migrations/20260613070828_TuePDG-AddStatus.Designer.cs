@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260613070828_TuePDG-AddStatus")]
+    partial class TuePDGAddStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -58,9 +61,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.Property<int>("TotalDuration")
                         .HasColumnType("integer");
@@ -172,9 +173,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("CategoryId");
 
@@ -197,9 +196,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("CategoryTypeId");
 
@@ -234,9 +231,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("ComponentId");
 
@@ -313,9 +308,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -370,9 +363,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -449,9 +440,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("NailArtistId");
 
@@ -577,9 +566,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("NailDesignId");
 
@@ -658,9 +645,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("NailShapeId");
 
@@ -692,9 +677,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("NailSurfaceId");
 
@@ -739,9 +722,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("NailVariantId");
 
@@ -786,9 +767,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("SalonId");
 
@@ -843,9 +822,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("WorkDate")
                         .HasColumnType("timestamp without time zone");
@@ -882,9 +859,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("ServiceId");
 
@@ -907,9 +882,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("SkillTypeId");
 
@@ -950,9 +923,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("text");
 
                     b.HasKey("UserId");
 

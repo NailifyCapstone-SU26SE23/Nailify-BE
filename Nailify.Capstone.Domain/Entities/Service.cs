@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string? Description { get; set; }
         public decimal Price { get; set; }
         public int Duration { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = "Active";
         public DateTime CreateAt { get; set; }
 
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();

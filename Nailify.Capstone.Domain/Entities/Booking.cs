@@ -16,7 +16,7 @@ namespace Nailify.Capstone.Domain.Entities
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public decimal TotalPrice { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = "Active";
         public string Price { get; set; }
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }

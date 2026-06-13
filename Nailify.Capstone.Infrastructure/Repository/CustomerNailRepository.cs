@@ -55,6 +55,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         private IQueryable<CustomerNail> BuildCustomerNailQuery()
         {
             return _dbSet
+                .Where(nail => nail.Status == "Active")
                 .Include(nail => nail.NailShape)
                 .Include(nail => nail.NailSurface)
                 .Include(nail => nail.CustomerNailComponents)

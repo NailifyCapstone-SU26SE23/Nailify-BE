@@ -14,7 +14,7 @@ namespace Nailify.Capstone.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public bool IsFavorite { get; set; }
         public bool IsPublic { get; set; }
-
+        public string Status { get; set; } = "Active";
         public virtual User User { get; set; } = null!;
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;

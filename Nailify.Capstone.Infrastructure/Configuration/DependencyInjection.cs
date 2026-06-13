@@ -114,6 +114,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<CloudinaryService>();
             services.AddScoped<IQRService, QRService>();
             services.AddScoped<IBookingService, BookingService>();
+            services.AddScoped<IBookingHistoryService, BookingHistoryService>();
             services.AddScoped<IServicesService, ServicesService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
