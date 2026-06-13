@@ -24,10 +24,10 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<List<NailRequiredSkillResponseDTO>>> AssignRequiredSkillsAsync(int designId, List<AssignRequiredSkillRequest> requests)
+        public async Task<ApiResult<List<NailRequiredSkillResponseDTO>>> AssignRequiredSkillsAsync(int variantId, List<AssignRequiredSkillRequest> requests)
         {
-            var designExist = await _unitOfWork.NailDesignRepository.ExistsAsync(x => x.NailDesignId == designId);
-            if (!designExist)
+            var variantExist = await _unitOfWork.NailVariantRepository.ExistsAsync(x => x.NailVariantId == variantId);
+            if (!variantExist)
             {
                 return new ApiErrorResult<List<NailRequiredSkillResponseDTO>>("Không tìm thấy thiết kế nail.");
             }
@@ -40,7 +40,7 @@ namespace Nailify.Capstone.Application.Services
                     return new ApiErrorResult<List<NailRequiredSkillResponseDTO>>($"Loại kỹ năng với ID {req.SkillTypeId} không tồn tại hoặc đã bị vô hiệu hóa.");
                 }
 
-                var existing = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(designId, req.SkillTypeId);
+                var existing = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(variantId, req.SkillTypeId);
                 if (existing != null)
                 {
                     _mapper.Map(req, existing);
@@ -50,26 +50,26 @@ namespace Nailify.Capstone.Application.Services
                 {
                     var newRequiredSkill = _mapper.Map<NailRequiredSkill>(req);
                     newRequiredSkill.NailRequiredSkillId = Guid.NewGuid();
-                    newRequiredSkill.NailVariantId = designId;
+                    newRequiredSkill.NailVariantId = variantId;
                     await _unitOfWork.NailRequiredSkillRepository.CreateAsync(newRequiredSkill);
                 }
             }
             await _unitOfWork.SaveChangesAsync();
 
-            var updatedSkills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(designId);
+            var updatedSkills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(variantId);
             var response= _mapper.Map<List<NailRequiredSkillResponseDTO>>(updatedSkills);
             return new ApiSuccessResult<List<NailRequiredSkillResponseDTO>>(response, "Gán kỹ năng yêu cầu cho thiết kế nail thành công.");
         }
 
-        public async Task<ApiResult<bool>> DeleteRequiredSkillAsync(int designId, Guid skillId)
+        public async Task<ApiResult<bool>> DeleteRequiredSkillAsync(int variantId, Guid skillId)
         {
-            var designExists = await _unitOfWork.NailDesignRepository.ExistsAsync(x => x.NailDesignId == designId);
-            if (!designExists)
+            var variantExists = await _unitOfWork.NailVariantRepository.ExistsAsync(x => x.NailVariantId == variantId);
+            if (!variantExists)
             {
                 return new ApiErrorResult<bool>("Không tìm thấy thiết kế nail.");
             }
 
-            var requiredSkill = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(designId, skillId);
+            var requiredSkill = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(variantId, skillId);
             if (requiredSkill == null)
             {
                 return new ApiErrorResult<bool>("Không tìm thấy kỹ năng yêu cầu cho thiết kế nail.");
@@ -80,27 +80,27 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa kỹ năng yêu cầu khỏi thiết kế nail thành công.");
         }
 
-        public async Task<ApiResult<List<NailRequiredSkillResponseDTO>>> GetRequiredSkillsByDesignIdAsync(int nailId)
+        public async Task<ApiResult<List<NailRequiredSkillResponseDTO>>> GetRequiredSkillsByDesignIdAsync(int variantId)
         {
-            var designExist = await _unitOfWork.NailDesignRepository.ExistsAsync(x => x.NailDesignId == nailId);
-            if (!designExist)
+            var variantExists = await _unitOfWork.NailVariantRepository.ExistsAsync(x => x.NailVariantId == variantId);
+            if (!variantExists)
             {
                 return new ApiErrorResult<List<NailRequiredSkillResponseDTO>>("Không tìm thấy thiết kế nail.");
             }
 
-            var skills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(nailId);
+            var skills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(variantId);
             var response = _mapper.Map<List<NailRequiredSkillResponseDTO>>(skills);
             return new ApiSuccessResult<List<NailRequiredSkillResponseDTO>>(response, "Lấy danh sách kỹ năng yêu cầu cho thiết kế nail thành công.");
         }
 
-        public async Task<ApiResult<NailRequiredSkillResponseDTO>> UpdateRequiredSkillLevelAsync(int designId, Guid skillId, UpdateRequiredSkillLevelRequest request)
+        public async Task<ApiResult<NailRequiredSkillResponseDTO>> UpdateRequiredSkillLevelAsync(int variantId, Guid skillId, UpdateRequiredSkillLevelRequest request)
         {
-            var designExist = await _unitOfWork.NailDesignRepository.ExistsAsync(x => x.NailDesignId == designId);
-            if(!designExist)
+            var variantExists = await _unitOfWork.NailVariantRepository.ExistsAsync(x => x.NailVariantId == variantId);
+            if(!variantExists)
             {
                 return new ApiErrorResult<NailRequiredSkillResponseDTO>("Không tìm thấy thiết kế nail.");
             }
-            var requiredSkill = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(designId, skillId);
+            var requiredSkill = await _unitOfWork.NailRequiredSkillRepository.GetByNailDesignAndSkillAsync(variantId, skillId);
             if (requiredSkill == null)
             {
                 return new ApiErrorResult<NailRequiredSkillResponseDTO>("Kỹ năng yêu cầu không tồn tại.");

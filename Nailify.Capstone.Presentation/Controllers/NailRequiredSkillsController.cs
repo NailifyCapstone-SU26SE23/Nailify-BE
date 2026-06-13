@@ -8,7 +8,7 @@ using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
-    [Route("api/nail-designs/{designId}/required-skills")]
+    [Route("api/nail-designs/{variantId}/required-skills")]
     [ApiController]
     public class NailRequiredSkillsController : ControllerBase
     {
@@ -23,9 +23,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<List<NailRequiredSkillResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetRequiredSkills(int designId)
+        public async Task<IActionResult> GetRequiredSkills(int variantId)
         {
-            var result = await _nailRequiredSkillService.GetRequiredSkillsByDesignIdAsync(designId);
+            var result = await _nailRequiredSkillService.GetRequiredSkillsByDesignIdAsync(variantId);
             if (!result.IsSucceeded) return NotFound(result);
             return Ok(result);
         }
@@ -37,9 +37,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<List<NailRequiredSkillResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> AssignRequiredSkills(int designId, [FromBody] List<AssignRequiredSkillRequest> requests)
+        public async Task<IActionResult> AssignRequiredSkills(int variantId, [FromBody] List<AssignRequiredSkillRequest> requests)
         {
-            var result = await _nailRequiredSkillService.AssignRequiredSkillsAsync(designId, requests);
+            var result = await _nailRequiredSkillService.AssignRequiredSkillsAsync(variantId, requests);
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
@@ -51,9 +51,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<NailRequiredSkillResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateRequiredSkillLevel(int designId, Guid skillTypeId, [FromBody] UpdateRequiredSkillLevelRequest request)
+        public async Task<IActionResult> UpdateRequiredSkillLevel(int variantId, Guid skillTypeId, [FromBody] UpdateRequiredSkillLevelRequest request)
         {
-            var result = await _nailRequiredSkillService.UpdateRequiredSkillLevelAsync(designId, skillTypeId, request);
+            var result = await _nailRequiredSkillService.UpdateRequiredSkillLevelAsync(variantId, skillTypeId, request);
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
@@ -65,9 +65,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> RemoveRequiredSkill(int designId, Guid skillTypeId)
+        public async Task<IActionResult> RemoveRequiredSkill(int variantId, Guid skillTypeId)
         {
-            var result = await _nailRequiredSkillService.DeleteRequiredSkillAsync(designId, skillTypeId);
+            var result = await _nailRequiredSkillService.DeleteRequiredSkillAsync(variantId, skillTypeId);
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }

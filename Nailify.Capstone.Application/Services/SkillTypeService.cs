@@ -37,7 +37,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SkillTypeRepository.CreateAsync(skillType);
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<SkillTypeResponseDTO>(skillType);
-            return new ApiSuccessResult<SkillTypeResponseDTO>(response, "Tên loại kỹ năng này đã tồn tại.");
+            return new ApiSuccessResult<SkillTypeResponseDTO>(response, "Tên loại kỹ năng này đã được tạo thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteSkillTYpeAsync(Guid skillTypeId)

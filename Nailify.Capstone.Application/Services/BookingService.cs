@@ -33,6 +33,10 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
+            if (booking.Status != "Approved")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-in đơn đã được xác nhận duyệt ('Approved'). Trạng thái hiện tại: '{booking.Status}'.");
+            }
 
             booking.CheckInImageUrl = request.CheckInImageUrl;
             booking.Status = "CheckedIn";
@@ -98,6 +102,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 item.BookingId = bookingId;
 
+                if (!item.NailVariantId.HasValue && !item.ServiceId.HasValue)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
+                }
+
                 decimal itemPrice = 0;
                 int itemDuration = 0;
 
@@ -150,11 +159,11 @@ namespace Nailify.Capstone.Application.Services
 
             if (request.NailArtistId.HasValue)
             {
-                var targetEndTime = request.ExpectedTime.Add(TimeSpan.FromMinutes(totalDuration));
+                var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
                 var isConflict = await _unitOfWork.BookingRepository.HasBookingConflictAsync(
                     request.NailArtistId.Value,
                     request.BookingDate,
-                    request.ExpectedTime,
+                    request.StartTime,
                     targetEndTime
                 );
                 if (isConflict)
@@ -200,8 +209,8 @@ namespace Nailify.Capstone.Application.Services
 
             var busySlots = bookings.Select(x => new BusyTimeSlotResponseDto
             {
-                StartTime = x.ExpectedTime,
-                EndTime = x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration))
+                StartTime = x.StartTime,
+                EndTime = x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration))
             })
             .OrderBy(x => x.StartTime)
             .ToList();
@@ -246,24 +255,32 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Vui lòng chọn mẫu nail trước khi tìm thợ.");
             }
             var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
-
-            var variantIds =  _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
-
-            if(!variantIds.Any())
+            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue))
             {
-                return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Vui lòng chọn mẫu nail trước khi tìm thợ.");
+                return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
             }
 
-            var suggestedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+            var variantIds =  _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
+            IEnumerable<NailArtist> suggestedArtist;
 
-            var response = _mapper.Map<List<SuggestedArtistResponseDTO>>(suggestedArtists);
+            if(variantIds.Any())
+            {
+                suggestedArtist = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+            }
+            else
+            {
+                var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(request.SalonId);
+                suggestedArtist = activeArtists.Where(x => x.Status == "Active");
+            }
+            var response = _mapper.Map<List<SuggestedArtistResponseDTO>>(suggestedArtist);
 
             return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(response, "Lấy danh sách thợ đề xuất thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId)
+                                            ;
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -294,6 +311,10 @@ namespace Nailify.Capstone.Application.Services
                     NailVariantId = x.NailVariantId
                 };
 
+                if (!x.NailVariantId.HasValue && !x.ServiceId.HasValue)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
+                }
                 decimal itemPrice = 0;
                 int itemDuration = 0;
 
@@ -336,11 +357,11 @@ namespace Nailify.Capstone.Application.Services
 
             if (request.NailArtistId.HasValue)
             {
-                var targetEndTime = request.ExpectedTime.Add(TimeSpan.FromMinutes(totalDuration));
+                var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
                 var isConflict = await _unitOfWork.BookingRepository.HasBookingConflictExcludingCurrentAsync(
                     request.NailArtistId.Value,
                     request.BookingDate,
-                    request.ExpectedTime,
+                    request.StartTime,
                     targetEndTime,
                     bookingId
                 );
@@ -350,18 +371,33 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
+            // Xóa các items cũ khỏi DB trước
+            var oldItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
+            foreach (var oldItem in oldItems)
+            {
+                oldItem.Booking = null!;
+                oldItem.NailVariant = null;
+                oldItem.Service = null;
+                oldItem.CustomerNail = null;
+                _unitOfWork.BookingItemRepository.Delete(oldItem);
+            }
+
             booking.BookingDate = request.BookingDate;
-            booking.ExpectedTime = request.ExpectedTime;
+            booking.StartTime = request.StartTime   ;
             booking.NailArtistId = request.NailArtistId;
             booking.TotalPrice = totalPrice;
             booking.Price = totalPrice.ToString("N0") + " VND";
             booking.TotalDuration = totalDuration;
             booking.UpdatedAt = DateTime.UtcNow;
 
+            // Clear list trong memory của booking
             booking.BookingItems.Clear();
+
+            _unitOfWork.BookingRepository.Update(booking);
+
             foreach (var item in bookingItems)
             {
-                booking.BookingItems.Add(item);
+                await _unitOfWork.BookingItemRepository.CreateAsync(item);
             }
 
             var history = new BookingHistory
@@ -373,7 +409,6 @@ namespace Nailify.Capstone.Application.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
 
@@ -400,7 +435,7 @@ namespace Nailify.Capstone.Application.Services
                 CustomerId = customerId,
                 SalonId = request.SalonId,
                 BookingDate = request.BookingDate,
-                ExpectedTime = request.ExpectedTime,
+                StartTime = request.StartTime,
                 Status = "CustomPending",
                 TotalPrice = 0,
                 Price = "0 VND",
@@ -566,6 +601,158 @@ namespace Nailify.Capstone.Application.Services
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Quản lý chốt báo giá và gửi khách hàng thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+
+            // if (booking.CustomerId != customerId)
+            // {
+            //     return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
+            // }
+
+            if (booking.Status != "Pending" && booking.Status != "Approved")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ được hủy đơn ở trạng thái 'Pending' hoặc 'Approved'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+
+            var oldStatus = booking.Status;
+            booking.Status = "Cancelled";
+            booking.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.BookingRepository.Update(booking);
+            var history = new BookingHistory
+            {
+                BookingId = booking.BookingId,
+                EventType = "BookingCancelled",
+                Payload = $"Hủy đơn từ trạng thái '{oldStatus}' sang 'Cancelled'. Lý do: {request.Reason}",
+                ActorId = customerId,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+            if (booking.Status != "Pending")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể xác nhận đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+            booking.Status = "Approved";
+            booking.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.BookingRepository.Update(booking);
+            var history = new BookingHistory
+            {
+                BookingHistoryId = Guid.NewGuid(),
+                BookingId = booking.BookingId,
+                EventType = "BookingConfirmed",
+                Payload = "Quản lý Salon xác nhận duyệt đơn đặt lịch.",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt đơn đặt lịch thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+            if (booking.Status != "Pending")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+            booking.Status = "Rejected";
+            booking.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.BookingRepository.Update(booking);
+            var history = new BookingHistory
+            {
+                BookingHistoryId = Guid.NewGuid(),
+                BookingId = booking.BookingId,
+                EventType = "BookingRejected",
+                Payload = "Quản lý Salon từ chối đơn đặt lịch.",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối đơn đặt lịch thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+            if (booking.Status != "CheckedIn")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể bắt đầu làm khi khách đã 'CheckedIn'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+            booking.Status = "InProgress";
+            booking.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.BookingRepository.Update(booking);
+            var history = new BookingHistory
+            {
+                BookingHistoryId = Guid.NewGuid(),
+                BookingId = booking.BookingId,
+                EventType = "ServiceStarted",
+                Payload = "Thợ làm móng bắt đầu thực hiện các dịch vụ trong đơn.",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Bắt đầu làm móng thành công.");
+        }
+
+        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId)
+        {
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsByCustomerAsync(customerId);
+            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
+            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của khách hàng thành công.");
+        }
+
+        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId)
+        {
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsBySalonAsync(salonId);
+            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
+            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Salon thành công.");
+        }
+
+        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId)
+        {
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAsync(artistId);
+            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
+            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Thợ làm móng thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
+            }
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Lấy thông tin chi tiết đặt lịch thành công.");
         }
     }
 }

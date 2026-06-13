@@ -58,7 +58,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .Include(x => x.NailArtist)
                                         .ThenInclude(x => x.Account)
                                     .OrderByDescending(x => x.BookingDate)
-                                    .ThenByDescending(x => x.ExpectedTime)
+                                    .ThenByDescending(x => x.StartTime)
                                     .ToListAsync();
 
         public async Task<IEnumerable<Booking>> GetBookingsBySalonAsync(Guid salonId)
@@ -75,13 +75,22 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime)
         {
             var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
-            return bookings.Any(x => x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
+            return bookings.Any(x => x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
         }
 
         public async Task<bool> HasBookingConflictExcludingCurrentAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid currentBookingId)
         {
             var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
-            return bookings.Any(x => x.BookingId != currentBookingId && x.ExpectedTime < endTime && x.ExpectedTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
+            return bookings.Any(x => x.BookingId != currentBookingId && x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
         }
+
+        public async Task<IEnumerable<Booking>> GetBookingsByArtistAsync(Guid artistId)
+             => await FindByCondition(x => x.NailArtistId == artistId)
+                            .Include(x => x.Salon)
+                            .Include(x => x.Customer)
+                                .ThenInclude(x => x.User)
+                            .OrderByDescending(x => x.BookingDate)
+                            .ThenByDescending(x => x.StartTime)
+                            .ToListAsync();
     }
 }

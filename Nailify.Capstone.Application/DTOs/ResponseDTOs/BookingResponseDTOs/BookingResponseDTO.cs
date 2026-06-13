@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -19,7 +19,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public Guid? NailArtistId { get; set; }
         public string ArtistName { get; set; } = string.Empty;
         public DateTime BookingDate { get; set; }
-        public TimeSpan ExpectedTime { get; set; }
+        public TimeSpan StartTime { get; set; }
         public decimal TotalPrice { get; set; }
         public string Status { get; set; } = string.Empty;
         public int TotalDuration { get; set; }
