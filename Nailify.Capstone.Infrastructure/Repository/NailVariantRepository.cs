@@ -54,20 +54,21 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToList();
 
             return await _dbSet
-                .Where(nv => ids.Contains(nv.NailVariantId))
+                .Where(nv => ids.Contains(nv.NailVariantId) && nv.Status == "Active")
                 .ToListAsync();
         }
 
         public async Task<List<NailVariant>> GetNailVariantsByDesignIdAsync(int nailDesignId)
         {
             return await _dbSet
-                .Where(nv => nv.NailDesignId == nailDesignId)
+                .Where(nv => nv.NailDesignId == nailDesignId && nv.Status == "Active")
                 .ToListAsync();
         }
 
         private IQueryable<NailVariant> BuildNailVariantQuery()
         {
             return _dbSet
+                .Where(nv => nv.Status == "Active")
                 .Include(nv => nv.NailShape)
                 .Include(nv => nv.NailSurface)
                 .Include(nv => nv.NailComponents)

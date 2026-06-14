@@ -114,15 +114,25 @@ namespace Nailify.Capstone.Infrastructure.Repository
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public async Task<T?> GetByIdAsync(Guid id) => await _dbSet.FindAsync(id);
+        public async Task<T?> GetByIdAsync(Guid id)
+        {
+            var entity = await _dbSet.FindAsync(id);
+            return IsActiveEntity(entity) ? entity : null;
+        }
 
-        public async Task<T?> GetByIdAsync(int id) => await _dbSet.FindAsync(id);
+        public async Task<T?> GetByIdAsync(int id)
+        {
+            var entity = await _dbSet.FindAsync(id);
+            return IsActiveEntity(entity) ? entity : null;
+        }
 
         public async Task<PagedList<T>> GetPagedAsync(int pageNumber, int pageSize,
        Expression<Func<T, bool>>? predicate = null,
        params Expression<Func<T, object>>[] includes)
         {
             IQueryable<T> query = _context.Set<T>();
+
+            query = ApplyActiveStatusFilter(query);
 
             if (predicate != null) query = query.Where(predicate);
             foreach (var include in includes ?? [])
@@ -145,5 +155,50 @@ namespace Nailify.Capstone.Infrastructure.Repository
         /// </summary>
         /// <param name="entity"></param>
         public void Update(T entity) => _dbSet.Update(entity);
+
+        private static IQueryable<T> ApplyActiveStatusFilter(IQueryable<T> query)
+        {
+            var statusProperty = typeof(T).GetProperty("Status",
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.IgnoreCase);
+
+            if (statusProperty?.PropertyType == typeof(string))
+            {
+                return query.Where(entity => EF.Property<string>(entity, statusProperty.Name) == "Active");
+            }
+
+            if (statusProperty?.PropertyType == typeof(bool))
+            {
+                return query.Where(entity => EF.Property<bool>(entity, statusProperty.Name));
+            }
+
+            return query;
+        }
+
+        private static bool IsActiveEntity(T? entity)
+        {
+            if (entity == null)
+            {
+                return false;
+            }
+
+            var statusProperty = typeof(T).GetProperty("Status",
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.IgnoreCase);
+
+            if (statusProperty?.PropertyType == typeof(string))
+            {
+                return string.Equals(statusProperty.GetValue(entity) as string, "Active", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (statusProperty?.PropertyType == typeof(bool))
+            {
+                return statusProperty.GetValue(entity) is true;
+            }
+
+            return true;
+        }
     }
 }

@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<NailDesign?> GetNailDesignWithCategoriesAsync(int nailDesignId)
         {
             return await BuildNailDesignQuery()
-                .FirstOrDefaultAsync(nd => nd.NailDesignId == nailDesignId);
+                .FirstOrDefaultAsync(nd => nd.NailDesignId == nailDesignId && nd.Status == "Active");
         }
 
         public async Task<List<NailDesign>> GetActiveNailDesignsAsync()

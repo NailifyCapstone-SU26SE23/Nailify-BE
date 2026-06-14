@@ -14,12 +14,16 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<List<Component>> GetAllComponentsAsync()
         {
-            return await _dbSet.ToListAsync();
+            return await _dbSet
+                .Where(component => component.Status == "Active")
+                .ToListAsync();
         }
 
         public async Task<PagedList<Component>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null)
         {
-            var query = _dbSet.AsQueryable();
+            var query = _dbSet
+                .Where(component => component.Status == "Active")
+                .AsQueryable();
             if (!string.IsNullOrWhiteSpace(name))
             {
                 var normalizedName = name.Trim().ToLower();

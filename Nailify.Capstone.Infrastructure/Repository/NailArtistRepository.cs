@@ -16,14 +16,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<NailArtist>> GetNailArtistsBySalonIdAsync(Guid salonId)
         {
-            return await FindByCondition(na => na.SalonId == salonId)
+            return await FindByCondition(na => na.SalonId == salonId && na.Status == "Active")
                 .Include(na => na.Account)
                 .ToListAsync();
         }
 
         public async Task<NailArtist?> GetNailArtistWithProfileAsync(Guid artistId)
         {
-            return await FindByCondition(na => na.NailArtistId == artistId)
+            return await FindByCondition(na => na.NailArtistId == artistId && na.Status == "Active")
                 .Include(na => na.Account)
                 .FirstOrDefaultAsync();
         }

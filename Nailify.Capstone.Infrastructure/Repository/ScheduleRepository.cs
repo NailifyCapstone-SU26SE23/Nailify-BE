@@ -28,7 +28,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<Schedule>> GetSchedulesByArtistIdAsync(Guid artistId, DateTime? startDate, DateTime? endDate)
         {
-            var query = FindByCondition(s => s.NailArtistId == artistId);
+            var query = FindByCondition(s => s.NailArtistId == artistId
+                && (s.Status == "Available" || s.Status == "Active"));
 
             if (startDate.HasValue)
                 query = query.Where(s => s.WorkDate >= startDate.Value);
