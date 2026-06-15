@@ -1,4 +1,5 @@
-﻿using System;
+using Nailify.Capstone.Domain.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,7 +17,8 @@ namespace Nailify.Capstone.Domain.Entities
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public decimal TotalPrice { get; set; }
-        public string Status { get; set; }
+        //public string Status { get; set; }
+        public BookingStatus Status { get; set; }
         public string Price { get; set; }
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }

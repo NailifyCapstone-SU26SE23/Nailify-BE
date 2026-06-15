@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Infrastructure.DBContext
 {
@@ -228,6 +229,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             {
                 entity.HasKey(b => b.BookingId);
                 entity.Property(b => b.TotalPrice).HasPrecision(18, 2);
+                entity.Property(b => b.Status)
+                    .HasConversion(
+                            v => v.ToString(),
+                            v => (BookingStatus)Enum.Parse(typeof(BookingStatus), v))
+                    .HasMaxLength(20);
             });
 
             modelBuilder.Entity<Services>(entity =>

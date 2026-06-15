@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
 using System.Collections.Generic;
@@ -47,8 +48,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                         x.NailArtistId == artistId
                                         && x.BookingDate >= range.start
                                         && x.BookingDate <= range.end
-                                        && x.Status != "Cancelled" 
-                                        && x.Status != "Rejected")
+                                        && x.Status != BookingStatus.Cancelled 
+                                        && x.Status != BookingStatus.Rejected)
                                     .ToListAsync();
         }
 
