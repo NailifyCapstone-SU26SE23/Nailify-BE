@@ -21,5 +21,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Services? Service { get; set; }
         public virtual NailVariant? NailVariant { get; set; }
         public virtual CustomerNail? CustomerNail { get; set; }
+        public virtual ICollection<BookingProcedure> BookingProcedures { get; set; } = new List<BookingProcedure>();
     }
 }

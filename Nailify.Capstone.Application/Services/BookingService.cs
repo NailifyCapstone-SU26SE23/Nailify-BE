@@ -19,12 +19,16 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IQRService _qrService;
+        private readonly IBookingProcedureService _bookingProcedureService;
+        private readonly INailVariantService _nailVariantService;
 
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService)
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _qrService = qrService;
+            _bookingProcedureService = bookingProcedureService;
+            _nailVariantService = nailVariantService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request)
@@ -113,11 +117,11 @@ namespace Nailify.Capstone.Application.Services
 
                 if (item.NailVariantId.HasValue)
                 {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
-                    if (variant != null)
+                    var variant = await _nailVariantService.GetNailVariantByIdAsync(item.NailVariantId.Value);
+                    if (variant?.Data != null)
                     {
-                        itemPrice += variant.Price;
-                        itemDuration += (variant.Duration ?? 60);
+                        itemPrice += variant.Data.Price;
+                        itemDuration += (variant.Data.Duration ?? 60);
                     }
                     else
                     {
@@ -186,7 +190,14 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.BookingRepository.CreateAsync(booking);
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
-
+            foreach (var item in booking.BookingItems)
+            {
+                if (item.NailVariantId.HasValue)
+                {
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item.BookingItemId, item.NailVariantId.Value);
+                }
+            }
+            await _unitOfWork.SaveChangesAsync();
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Tạo đơn đặt lịch thành công.");

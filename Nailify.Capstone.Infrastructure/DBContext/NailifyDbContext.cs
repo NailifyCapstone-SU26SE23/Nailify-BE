@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public NailifyDbContext(DbContextOptions<NailifyDbContext> options) : base(options)
         {
         }
+        #region initial DBSet
         public DbSet<User> Users { get; set; }
         public DbSet<CategoryType> CategoryTypes { get; set; }
         public DbSet<Category> Categories { get; set; }
@@ -39,6 +40,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<BookingItem> BookingItems { get; set; }
         public DbSet<BookingHistory> BookingHistories { get; set; }
         public DbSet<Services> Services { get; set; }
+        public DbSet<Procedure> Procedures { get; set; }
+        public DbSet<NailProcedure> NailProcedures { get; set; }
+        public DbSet<BookingProcedure> BookingProcedures { get; set; }
+        #endregion initial DBSet
+
         public static string GetConnectionString(string connectionStringName)
         {
             var config = new ConfigurationBuilder()
@@ -413,6 +419,50 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .WithMany()
                         .HasForeignKey(bi => bi.CustomerNailId)
                         .OnDelete(DeleteBehavior.SetNull);
+
+
+            modelBuilder.Entity<Procedure>(entity =>
+            {
+                entity.HasKey(p => p.ProcedureId);
+                entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            });
+            modelBuilder.Entity<NailProcedure>(entity =>
+            {
+                entity.HasKey(np => np.NailProcedureId);
+
+                entity.HasOne(np => np.NailVariant)
+                      .WithMany(nv => nv.NailProcedures)
+                      .HasForeignKey(np => np.NailVariantId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(np => np.Procedure)
+                      .WithMany(p => p.NailProcedures)
+                      .HasForeignKey(np => np.ProcedureId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<BookingProcedure>(entity =>
+            {
+                entity.HasKey(bp => bp.BookingProcedureId);
+
+                entity.Property(bp => bp.ProcedureName).IsRequired().HasMaxLength(200);
+
+                entity.Property(bp => bp.Status)
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => (BookingProcedureStatus)Enum.Parse(typeof(BookingProcedureStatus), v))
+                      .HasMaxLength(20);
+                entity.HasOne(bp => bp.BookingItem)
+                      .WithMany(bi => bi.BookingProcedures)
+                      .HasForeignKey(bp => bp.BookingItemId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(bp => bp.Procedure)
+                      .WithMany()
+                      .HasForeignKey(bp => bp.ProcedureId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(bp => bp.CompletedBy)
+                      .WithMany()
+                      .HasForeignKey(bp => bp.CompletedById)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
 
             ConfigureStatusDefaults(modelBuilder);
         }
