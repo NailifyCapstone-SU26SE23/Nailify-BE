@@ -2,28 +2,24 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project files
-COPY ["API/API.csproj", "API/"]
-COPY ["Business/Business.csproj", "Business/"]
-COPY ["Data/Data.csproj", "Data/"]
+COPY ["Nailify.Capstone.Presentation/Nailify.Capstone.Presentation.csproj", "Nailify.Capstone.Presentation/"]
+COPY ["Nailify.Capstone.Application/Nailify.Capstone.Application.csproj", "Nailify.Capstone.Application/"]
+COPY ["Nailify.Capstone.Domain/Nailify.Capstone.Domain.csproj", "Nailify.Capstone.Domain/"]
+COPY ["Nailify.Capstone.Infrastructure/Nailify.Capstone.Infrastructure.csproj", "Nailify.Capstone.Infrastructure/"]
 
-# Restore dependencies
-RUN dotnet restore "API/API.csproj"
+RUN dotnet restore "Nailify.Capstone.Presentation/Nailify.Capstone.Presentation.csproj"
 
-# Copy everything else
 COPY . .
 
-# Build the API project (entry point)
-WORKDIR /src/API
-RUN dotnet build "API.csproj" -c Release -o /app/build
-
-# Publish stage
-FROM build AS publish
-RUN dotnet publish "API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+WORKDIR /src/Nailify.Capstone.Presentation
+RUN dotnet publish "Nailify.Capstone.Presentation.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+
+COPY --from=build /app/publish .
+
 RUN mkdir -p /app/image
-ENTRYPOINT ["dotnet", "API.dll"]
+
+ENTRYPOINT ["dotnet", "Nailify.Capstone.Presentation.dll"]
