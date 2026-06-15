@@ -8,6 +8,7 @@ namespace Nailify.Capstone.Domain.Entities
         public ComponentType ComponentType { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
+        public string Status { get; set; } = "Active";
 
         public virtual ICollection<NailComponent> NailComponents { get; set; } = new List<NailComponent>();
     }

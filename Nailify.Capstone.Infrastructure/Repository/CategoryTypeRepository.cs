@@ -16,7 +16,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await _dbSet
                 .Include(ct => ct.Categories)
-                .FirstOrDefaultAsync(ct => ct.CategoryTypeId == categoryTypeId);
+                .FirstOrDefaultAsync(ct => ct.CategoryTypeId == categoryTypeId && ct.Status == "Active");
         }
 
         public async Task<PagedList<CategoryType>> GetPagedCategoryTypesAsync(

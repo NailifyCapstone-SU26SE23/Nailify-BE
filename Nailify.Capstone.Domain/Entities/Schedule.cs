@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Domain.Entities
         public DateTime WorkDate { get; set; }
         public TimeSpan ShiftStart { get; set; }
         public TimeSpan ShiftEnd { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = "Active";
         public virtual NailArtist NailArtist { get; set; }
     }
 }

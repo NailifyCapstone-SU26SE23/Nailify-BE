@@ -21,13 +21,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<Salon?> GetSalonWithOperatingHoursAsync(Guid salonId)
         {
             return await _dbSet.Include(x => x.OperatingHours)
-                .FirstOrDefaultAsync(x => x.SalonId == salonId);
+                .FirstOrDefaultAsync(x => x.SalonId == salonId && x.Status == "Active");
         }
 
         public async Task<PagedList<Salon>> GetPagedSalonsAsync(SalonRequestParameters parameters)
         {
             var query = _context.Salons
                 .Include(s => s.OperatingHours)
+                .Where(s => s.Status == "Active")
                 .AsQueryable();
 
             // Lọc theo Tên

@@ -109,9 +109,11 @@ namespace Nailify.Capstone.Application.Services
                 return;
             }
 
-            variant.Price = variantDetail.NailShape.Price
-                + variantDetail.NailSurface.Price
-                + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
+            variant.Price =
+                (variantDetail.NailShape?.Price ?? 0m)
+                + (variantDetail.NailSurface?.Price ?? 0m)
+                + (variantDetail.NailComponents?.Sum(nailComponent => nailComponent.Component?.Price ?? 0m) ?? 0m);
+
             variant.Duration = (variantDetail.NailShape.Duration ?? 0)
                 + (variantDetail.NailSurface.Duration ?? 0)
                 + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);

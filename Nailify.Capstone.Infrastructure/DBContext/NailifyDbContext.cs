@@ -413,6 +413,26 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .WithMany()
                         .HasForeignKey(bi => bi.CustomerNailId)
                         .OnDelete(DeleteBehavior.SetNull);
+
+            ConfigureStatusDefaults(modelBuilder);
+        }
+
+        private static void ConfigureStatusDefaults(ModelBuilder modelBuilder)
+        {
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var statusProperty = entityType.ClrType.GetProperty("Status",
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.IgnoreCase);
+
+                if (statusProperty?.PropertyType == typeof(string))
+                {
+                    modelBuilder.Entity(entityType.ClrType)
+                        .Property<string>(statusProperty.Name)
+                        .HasDefaultValue("Active");
+                }
+            }
         }
     }
 }
