@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string Price { get; set; }
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }
-        public string? CheckInImageUrl { get; set; }s
+        public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
         public virtual Customer Customer { get; set; } = null!;
