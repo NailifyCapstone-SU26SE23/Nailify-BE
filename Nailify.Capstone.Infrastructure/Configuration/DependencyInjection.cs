@@ -90,7 +90,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingItemRepository, BookingItemRepository>();
             services.AddScoped<IBookingHistoryRepository, BookingHistoryRepository>();
             services.AddScoped<IServicesRepository, ServicesRepository>();
-
+            services.AddScoped<IProcedureRepository, ProcedureRepository>();
+            services.AddScoped<INailProcedureRepository, NailProcedureRepository>();
+            services.AddScoped<IBookingProcedureRepository, BookingProcedureRepository>();
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -116,6 +118,8 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<IBookingHistoryService, BookingHistoryService>();
             services.AddScoped<IServicesService, ServicesService>();
+            services.AddScoped<IBookingProcedureService, BookingProcedureService>();
+            services.AddScoped<IProcedureService, ProcedureService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();

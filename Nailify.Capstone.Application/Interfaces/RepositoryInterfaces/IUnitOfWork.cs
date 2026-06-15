@@ -32,6 +32,9 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IBookingItemRepository BookingItemRepository { get; }
         IBookingHistoryRepository BookingHistoryRepository { get; }
         IServicesRepository ServicesRepository { get; }
+        IProcedureRepository ProcedureRepository { get; }
+        INailProcedureRepository NailProcedureRepository { get; }
+        IBookingProcedureRepository BookingProcedureRepository { get; }
         Task<int> SaveChangesAsync();
     }
 }

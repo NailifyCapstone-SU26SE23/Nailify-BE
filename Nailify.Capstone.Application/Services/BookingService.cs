@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,12 +19,16 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IQRService _qrService;
+        private readonly IBookingProcedureService _bookingProcedureService;
+        private readonly INailVariantService _nailVariantService;
 
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService)
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _qrService = qrService;
+            _bookingProcedureService = bookingProcedureService;
+            _nailVariantService = nailVariantService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request)
@@ -33,13 +38,13 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if (booking.Status != "Approved")
+            if (booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-in đơn đã được xác nhận duyệt ('Approved'). Trạng thái hiện tại: '{booking.Status}'.");
             }
 
             booking.CheckInImageUrl = request.CheckInImageUrl;
-            booking.Status = "CheckedIn";
+            booking.Status = BookingStatus.CheckedIn;
             booking.UpdatedAt = DateTime.UtcNow;
             var history = new BookingHistory
             {
@@ -66,7 +71,7 @@ namespace Nailify.Capstone.Application.Services
 
             string finalUrls = string.Join(",", request.CheckOutImagesUrl);
             booking.CheckOutImagesUrl = finalUrls;
-            booking.Status = "Completed";
+            booking.Status = BookingStatus.Completed;
             booking.UpdatedAt = DateTime.UtcNow;
 
             var history = new BookingHistory
@@ -112,11 +117,11 @@ namespace Nailify.Capstone.Application.Services
 
                 if (item.NailVariantId.HasValue)
                 {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
-                    if (variant != null)
+                    var variant = await _nailVariantService.GetNailVariantByIdAsync(item.NailVariantId.Value);
+                    if (variant?.Data != null)
                     {
-                        itemPrice += variant.Price;
-                        itemDuration += (variant.Duration ?? 60);
+                        itemPrice += variant.Data.Price;
+                        itemDuration += (variant.Data.Duration ?? 60);
                     }
                     else
                     {
@@ -154,7 +159,7 @@ namespace Nailify.Capstone.Application.Services
             booking.Price = totalPrice.ToString("N0") + " VND";
             booking.TotalDuration = totalDuration;
             booking.QRCode = qrCodeBase64;
-            booking.Status = "Pending";
+            booking.Status = BookingStatus.Pending;
             booking.BookingItems = bookingItems;
 
             if (request.NailArtistId.HasValue)
@@ -185,7 +190,14 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.BookingRepository.CreateAsync(booking);
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
-
+            foreach (var item in booking.BookingItems)
+            {
+                if (item.NailVariantId.HasValue)
+                {
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item.BookingItemId, item.NailVariantId.Value);
+                }
+            }
+            await _unitOfWork.SaveChangesAsync();
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Tạo đơn đặt lịch thành công.");
@@ -286,7 +298,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != "Pending")
+            if (booking.Status != BookingStatus.Pending)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không thể cập nhật đơn đặt lịch đã được xử lý hoặc đã hủy.");
             }
@@ -436,7 +448,7 @@ namespace Nailify.Capstone.Application.Services
                 SalonId = request.SalonId,
                 BookingDate = request.BookingDate,
                 StartTime = request.StartTime,
-                Status = "CustomPending",
+                Status = BookingStatus.Pending,
                 TotalPrice = 0,
                 Price = "0 VND",
                 TotalDuration = 0,
@@ -482,7 +494,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != "CustomPending")
+            if (booking.Status != BookingStatus.Pending)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không ở trạng thái chờ phân bổ thợ.");
             }
@@ -494,14 +506,14 @@ namespace Nailify.Capstone.Application.Services
             }
 
             booking.NailArtistId = request.StaffArtistId;
-            booking.Status = "ArtistAssigned";
+            booking.Status = BookingStatus.Assigned;
             booking.UpdatedAt = DateTime.UtcNow;
 
             var history = new BookingHistory
             {
                 BookingHistoryId = Guid.NewGuid(),
                 BookingId = booking.BookingId,
-                EventType = "ArtistAssigned",
+                EventType = BookingStatus.Assigned.ToString(),
                 Payload = $"Quản lý đã chỉ định thợ {artist.Account.FirstName} {artist.Account.LastName} thẩm định và báo giá.",
                 CreatedAt = DateTime.UtcNow
             };
@@ -523,7 +535,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != "ArtistAssigned")
+            if (booking.Status != BookingStatus.Assigned)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không ở trạng thái chờ thợ báo giá.");
             }
@@ -531,7 +543,7 @@ namespace Nailify.Capstone.Application.Services
             booking.TotalPrice = request.QuotedPrice;
             booking.Price = request.QuotedPrice.ToString("N0") + " VND";
             booking.TotalDuration = request.QuotedDuration;
-            booking.Status = "ArtistQuoted";
+            booking.Status = BookingStatus.Reviewed;
             booking.UpdatedAt = DateTime.UtcNow;
 
             var item = booking.BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
@@ -545,7 +557,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 BookingHistoryId = Guid.NewGuid(),
                 BookingId = booking.BookingId,
-                EventType = "ArtistQuoted",
+                EventType = BookingStatus.Reviewed.ToString(),
                 Payload = $"Thợ nail đề xuất giá: {booking.Price}, thời gian: {request.QuotedDuration} phút.",
                 CreatedAt = DateTime.UtcNow
             };
@@ -567,7 +579,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != "ArtistQuoted")
+            if (booking.Status != BookingStatus.Reviewed)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không ở trạng thái chờ quản lý duyệt báo giá.");
             }
@@ -575,7 +587,7 @@ namespace Nailify.Capstone.Application.Services
             booking.TotalPrice = request.FinalPrice;
             booking.Price = request.FinalPrice.ToString("N0") + " VND";
             booking.TotalDuration = request.FinalDuration;
-            booking.Status = "Pending";
+            booking.Status = BookingStatus.Pending;
             booking.UpdatedAt = DateTime.UtcNow;
 
             var item = booking.BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
@@ -616,19 +628,19 @@ namespace Nailify.Capstone.Application.Services
             //     return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
             // }
 
-            if (booking.Status != "Pending" && booking.Status != "Approved")
+            if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ được hủy đơn ở trạng thái 'Pending' hoặc 'Approved'. Trạng thái hiện tại: '{booking.Status}'.");
             }
 
             var oldStatus = booking.Status;
-            booking.Status = "Cancelled";
+            booking.Status = BookingStatus.Cancelled;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
             var history = new BookingHistory
             {
                 BookingId = booking.BookingId,
-                EventType = "BookingCancelled",
+                EventType = BookingStatus.Cancelled.ToString(),
                 Payload = $"Hủy đơn từ trạng thái '{oldStatus}' sang 'Cancelled'. Lý do: {request.Reason}",
                 ActorId = customerId,
                 CreatedAt = DateTime.UtcNow
@@ -646,11 +658,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
-            if (booking.Status != "Pending")
+            if (booking.Status != BookingStatus.Pending)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể xác nhận đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            booking.Status = "Approved";
+            booking.Status = BookingStatus.Approved;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
             var history = new BookingHistory
@@ -674,11 +686,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
-            if (booking.Status != "Pending")
+            if (booking.Status != BookingStatus.Pending)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            booking.Status = "Rejected";
+            booking.Status = BookingStatus.Rejected;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
             var history = new BookingHistory
@@ -702,11 +714,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
-            if (booking.Status != "CheckedIn")
+            if (booking.Status != BookingStatus.CheckedIn)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể bắt đầu làm khi khách đã 'CheckedIn'. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            booking.Status = "InProgress";
+            booking.Status = BookingStatus.InProgress;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
             var history = new BookingHistory

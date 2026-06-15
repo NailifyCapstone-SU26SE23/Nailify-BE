@@ -32,7 +32,11 @@ namespace Nailify.Capstone.Infrastructure
         private IBookingRepository? _bookingRepository;
         private IBookingItemRepository? _bookingItemRepository;
         private IBookingHistoryRepository? _bookingHistoryRepository;
-        private IServicesRepository? _servicesRepository;   
+        private IServicesRepository? _servicesRepository;
+        private IProcedureRepository? _procedureRepository;
+        private INailProcedureRepository? _nailProcedureRepository;
+        private IBookingProcedureRepository? _bookingProcedureRepository;
+
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -72,7 +76,9 @@ namespace Nailify.Capstone.Infrastructure
         public IBookingHistoryRepository BookingHistoryRepository => _bookingHistoryRepository ??= new BookingHistoryRepository(_context);
 
         public IServicesRepository ServicesRepository => _servicesRepository ??= new ServicesRepository(_context);
-
+        public IProcedureRepository ProcedureRepository => _procedureRepository ??= new ProcedureRepository(_context);
+        public INailProcedureRepository NailProcedureRepository => _nailProcedureRepository ??= new NailProcedureRepository(_context);
+        public IBookingProcedureRepository BookingProcedureRepository => _bookingProcedureRepository ??= new BookingProcedureRepository(_context);
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
