@@ -31,6 +31,46 @@ namespace Nailify.Capstone.Application.Services
             _nailVariantService = nailVariantService;
         }
 
+        public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken)
+        {
+            if (string.IsNullOrEmpty(qrToken))
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Mã QR không hợp lệ.");
+            }
+
+            var parts = qrToken.Split('|');
+            if (parts.Length != 3 || parts[0] != "NAILIFY")
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Định dạng mã QR không đúng.");
+            }
+
+            if (!Guid.TryParse(parts[1], out Guid bookingId))
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Mã đặt lịch trong QR không hợp lệ.");
+            }
+
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
+            }
+
+            if (booking.Status != BookingStatus.Approved)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Đơn đặt lịch không ở trạng thái sẵn sàng để check-in. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+
+            var tokenDateStr = parts[2];
+            var localBookingDate = (booking.BookingDate.Kind == DateTimeKind.Utc ? booking.BookingDate.AddHours(7) : booking.BookingDate).Date;
+            if (localBookingDate.ToString("yyyyMMdd") != tokenDateStr)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Ngày đặt lịch không khớp với thông tin trên mã QR.");
+            }
+
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Xác thực mã QR thành công. Đơn hàng hợp lệ.");
+        }
+
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
@@ -742,9 +782,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của khách hàng thành công.");
         }
 
-        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId)
+        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, DateTime? date = null)
         {
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsBySalonAsync(salonId);
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsBySalonAsync(salonId, date);
             var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
             return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Salon thành công.");
         }

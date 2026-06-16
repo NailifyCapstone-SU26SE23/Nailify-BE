@@ -26,8 +26,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId);
         Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId);
-        Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId);
+        Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, DateTime? date = null);
         Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId);
         Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId);
+        Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken);
+
     }
 }
