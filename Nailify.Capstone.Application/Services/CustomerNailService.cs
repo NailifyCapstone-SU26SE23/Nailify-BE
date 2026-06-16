@@ -162,7 +162,7 @@ namespace Nailify.Capstone.Application.Services
                 return "Không tìm thấy dáng móng.";
             }
 
-            if (!nailSurfaceId.HasValue || await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
+            if (nailSurfaceId.HasValue && await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
             {
                 return "Không tìm thấy bề mặt móng.";
             }
