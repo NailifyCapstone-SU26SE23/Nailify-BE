@@ -55,9 +55,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<Booking>> GetBookingsByCustomerAsync(Guid customerId)
             => await FindByCondition(x => x.CustomerId == customerId)
+                                    .Include(x => x.Customer)
+                                        .ThenInclude(x => x.User)
                                     .Include(x => x.Salon)
                                     .Include(x => x.NailArtist)
                                         .ThenInclude(x => x.Account)
+                                    .Include(x => x.BookingItems)
+                                        .ThenInclude(x => x.NailVariant)
+                                    .Include(x => x.BookingItems)
+                                        .ThenInclude(x => x.Service)
+                                    .Include(x => x.BookingItems)
+                                        .ThenInclude(x => x.CustomerNail)
                                     .OrderByDescending(x => x.BookingDate)
                                     .ThenByDescending(x => x.StartTime)
                                     .ToListAsync();
