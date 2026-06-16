@@ -404,11 +404,7 @@ FodyWeavers.xsd
 appsettings.json
 appsettings.Development.json
 
-/.claude/skills/gitnexus/gitnexus-cli/SKILL.md
-/.claude/skills/gitnexus/gitnexus-debugging/SKILL.md
-/.claude/skills/gitnexus/gitnexus-guide/SKILL.md
-/.claude/skills/gitnexus/gitnexus-exploring/SKILL.md
-/.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md
-/.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md
-/AGENTS.md
-/CLAUDE.md
+# Claude AI configuration (local/personal files)
+.claude/
+AGENTS.md
+CLAUDE.md
