@@ -18,6 +18,25 @@ namespace Nailify.Capstone.Infrastructure
         private ISalonRepository? _salonRepository;
         private INailArtistRepository? _nailArtistRepository;
         private IScheduleRepository? _scheduleRepository;
+        private IComponentRepository? _componentRepository;
+        private INailShapeRepository? _nailShapeRepository;
+        private INailSurfaceRepository? _nailSurfaceRepository;
+        private INailVariantRepository? _nailVariantRepository;
+        private INailComponentRepository? _nailComponentRepository;
+        private ICustomerComponentRepository? _customerComponentRepository;
+        private ICustomerNailRepository? _customerNailRepository;
+        private ICustomerNailComponentRepository? _customerNailComponentRepository;
+        private ISkillTypeRepository? _skillTypeRepository;
+        private INailArtistSkillRepository? _nailArtistSkillRepository;
+        private INailRequiredSkillRepository? _nailRequiredSkillRepository;
+        private IBookingRepository? _bookingRepository;
+        private IBookingItemRepository? _bookingItemRepository;
+        private IBookingHistoryRepository? _bookingHistoryRepository;
+        private IServicesRepository? _servicesRepository;
+        private IProcedureRepository? _procedureRepository;
+        private INailProcedureRepository? _nailProcedureRepository;
+        private IBookingProcedureRepository? _bookingProcedureRepository;
+
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -35,7 +54,31 @@ namespace Nailify.Capstone.Infrastructure
         public INailArtistRepository NailArtistRepository => _nailArtistRepository ??= new NailArtistRepository(_context);
 
         public IScheduleRepository ScheduleRepository => _scheduleRepository ??= new ScheduleRepository(_context);
+        public IComponentRepository ComponentRepository => _componentRepository ??= new ComponentRepository(_context);
+        public INailShapeRepository NailShapeRepository => _nailShapeRepository ??= new NailShapeRepository(_context);
+        public INailSurfaceRepository NailSurfaceRepository => _nailSurfaceRepository ??= new NailSurfaceRepository(_context);
+        public INailVariantRepository NailVariantRepository => _nailVariantRepository ??= new NailVariantRepository(_context);
+        public INailComponentRepository NailComponentRepository => _nailComponentRepository ??= new NailComponentRepository(_context);
+        public ICustomerComponentRepository CustomerComponentRepository => _customerComponentRepository ??= new CustomerComponentRepository(_context);
+        public ICustomerNailRepository CustomerNailRepository => _customerNailRepository ??= new CustomerNailRepository(_context);
+        public ICustomerNailComponentRepository CustomerNailComponentRepository => _customerNailComponentRepository ??= new CustomerNailComponentRepository(_context);
 
+        public ISkillTypeRepository SkillTypeRepository => _skillTypeRepository ??= new SkillTypeRepository(_context);
+
+        public INailArtistSkillRepository NailArtistSkillRepository => _nailArtistSkillRepository ??= new NailArtistSkillRepository(_context);
+
+        public INailRequiredSkillRepository NailRequiredSkillRepository => _nailRequiredSkillRepository ??= new NailRequiredSkillRepository(_context);
+
+        public IBookingRepository BookingRepository => _bookingRepository ??= new BookingRepository(_context);
+
+        public IBookingItemRepository BookingItemRepository => _bookingItemRepository ??= new BookingItemRepository(_context);
+
+        public IBookingHistoryRepository BookingHistoryRepository => _bookingHistoryRepository ??= new BookingHistoryRepository(_context);
+
+        public IServicesRepository ServicesRepository => _servicesRepository ??= new ServicesRepository(_context);
+        public IProcedureRepository ProcedureRepository => _procedureRepository ??= new ProcedureRepository(_context);
+        public INailProcedureRepository NailProcedureRepository => _nailProcedureRepository ??= new NailProcedureRepository(_context);
+        public IBookingProcedureRepository BookingProcedureRepository => _bookingProcedureRepository ??= new BookingProcedureRepository(_context);
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();

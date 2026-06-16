@@ -63,9 +63,9 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CategoryTypeDto>(categoryTypeDto, "Tạo loại danh mục thành công.");
         }
 
-        public async Task<ApiResult<CategoryTypeDto>> UpdateCategoryTypeAsync(CategoryTypeUpdateRequest request)
+        public async Task<ApiResult<CategoryTypeDto>> UpdateCategoryTypeAsync(int id, CategoryTypeUpdateRequest request)
         {
-            var categoryType = await _unitOfWork.CategoryTypeRepository.GetByIdAsync(request.CategoryTypeId);
+            var categoryType = await _unitOfWork.CategoryTypeRepository.GetByIdAsync(id);
             if (categoryType == null)
             {
                 return new ApiErrorResult<CategoryTypeDto>("Không tìm thấy loại danh mục.");

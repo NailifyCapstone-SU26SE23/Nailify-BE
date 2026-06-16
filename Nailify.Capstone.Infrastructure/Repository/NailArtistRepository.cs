@@ -16,16 +16,48 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<NailArtist>> GetNailArtistsBySalonIdAsync(Guid salonId)
         {
-            return await FindByCondition(na => na.SalonId == salonId)
+            return await FindByCondition(na => na.SalonId == salonId && na.Status == "Active")
                 .Include(na => na.Account)
                 .ToListAsync();
         }
 
         public async Task<NailArtist?> GetNailArtistWithProfileAsync(Guid artistId)
         {
-            return await FindByCondition(na => na.NailArtistId == artistId)
+            return await FindByCondition(na => na.NailArtistId == artistId && na.Status == "Active")
                 .Include(na => na.Account)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<NailArtist>> GetSuggestedArtistsAsync(Guid salonId, List<int> nailVariantIds)
+        {
+            var requiredSkills = await _context.NailRequiredSkills
+                                               .Where(x => nailVariantIds.Contains(x.NailVariantId))
+                                               .ToListAsync();
+            var artists = await FindByCondition(x => x.SalonId == salonId && x.Status == "Active")
+                                               .Include(x => x.Account)
+                                               .Include(x => x.NailArtistSkills)
+                                                    .ThenInclude(nas => nas.SkillType)
+                                               .ToListAsync();
+
+            var suggestedArtists = new List<NailArtist>();
+            foreach (var artist in artists)
+            {
+                bool isQualified = true;
+                foreach (var reqSkill in requiredSkills)
+                {
+                    var artistSkill = artist.NailArtistSkills.FirstOrDefault(x => x.SkillTypeId == reqSkill.SkillTypeId);
+                    if (artistSkill == null || artistSkill.Level < reqSkill.RequiredLevel)
+                    {
+                        isQualified = false;
+                        break;
+                    }
+                }
+                if (isQualified)
+                {
+                    suggestedArtists.Add(artist);
+                }
+            }
+            return suggestedArtists;
         }
     }
 }

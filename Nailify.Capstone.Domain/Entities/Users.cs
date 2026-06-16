@@ -16,6 +16,6 @@ namespace Nailify.Capstone.Domain.Entities
         public string LastName { get; set; }
         public string? AvatarUrl { get; set; }
         public string Role { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = "Active";
     }
 }

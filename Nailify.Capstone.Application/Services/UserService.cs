@@ -118,13 +118,36 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Vô hiệu hóa tài khoản người dùng thành công.");
         }
 
-        public async Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request)
+        public async Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request, string? avatarUrl = null)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
             if (user == null || user.Status != "Active")
                 return new ApiResult<UserDto>(false, "Không tìm thấy tài khoản.");
 
-            _mapper.Map(request, user);
+            if (request.Email != null)
+            {
+                user.Email = request.Email;
+            }
+
+            if (request.FirstName != null)
+            {
+                user.FirstName = request.FirstName;
+            }
+
+            if (request.LastName != null)
+            {
+                user.LastName = request.LastName;
+            }
+
+            if (request.Phone != null)
+            {
+                user.Phone = request.Phone;
+            }
+
+            if (!string.IsNullOrWhiteSpace(avatarUrl))
+            {
+                user.AvatarUrl = avatarUrl;
+            }
 
             _unitOfWork.UserRepository.Update(user);
             await _unitOfWork.SaveChangesAsync();
