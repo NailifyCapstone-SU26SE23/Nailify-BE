@@ -62,9 +62,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .ThenByDescending(x => x.StartTime)
                                     .ToListAsync();
 
-        public async Task<IEnumerable<Booking>> GetBookingsBySalonAsync(Guid salonId)
+        public async Task<IEnumerable<Booking>> GetBookingsBySalonAsync(Guid salonId, DateTime? date = null)
         {
-            return await FindByCondition(b => b.SalonId == salonId)
+            var query = FindByCondition(b => b.SalonId == salonId);
+
+            if (date.HasValue)
+            {
+                var range = GetDateRangeUtc(date.Value);
+                query = query.Where(x => x.BookingDate >= range.start && x.BookingDate <= range.end);
+            }
+
+            return await query
                          .Include(b => b.Customer)
                             .ThenInclude(c => c.User)
                          .Include(b => b.NailArtist)
