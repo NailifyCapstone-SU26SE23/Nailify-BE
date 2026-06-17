@@ -60,6 +60,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var response = _mapper.Map<UserDto>(user);
+            await PopulateUserContextAsync(user, response);
             return new ApiSuccessResult<UserDto>(response, "Lấy thông tin người dùng thành công.");
         }
 
@@ -153,6 +154,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             var response = _mapper.Map<UserDto>(user);
+            await PopulateUserContextAsync(user, response);
             return new ApiSuccessResult<UserDto>(response, "Cập nhật thông tin cá nhân thành công.");
         }
         #endregion Account Management
@@ -283,6 +285,27 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Cập nhật hồ sơ cá nhân thành công.");
         }
         #endregion Customer Management
+
+        private async Task PopulateUserContextAsync(User user, UserDto response)
+        {
+            if (user.Role == "Manager")
+            {
+                var salons = await _unitOfWork.SalonRepository.GetPagedAsync(1, 1, x => x.ManagerId == user.UserId);
+                var salon = salons.Items.FirstOrDefault();
+
+                response.SalonId = salon?.SalonId;
+                return;
+            }
+
+            if (user.Role == "Staff_Artist")
+            {
+                var artists = await _unitOfWork.NailArtistRepository.GetPagedAsync(1, 1, x => x.AccountId == user.UserId);
+                var artist = artists.Items.FirstOrDefault();
+
+                response.SalonId = artist?.SalonId;
+                response.StaffId = artist?.NailArtistId;
+            }
+        }
     }
 }
 

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
@@ -29,6 +31,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Lấy thông tin người dùng.
         /// </summary>
         [HttpGet]
+        [Produces("application/json")]
+        [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
         public async Task<IActionResult> GetMyProfile()
         {

@@ -41,5 +41,15 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// </summary>
         public string Status { get; set; }
         public string Role { get; set; }
+
+        /// <summary>
+        /// ID salon của quản lý hoặc thợ nail. Null nếu tài khoản không thuộc salon.
+        /// </summary>
+        public Guid? SalonId { get; set; }
+
+        /// <summary>
+        /// ID thợ nail. Null nếu tài khoản không phải thợ nail.
+        /// </summary>
+        public Guid? StaffId { get; set; }
     }
 }
