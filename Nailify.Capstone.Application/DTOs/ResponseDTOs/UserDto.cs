@@ -46,5 +46,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// ID salon của quản lý hoặc thợ nail. Null nếu tài khoản không thuộc salon.
         /// </summary>
         public Guid? SalonId { get; set; }
+
+        /// <summary>
+        /// ID thợ nail. Null nếu tài khoản không phải thợ nail.
+        /// </summary>
+        public Guid? StaffId { get; set; }
     }
 }

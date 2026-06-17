@@ -299,7 +299,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng xem lịch sử đặt hẹn của chính mình.
         /// </summary>
         [HttpGet("my-bookings")]
-        [HttpGet("my-booking")]
         [ProducesResponseType(typeof(ApiResult<PagedList<BookingResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
