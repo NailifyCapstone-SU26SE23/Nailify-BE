@@ -43,6 +43,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy thông tin một thợ ngẫu nhiên tối ưu nhất (Nhân đạo ThanhDT).
+        /// </summary>
+        [HttpPost("random-artist")]
+        [ProducesResponseType(typeof(ApiResult<SuggestedArtistResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetRandomArtist([FromBody] GetRandomArtistRequestDTO request)
+        {
+            var response = await _bookingService.GetRandomArtistAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
         /// Lấy danh sách các khung giờ bận của thợ làm móng trong ngày cụ thể.
         /// </summary>
         [HttpGet("artist-available-slots")]
@@ -377,19 +390,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> VerifyQr([FromQuery] string qrToken)
         {
             var response = await _bookingService.VerifyQrCodeAsync(qrToken);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
-        /// <summary>
-        /// Lễ tân bấm check in trực tiếp trên hệ thống
-        /// </summary>
-        [HttpPost("{id}/check-in")]
-        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> CheckIn(Guid id)
-        {
-            var response = await _bookingService.CheckInBooking(id);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }

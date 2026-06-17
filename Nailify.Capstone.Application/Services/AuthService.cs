@@ -56,7 +56,7 @@ namespace Nailify.Capstone.Application.Services
 
             var user = _mapper.Map<User>(request);
             user.Password = _passwordHasher.HashPassword(request.Password);
-            user.Role = "Customer";
+            user.Role = Nailify.Capstone.Domain.Enums.UserRole.Customer;
             user.Status = "Active";
 
             await _unitOfWork.UserRepository.CreateAsync(user);

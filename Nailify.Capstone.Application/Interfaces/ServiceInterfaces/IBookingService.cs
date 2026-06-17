@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface IBookingService
     {
         Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request);
+        Task<ApiResult<SuggestedArtistResponseDTO>> GetRandomArtistAsync(GetRandomArtistRequestDTO request);
         Task<ApiResult<ArtistAvailabilityResponseDTO>> GetArtistAvailableSlotAsync(GetArtistAvailableSlotsRequestDTO request);
         Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request);
         Task<ApiResult<BookingResponseDTO>> CreateCustomBookingAsync(Guid customerId, CreateCustomBookingRequestDTO request);
@@ -31,7 +32,5 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<PagedList<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
         Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken);
-        Task<ApiResult<BookingResponseDTO>> CheckInBooking(Guid bookingId);
-
     }
 }

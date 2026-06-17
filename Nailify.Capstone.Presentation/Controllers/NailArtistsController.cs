@@ -44,18 +44,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Tạo mới một thợ làm móng.
-        /// </summary>
-        [HttpPost]
-        [ProducesResponseType(typeof(ApiResult<NailArtistResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] NailArtistCreateRequest request)
-        {
-            var response = await _artistService.CreateNailArtistAsync(request);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
+ 
 
         /// <summary>
         /// Cập nhật thông tin thợ làm móng (đổi chi nhánh Salon làm việc hoặc trạng thái).

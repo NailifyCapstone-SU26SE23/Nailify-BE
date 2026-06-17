@@ -16,8 +16,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<NailArtist>> GetNailArtistsBySalonIdAsync(Guid salonId)
         {
-            return await FindByCondition(na => na.SalonId == salonId && na.Status == "Active")
-                .Include(na => na.Account)
+            return await FindByCondition(x => x.Account.SalonId == salonId && x.Status == "Active")
+                .Include(x => x.Account)
+                    .ThenInclude(x => x.Salon)
                 .ToListAsync();
         }
 
@@ -33,8 +34,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
             var requiredSkills = await _context.NailRequiredSkills
                                                .Where(x => nailVariantIds.Contains(x.NailVariantId))
                                                .ToListAsync();
-            var artists = await FindByCondition(x => x.SalonId == salonId && x.Status == "Active")
+            var artists = await FindByCondition(x => x.Account.SalonId == salonId && x.Status == "Active")
                                                .Include(x => x.Account)
+                                                    .ThenInclude(x => x.Salon)
                                                .Include(x => x.NailArtistSkills)
                                                     .ThenInclude(nas => nas.SkillType)
                                                .ToListAsync();

@@ -1,17 +1,21 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Infrastructure.Extensions;
 
 namespace Nailify.Capstone.Infrastructure.DBContext
 {
     public class NailifyDbContext : DbContext
     {
+        private readonly IMediator? _mediator;
         public NailifyDbContext()
         {
         }
-        public NailifyDbContext(DbContextOptions<NailifyDbContext> options) : base(options)
+        public NailifyDbContext(DbContextOptions<NailifyDbContext> options, IMediator mediator) : base(options)
         {
+            _mediator = mediator;
         }
         #region initial DBSet
         public DbSet<User> Users { get; set; }
@@ -324,11 +328,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);
 
-            modelBuilder.Entity<Salon>()
-                .HasOne(s => s.Manager)
-                .WithOne()
-                .HasForeignKey<Salon>(s => s.ManagerId)
-                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalonOperatingHour>()
                 .HasKey(soh => soh.OperatingHourId);
@@ -356,12 +355,17 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .HasForeignKey<NailArtist>(na => na.AccountId)
                         .OnDelete(DeleteBehavior.Restrict);
 
-            // Cấu hình mối quan hệ Nhiều-1 giữa NailArtist và Salon
-            modelBuilder.Entity<NailArtist>()
-                        .HasOne(na => na.Salon)
-                        .WithMany(s => s.NailArtists)
-                        .HasForeignKey(na => na.SalonId)
-                        .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Salon)
+                .WithMany()
+                .HasForeignKey(u => u.SalonId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                        .Property(u => u.Role)
+                        .HasConversion<string>();
+
 
             modelBuilder.Entity<Customer>(entity =>
             {
@@ -483,6 +487,19 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .HasDefaultValue("Active");
                 }
             }
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Dispatch domain events TRƯỚC khi commit:
+            // → Handler (vd: BookingStatusChangedEventHandler) sẽ track BookingHistory vào cùng DbContext này
+            // → base.SaveChangesAsync() commit tất cả trong 1 transaction duy nhất
+            // → Nếu lỗi xảy ra → cả Booking state lẫn BookingHistory đều rollback, không mất data
+            if (_mediator != null)
+            {
+                await _mediator.DispatchDomainEventsAsync(this);
+            }
+            return await base.SaveChangesAsync(cancellationToken);
         }
     }
 }

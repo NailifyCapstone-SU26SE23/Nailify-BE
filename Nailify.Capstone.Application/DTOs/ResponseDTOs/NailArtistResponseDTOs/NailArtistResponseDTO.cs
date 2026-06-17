@@ -32,6 +32,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs
               .ForMember(d => d.Email, opt => opt.MapFrom(s => s.Account.Email))
               .ForMember(d => d.FirstName, opt => opt.MapFrom(s => s.Account.FirstName))
               .ForMember(d => d.LastName, opt => opt.MapFrom(s => s.Account.LastName))
+              .ForMember(d => d.SalonId, opt => opt.MapFrom(s => s.Account.SalonId))
               .ForMember(d => d.Phone, opt => opt.MapFrom(s => s.Account.Phone))
               .ForMember(d => d.AvatarUrl, opt => opt.MapFrom(s => s.Account.AvatarUrl));
         }
