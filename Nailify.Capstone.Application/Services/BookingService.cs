@@ -55,7 +55,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != BookingStatus.Approved)
+            if (booking.Status != BookingStatus.Approved && booking.Status != BookingStatus.CheckedIn)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Đơn đặt lịch không ở trạng thái sẵn sàng để check-in. Trạng thái hiện tại: '{booking.Status}'.");
             }
@@ -67,8 +67,27 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Ngày đặt lịch không khớp với thông tin trên mã QR.");
             }
 
+            if (booking.Status == BookingStatus.Approved)
+            {
+                booking.Status = BookingStatus.CheckedIn;
+                booking.UpdatedAt = DateTime.UtcNow;
+
+                var history = new BookingHistory
+                {
+                    BookingHistoryId = Guid.NewGuid(),
+                    BookingId = booking.BookingId,
+                    EventType = "CheckedIn",
+                    Payload = "Xác thực mã QR thành công. Trạng thái đơn hàng chuyển sang CheckedIn.",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _unitOfWork.BookingRepository.Update(booking);
+                await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+                await _unitOfWork.SaveChangesAsync();
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
-            return new ApiSuccessResult<BookingResponseDTO>(response, "Xác thực mã QR thành công. Đơn hàng hợp lệ.");
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Xác thực mã QR thành công. Trạng thái đơn chuyển sang CheckedIn.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request)
@@ -78,13 +97,13 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if (booking.Status != BookingStatus.Approved)
-            {
-                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-in đơn đã được xác nhận duyệt ('Approved'). Trạng thái hiện tại: '{booking.Status}'.");
-            }
+            // if (booking.Status != BookingStatus.Approved && booking.Status != BookingStatus.CheckedIn)
+            // {
+            //     return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-in đơn đã được xác nhận duyệt ('Approved') hoặc đang check-in. Trạng thái hiện tại: '{booking.Status}'.");
+            // }
 
             booking.CheckInImageUrl = request.CheckInImageUrl;
-            booking.Status = BookingStatus.CheckedIn;
+            booking.Status = booking.Status; // Keep current DB status
             booking.UpdatedAt = DateTime.UtcNow;
             var history = new BookingHistory
             {
