@@ -32,7 +32,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="searchTerm">Từ khóa tìm kiếm theo tên, họ hoặc email.</param>
         /// <returns>Danh sách người dùng phân trang.</returns>
         [HttpGet]
-        [HasRole("Admin")]
         [ProducesResponseType(typeof(ApiResult<PagedList<UserDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
         {
@@ -46,7 +45,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="id">ID duy nhất của người dùng.</param>
         /// <returns>Thông tin chi tiết người dùng.</returns>
         [HttpGet("{id}")]
-        [HasRole("Admin")]
         [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(Guid id)
@@ -65,7 +63,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="request">Thông tin yêu cầu tạo tài khoản mới.</param>
         /// <returns>Thông tin tài khoản vừa tạo.</returns>
         [HttpPost]
-        [HasRole("Admin")]
         [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] UserCreateRequest request)
@@ -85,7 +82,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="request">Dữ liệu thông tin cập nhật mới.</param>
         /// <returns>Dữ liệu người dùng sau khi cập nhật thành công.</returns>
         [HttpPut("{id}")]
-        [HasRole("Admin")]
         [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
@@ -110,7 +106,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="id">ID của người dùng cần xóa.</param>
         /// <returns>Kết quả xóa thành công.</returns>
         [HttpDelete("{id}")]
-        [HasRole("Admin")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(Guid id)
@@ -127,7 +122,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Quản trị viên/Quản lý tìm kiếm và xem toàn bộ danh sách khách hàng kèm phân trang hệ thống.
         /// </summary>
         [HttpGet("customers")]
-        [HasRole("Admin", "Manager")]
         [ProducesResponseType(typeof(ApiResult<PagedList<CustomerProfileDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
         {
@@ -140,7 +134,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         /// <param name="id">ID của khách hàng.</param>
         [HttpGet("customers/{id}")]
-        [HasRole("Admin", "Manager")]
         [ProducesResponseType(typeof(ApiResult<CustomerProfileDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetCustomerById(Guid id)
@@ -159,7 +152,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <param name="id">ID của khách hàng.</param>
         /// <param name="request">Thông tin cập nhật mới.</param>
         [HttpPut("customers/{id}")]
-        [HasRole("Admin", "Manager")]
         [ProducesResponseType(typeof(ApiResult<CustomerProfileDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
@@ -182,7 +174,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         /// <param name="id">ID của khách hàng.</param>
         [HttpDelete("customers/{id}")]
-        [HasRole("Admin", "Manager")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteCustomer(Guid id)

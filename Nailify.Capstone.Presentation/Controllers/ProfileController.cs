@@ -35,7 +35,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
         public async Task<IActionResult> GetMyProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -114,7 +113,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự truy xuất thông tin hồ sơ cá nhân tổng hợp (Gồm cả bảng User và Customer)
         /// </summary>
         [HttpGet("customers")]
-        [HasRole("Customer")]
         public async Task<IActionResult> GetMyCustomerProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -136,7 +134,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự cập nhật đặc điểm da và lối sống cá nhân phục vụ gợi ý móng mẫu thích hợp
         /// </summary>
         [HttpPut("customers/preferences")]
-        [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyPreferences([FromBody] CustomerPreferencesUpdateRequest request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -158,7 +155,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự cập nhật đầy đủ hồ sơ và đặc điểm da/lối sống cá nhân (Persona).
         /// </summary>
         [HttpPut("customers")]
-        [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyCustomerProfile([FromBody] CustomerSelfProfileUpdateRequest request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value

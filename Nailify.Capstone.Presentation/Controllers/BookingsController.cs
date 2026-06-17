@@ -78,7 +78,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Thực hiện Check-in cho đơn đặt lịch (Chụp hình trước khi làm).
+        /// Thực hiện chụp hình bàn tay khách cho đơn đặt lịch (Chụp hình trước khi làm).
         /// </summary>
         [HttpPost("check-in")]
         [Consumes("multipart/form-data")]
@@ -86,15 +86,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CheckIn([FromForm] CheckInForm request)
         {
-            if (request.Image == null || request.Image.Length == 0)
-            {
-                return BadRequest(new ApiResult<object>(false, "Vui lòng chụp/tải lên ảnh check-in."));
-            }
-
             string checkInImageUrl = string.Empty;
             try
             {
-                checkInImageUrl = await _cloudinaryService.UploadImageAsync(request.Image);
+                if (request.Image != null && request.Image.Length > 0)
+                {
+                    checkInImageUrl = await _cloudinaryService.UploadImageAsync(request.Image);
+                }
 
                 var appRequest = new CheckInRequestDTO
                 {
@@ -103,7 +101,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 };
 
                 var response = await _bookingService.CheckInBookingAsync(appRequest);
-                if (!response.IsSucceeded)
+                if (!response.IsSucceeded && !string.IsNullOrEmpty(checkInImageUrl))
                 {
                     await _cloudinaryService.DeleteImageAsync(checkInImageUrl);
                     return BadRequest(response);
@@ -117,7 +115,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 {
                     await _cloudinaryService.DeleteImageAsync(checkInImageUrl);
                 }
-                return BadRequest(new ApiResult<object>(false, $"Check-in thất bại khi tải ảnh: {ex.Message}"));
+                return BadRequest(new ApiResult<object>(false, $"Check-in thất bại: {ex.Message}"));
             }
         }
 
@@ -382,12 +380,25 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
+        /// <summary>
+        /// Lễ tân bấm check in trực tiếp trên hệ thống
+        /// </summary>
+        [HttpPost("{id}/check-in")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> CheckIn(Guid id)
+        {
+            var response = await _bookingService.CheckInBooking(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
     }
 
     public class CheckInForm
     {
         public Guid BookingId { get; set; }
-        public IFormFile Image { get; set; } = null!;
+        public IFormFile? Image { get; set; }
     }
 
     public class CheckOutForm
