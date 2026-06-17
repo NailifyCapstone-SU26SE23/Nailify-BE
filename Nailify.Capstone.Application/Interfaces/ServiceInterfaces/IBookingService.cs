@@ -1,6 +1,7 @@
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,9 +26,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId);
-        Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId);
-        Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, DateTime? date = null);
-        Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId);
+        Task<ApiResult<PagedList<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null);
+        Task<ApiResult<PagedList<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
+        Task<ApiResult<PagedList<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
         Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken);
 

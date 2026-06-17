@@ -794,25 +794,25 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<BookingResponseDTO>(response, "Bắt đầu làm móng thành công.");
         }
 
-        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId)
+        public async Task<ApiResult<PagedList<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null)
         {
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsByCustomerAsync(customerId);
-            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
-            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của khách hàng thành công.");
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsByCustomerAsync(customerId, pageNumber, pageSize, startDate, endDate, status);
+            var response = MapPagedBookings(bookings, pageNumber, pageSize);
+            return new ApiSuccessResult<PagedList<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của khách hàng thành công.");
         }
 
-        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, DateTime? date = null)
+        public async Task<ApiResult<PagedList<BookingResponseDTO>>> GetBookingsBySalonAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null)
         {
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsBySalonAsync(salonId, date);
-            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
-            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Salon thành công.");
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsBySalonAsync(salonId, pageNumber, pageSize, startDate, endDate, status, search);
+            var response = MapPagedBookings(bookings, pageNumber, pageSize);
+            return new ApiSuccessResult<PagedList<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Salon thành công.");
         }
 
-        public async Task<ApiResult<IEnumerable<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId)
+        public async Task<ApiResult<PagedList<BookingResponseDTO>>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null)
         {
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAsync(artistId);
-            var response = _mapper.Map<IEnumerable<BookingResponseDTO>>(bookings);
-            return new ApiSuccessResult<IEnumerable<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Thợ làm móng thành công.");
+            var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAsync(artistId, pageNumber, pageSize, startDate, endDate, status, search);
+            var response = MapPagedBookings(bookings, pageNumber, pageSize);
+            return new ApiSuccessResult<PagedList<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Thợ làm móng thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)
@@ -824,6 +824,12 @@ namespace Nailify.Capstone.Application.Services
             }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Lấy thông tin chi tiết đặt lịch thành công.");
+        }
+
+        private PagedList<BookingResponseDTO> MapPagedBookings(PagedList<Booking> pagedBookings, int pageNumber, int pageSize)
+        {
+            var mappedItems = _mapper.Map<List<BookingResponseDTO>>(pagedBookings.Items);
+            return new PagedList<BookingResponseDTO>(mappedItems, pagedBookings.MetaData.TotalItems, pageNumber, pageSize);
         }
     }
 }

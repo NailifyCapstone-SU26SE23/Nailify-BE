@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
 using System;
@@ -298,13 +299,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng xem lịch sử đặt hẹn của chính mình.
         /// </summary>
         [HttpGet("my-bookings")]
-        [ProducesResponseType(typeof(ApiResult<IEnumerable<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [HttpGet("my-booking")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetMyBookings()
+        public async Task<IActionResult> GetMyBookings(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] BookingStatus? status = null)
         {
             var customerId = GetCurrentUserId();
-            var response = await _bookingService.GetMyBookingsAsync(customerId);
+            var response = await _bookingService.GetMyBookingsAsync(customerId, pageNumber, pageSize, startDate, endDate, status);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -312,12 +319,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Quản lý Salon xem toàn bộ danh sách lịch hẹn của Salon đó (có thể lọc theo ngày).
         /// </summary>
         [HttpGet("salon/{salonId}")]
-        [ProducesResponseType(typeof(ApiResult<IEnumerable<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetSalonBookings(Guid salonId, [FromQuery] DateTime? date)
+        public async Task<IActionResult> GetSalonBookings(
+            Guid salonId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] BookingStatus? status = null,
+            [FromQuery] string? search = null)
         {
-            var response = await _bookingService.GetBookingsBySalonAsync(salonId, date);
+            var response = await _bookingService.GetBookingsBySalonAsync(salonId, pageNumber, pageSize, startDate, endDate, status, search);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -325,12 +339,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Thợ làm móng xem danh sách lịch hẹn được giao của chính mình.
         /// </summary>
         [HttpGet("artist/{artistId}")]
-        [ProducesResponseType(typeof(ApiResult<IEnumerable<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingResponseDTO>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetArtistBookings(Guid artistId)
+        public async Task<IActionResult> GetArtistBookings(
+            Guid artistId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] BookingStatus? status = null,
+            [FromQuery] string? search = null)
         {
-            var response = await _bookingService.GetBookingsByArtistAsync(artistId);
+            var response = await _bookingService.GetBookingsByArtistAsync(artistId, pageNumber, pageSize, startDate, endDate, status, search);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
