@@ -9,7 +9,6 @@ namespace Nailify.Capstone.Domain.Entities
     public class Salon
     {
         public Guid SalonId { get; set; }
-        public Guid? ManagerId { get; set; }
         public string Name { get; set; }
         public string Address { get; set; }
         public string Phone { get; set; }
@@ -18,8 +17,5 @@ namespace Nailify.Capstone.Domain.Entities
         public string Status { get; set; }
         public string? ImageUrl { get; set; }
         public virtual ICollection<SalonOperatingHour> OperatingHours { get; set; }
-        public virtual ICollection<NailArtist> NailArtists { get; set; } = new List<NailArtist>();
-        public virtual User? Manager
-        { get; set; }
     } 
 }

@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -27,20 +28,33 @@ namespace Nailify.Capstone.Application.Services
             _passwordHasher = passwordHasher;
         }
         #region Account Management
-        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null)
+        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>>? predicate = null;
-            if (!string.IsNullOrWhiteSpace(searchTerm))
+            if (!string.IsNullOrWhiteSpace(searchTerm) || role.HasValue || salonId.HasValue)
             {
-                var term = searchTerm.Trim().ToLower();
-                predicate = u => u.Email.ToLower().Contains(term) ||
-                                 u.FirstName.ToLower().Contains(term) ||
-                                 u.LastName.ToLower().Contains(term);
+                var term = searchTerm?.Trim().ToLower();
+                predicate = u =>
+                    (string.IsNullOrEmpty(term) || u.Email.ToLower().Contains(term) || u.FirstName.ToLower().Contains(term) || u.LastName.ToLower().Contains(term))
+                    && (!role.HasValue || u.Role == role.Value)
+                    && (!salonId.HasValue || u.SalonId == salonId.Value)
+                    && u.Status == "Active";
+            }
+            else
+            {
+                predicate = u => u.Status == "Active";
             }
 
             var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
+
+            foreach (var dto in mappedItems)
+            {
+                var user = pagedResult.Items.First(x => x.UserId == dto.UserId);
+                await PopulateUserContextAsync(user, dto);
+            }
+
             var response = new PagedList<UserDto>(
                 mappedItems,
                 pagedResult.MetaData.TotalItems,
@@ -49,6 +63,39 @@ namespace Nailify.Capstone.Application.Services
             );
 
             return new ApiSuccessResult<PagedList<UserDto>>(response, "Lấy danh sách người dùng thành công.");
+        }
+
+        public async Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null)
+        {
+            System.Linq.Expressions.Expression<Func<User, bool>> predicate;
+
+            if (role.HasValue)
+            {
+                predicate = u => u.SalonId == salonId && u.Role == role.Value && u.Status == "Active";
+            }
+            else
+            {
+                predicate = u => u.SalonId == salonId && (u.Role == UserRole.Manager || u.Role == UserRole.Receptionist || u.Role == UserRole.Staff_Artist) && u.Status == "Active";
+            }
+
+            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+
+            var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
+
+            foreach (var dto in mappedItems)
+            {
+                var user = pagedResult.Items.First(x => x.UserId == dto.UserId);
+                await PopulateUserContextAsync(user, dto);
+            }
+
+            var response = new PagedList<UserDto>(
+                mappedItems,
+                pagedResult.MetaData.TotalItems,
+                pageNumber,
+                pageSize
+            );
+
+            return new ApiSuccessResult<PagedList<UserDto>>(response, "Lấy danh sách nhân viên salon thành công.");
         }
 
         public async Task<ApiResult<UserDto>> GetUserByIdAsync(Guid id)
@@ -74,7 +121,7 @@ namespace Nailify.Capstone.Application.Services
             user.Status = "Active";
             await _unitOfWork.UserRepository.CreateAsync(user);
 
-            if (user.Role == "Customer")
+            if (user.Role == UserRole.Customer)
             {
                 var customer = new Customer
                 {
@@ -82,6 +129,15 @@ namespace Nailify.Capstone.Application.Services
                     LoyaltyPoint = 0
                 };
                 await _unitOfWork.CustomerRepository.CreateAsync(customer);
+            }
+            else if (user.Role == UserRole.Staff_Artist)
+            {
+                var artist = new NailArtist
+                {
+                    AccountId = user.UserId,
+                    Status = "Active"
+                };
+                await _unitOfWork.NailArtistRepository.CreateAsync(artist);
             }
 
             await _unitOfWork.SaveChangesAsync();
@@ -162,7 +218,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Role != "Customer")
+            if (user == null || user.Role != UserRole.Customer)
                 return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy khách hàng.");
 
             var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
@@ -181,11 +237,11 @@ namespace Nailify.Capstone.Application.Services
         }
         public async Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null)
         {
-            System.Linq.Expressions.Expression<Func<User, bool>> predicate = u => u.Role == "Customer";
+            System.Linq.Expressions.Expression<Func<User, bool>> predicate = u => u.Role == UserRole.Customer;
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 var term = searchTerm.Trim().ToLower();
-                predicate = u => u.Role == "Customer" &&
+                predicate = u => u.Role == UserRole.Customer &&
                                  (u.Email.ToLower().Contains(term) ||
                                   u.FirstName.ToLower().Contains(term) ||
                                   u.LastName.ToLower().Contains(term));
@@ -213,7 +269,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
-            if (user == null || user.Role != "Customer")
+            if (user == null || user.Role != UserRole.Customer)
             {
                 return new ApiResult<CustomerProfileDto>(false, "Không tìm thấy khách hàng.");
             }
@@ -288,21 +344,14 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task PopulateUserContextAsync(User user, UserDto response)
         {
-            if (user.Role == "Manager")
-            {
-                var salons = await _unitOfWork.SalonRepository.GetPagedAsync(1, 1, x => x.ManagerId == user.UserId);
-                var salon = salons.Items.FirstOrDefault();
+            // SalonId nằm trực tiếp trên User (cả Manager lẫn Staff_Artist đều lưu ở đây)
+            response.SalonId = user.SalonId;
 
-                response.SalonId = salon?.SalonId;
-                return;
-            }
-
-            if (user.Role == "Staff_Artist")
+            if (user.Role == UserRole.Staff_Artist)
             {
+                // Chỉ query NailArtist để lấy StaffId — SalonId đã có từ user.SalonId rồi
                 var artists = await _unitOfWork.NailArtistRepository.GetPagedAsync(1, 1, x => x.AccountId == user.UserId);
                 var artist = artists.Items.FirstOrDefault();
-
-                response.SalonId = artist?.SalonId;
                 response.StaffId = artist?.NailArtistId;
             }
         }

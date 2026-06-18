@@ -1,6 +1,7 @@
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Threading.Tasks;
 
@@ -8,7 +9,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IUserService
     {
-        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null);
+        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null);
+        Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null);
         Task<ApiResult<UserDto>> GetUserByIdAsync(Guid id);
         Task<ApiResult<UserDto>> CreateUserAsync(UserCreateRequest request);
         Task<ApiResult<UserDto>> UpdateUserAsync(Guid id, UserUpdateRequest request);

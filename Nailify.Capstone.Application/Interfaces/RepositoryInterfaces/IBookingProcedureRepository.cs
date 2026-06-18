@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface IBookingProcedureRepository : IGenericRepository<BookingProcedure>
     {
         Task<List<BookingProcedure>> GetProceduresByBookingItemIdAsync(Guid bookingItemId);
+        Task<List<BookingProcedure>> GetProceduresByBookingIdAsync(Guid bookingId);
     }
 }

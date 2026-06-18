@@ -19,7 +19,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistRequestDTOs
                    .ForMember(dest => dest.NailArtistId, opt => opt.Ignore())
                    .ForMember(dest => dest.AccountId, opt => opt.Ignore())
                    .ForMember(dest => dest.Account, opt => opt.Ignore())
-                   .ForMember(dest => dest.Salon, opt => opt.Ignore())
                    .ForMember(dest => dest.Schedules, opt => opt.Ignore());
         }
     }

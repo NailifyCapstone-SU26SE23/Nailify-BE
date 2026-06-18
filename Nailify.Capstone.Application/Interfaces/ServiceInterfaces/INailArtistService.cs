@@ -8,7 +8,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface INailArtistService
     {
-        Task<ApiResult<NailArtistResponseDTO>> CreateNailArtistAsync(NailArtistCreateRequest request);
         Task<ApiResult<NailArtistResponseDTO>> GetNailArtistByIdAsync(Guid artistId);
         Task<ApiResult<PagedList<NailArtistResponseDTO>>> GetPagedNailArtistsAsync(int pageNumber, int pageSize, Guid? salonId = null);
         Task<ApiResult<NailArtistResponseDTO>> UpdateNailArtistAsync(Guid artistId, NailArtistUpdateRequest request);

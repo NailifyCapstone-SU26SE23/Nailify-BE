@@ -1,6 +1,8 @@
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
+using System.Text.Json.Serialization;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 {
@@ -40,7 +42,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// Trạng thái hoạt động (Active, InActive...).
         /// </summary>
         public string Status { get; set; }
-        public string Role { get; set; }
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public UserRole Role { get; set; }
 
         /// <summary>
         /// ID salon của quản lý hoặc thợ nail. Null nếu tài khoản không thuộc salon.

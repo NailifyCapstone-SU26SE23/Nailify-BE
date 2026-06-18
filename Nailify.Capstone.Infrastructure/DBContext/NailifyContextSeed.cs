@@ -25,7 +25,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                     LastName = "Admin",
                     Phone = "0966340303",
                     AvatarUrl = "default-avatar.png",
-                    Role = "Admin",
+                    Role = Nailify.Capstone.Domain.Enums.UserRole.Admin,
                     Status = "Active",
                 });
                 await nailifyDbContext.SaveChangesAsync();

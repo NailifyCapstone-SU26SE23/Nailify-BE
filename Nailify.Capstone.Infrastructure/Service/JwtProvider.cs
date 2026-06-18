@@ -1,4 +1,4 @@
-﻿// File: Nailify.Capstone.Infrastructure/Repository/JwtProvider.cs
+// File: Nailify.Capstone.Infrastructure/Repository/JwtProvider.cs
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("role", user.Role)
+                new Claim("role", user.Role.ToString())
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));

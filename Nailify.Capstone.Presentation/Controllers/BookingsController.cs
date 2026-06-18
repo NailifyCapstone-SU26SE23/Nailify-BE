@@ -43,6 +43,19 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy thông tin một thợ ngẫu nhiên tối ưu nhất (Nhân đạo ThanhDT).
+        /// </summary>
+        [HttpPost("random-artist")]
+        [ProducesResponseType(typeof(ApiResult<SuggestedArtistResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetRandomArtist([FromBody] GetRandomArtistRequestDTO request)
+        {
+            var response = await _bookingService.GetRandomArtistAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
         /// Lấy danh sách các khung giờ bận của thợ làm móng trong ngày cụ thể.
         /// </summary>
         [HttpGet("artist-available-slots")]
@@ -78,23 +91,21 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Thực hiện Check-in cho đơn đặt lịch (Chụp hình trước khi làm).
+        /// Thực hiện chụp hình bàn tay khách cho đơn đặt lịch (Chụp hình trước khi làm).
         /// </summary>
-        [HttpPost("check-in")]
+        [HttpPost("check-in-images")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CheckIn([FromForm] CheckInForm request)
         {
-            if (request.Image == null || request.Image.Length == 0)
-            {
-                return BadRequest(new ApiResult<object>(false, "Vui lòng chụp/tải lên ảnh check-in."));
-            }
-
             string checkInImageUrl = string.Empty;
             try
             {
-                checkInImageUrl = await _cloudinaryService.UploadImageAsync(request.Image);
+                if (request.Image != null && request.Image.Length > 0)
+                {
+                    checkInImageUrl = await _cloudinaryService.UploadImageAsync(request.Image);
+                }
 
                 var appRequest = new CheckInRequestDTO
                 {
@@ -103,7 +114,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 };
 
                 var response = await _bookingService.CheckInBookingAsync(appRequest);
-                if (!response.IsSucceeded)
+                if (!response.IsSucceeded && !string.IsNullOrEmpty(checkInImageUrl))
                 {
                     await _cloudinaryService.DeleteImageAsync(checkInImageUrl);
                     return BadRequest(response);
@@ -117,52 +128,22 @@ namespace Nailify.Capstone.Presentation.Controllers
                 {
                     await _cloudinaryService.DeleteImageAsync(checkInImageUrl);
                 }
-                return BadRequest(new ApiResult<object>(false, $"Check-in thất bại khi tải ảnh: {ex.Message}"));
+                return BadRequest(new ApiResult<object>(false, $"Check-in thất bại: {ex.Message}"));
             }
         }
 
         /// <summary>
-        /// Thực hiện Check-out cho đơn đặt lịch (Chụp hình hoàn thành dịch vụ).
+        /// Thực hiện Check-out cho đơn đặt lịch (Sau khi thợ hoàn thành dịch vụ xong và khách thanh toán thành công).
         /// </summary>
         [HttpPost("check-out")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> CheckOut([FromForm] CheckOutForm request)
+        public async Task<IActionResult> CheckOut([FromForm] CheckOutRequestDTO request)
         {
-            if (request.Images == null || !request.Images.Any())
-            {
-                return BadRequest(new ApiResult<object>(false, "Vui lòng chụp/tải lên ảnh check-out."));
-            }
-
-            var uploadedUrls = new List<string>();
-            try
-            {
-                uploadedUrls = await _cloudinaryService.UploadMultipleImagesAsync(request.Images);
-
-                var appRequest = new CheckOutRequestDTO
-                {
-                    BookingId = request.BookingId,
-                    CheckOutImagesUrl = uploadedUrls
-                };
-
-                var response = await _bookingService.CheckOutBookingAsync(appRequest);
-                if (!response.IsSucceeded)
-                {
-                    await _cloudinaryService.DeleteMultipleImagesAsync(uploadedUrls);
-                    return BadRequest(response);
-                }
-
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                if (uploadedUrls.Any())
-                {
-                    await _cloudinaryService.DeleteMultipleImagesAsync(uploadedUrls);
-                }
-                return BadRequest(new ApiResult<object>(false, $"Check-out thất bại khi tải ảnh: {ex.Message}"));
-            }
+            var response = await _bookingService.CheckOutBookingAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
         }
 
         /// <summary>
@@ -396,17 +377,56 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
+
+        /// <summary>
+        /// Thợ nail (hoặc Lễ tân) báo hoàn thành các bước làm móng và tải lên ảnh móng hoàn chỉnh.
+        /// </summary>
+        [HttpPost("{id}/complete-service")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CompleteService(Guid id, [FromForm] CompleteServiceForm request)
+        {
+            if (request.Images == null || !request.Images.Any())
+            {
+                return BadRequest(new ApiResult<object>(false, "Vui lòng chụp/tải lên ảnh móng tay sau khi làm xong."));
+            }
+            var uploadedUrls = new List<string>();
+            try
+            {
+                uploadedUrls = await _cloudinaryService.UploadMultipleImagesAsync(request.Images);
+                var appRequest = new CompleteServiceRequestDTO
+                {
+                    BookingId = id,
+                    CompleteImagesUrl = uploadedUrls
+                };
+                var response = await _bookingService.CompleteServiceAsync(appRequest);
+                if (!response.IsSucceeded)
+                {
+                    await _cloudinaryService.DeleteMultipleImagesAsync(uploadedUrls);
+                    return BadRequest(response);
+                }
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                if (uploadedUrls.Any())
+                {
+                    await _cloudinaryService.DeleteMultipleImagesAsync(uploadedUrls);
+                }
+                return BadRequest(new ApiResult<object>(false, $"Hoàn thành dịch vụ thất bại khi tải ảnh: {ex.Message}"));
+            }
+        }
+
     }
 
     public class CheckInForm
     {
         public Guid BookingId { get; set; }
-        public IFormFile Image { get; set; } = null!;
+        public IFormFile? Image { get; set; }
     }
-
-    public class CheckOutForm
+    public class CompleteServiceForm
     {
-        public Guid BookingId { get; set; }
         public List<IFormFile> Images { get; set; } = new();
     }
 }

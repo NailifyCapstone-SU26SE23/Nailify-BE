@@ -16,7 +16,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ProcedureRequestDTOs
         public string? Description { get; set; }
         public int? Duration { get; set; }
         public string Status { get; set; } = "Active";
-
+        public bool IsRequired { get; set; } = true;
         public void Mapping(Profile profile)
         {
             profile.CreateMap<UpdateProcedureRequestDTO, Procedure>()

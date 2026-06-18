@@ -1,7 +1,10 @@
 using FluentValidation;
+using MediatR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -9,10 +12,8 @@ using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
-using System.Reflection;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Text;
 
 namespace Nailify.Capstone.Infrastructure.Configuration
@@ -133,6 +134,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             // Đăng ký AutoMapper
             services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
+
+            // Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
+            services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
+
 
             return services;
         }
