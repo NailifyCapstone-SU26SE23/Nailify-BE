@@ -133,11 +133,12 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
+            if(booking.Status != BookingStatus.ServiceCompleted)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-out thanh toán khi dịch vụ đã làm xong ('ServiceCompleted'). Trạng thái hiện tại; '{booking.Status}'.");
+            }
 
-            string finalUrls = string.Join(",", request.CheckOutImagesUrl);
-            booking.CheckOut(finalUrls);
-
-
+            booking.CheckOut();
             _unitOfWork.BookingRepository.Update(booking);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
@@ -823,6 +824,43 @@ namespace Nailify.Capstone.Application.Services
         {
             var mappedItems = _mapper.Map<List<BookingResponseDTO>>(pagedBookings.Items);
             return new PagedList<BookingResponseDTO>(mappedItems, pagedBookings.MetaData.TotalItems, pageNumber, pageSize);
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> CompleteServiceAsync(CompleteServiceRequestDTO request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            if(booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch");
+            }
+            if(booking.Status != BookingStatus.InProgress)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể hoàn thành dịch vụ khi đơn đang ở trạng thái 'InProgress'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(request.BookingId);
+
+            if (procedures.Any())
+            {
+                var incompleteRequiredProcedures = procedures.Where(x =>
+                    x.IsRequired &&
+                    x.Status != BookingProcedureStatus.Completed &&
+                    x.Status != BookingProcedureStatus.Skipped)
+                    .ToList();
+                if (incompleteRequiredProcedures.Any())
+                {
+                    var names = string.Join(", ", incompleteRequiredProcedures.Select(p => p.ProcedureName));
+                    return new ApiErrorResult<BookingResponseDTO>(
+                                    $"Không thể hoàn thành dịch vụ. Các bước bắt buộc sau chưa hoàn thành: {names}.");
+                }
+            }
+            string finalUrls = string.Join(",", request.CompleteImagesUrl);
+            booking.CompleteService(finalUrls);
+
+            _unitOfWork.BookingRepository.Update(booking);
+            await _unitOfWork.SaveChangesAsync();
+            
+            var response = _mapper.Map<BookingResponseDTO>(booking);    
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Hoàn thành dịch vụ làm móng thành công");
         }
     }
 }

@@ -18,6 +18,8 @@ namespace Nailify.Capstone.Domain.Entities
         public BookingProcedureStatus Status { get; set; } = BookingProcedureStatus.Pending;
         public DateTime? CompletedAt { get; set; }
         public Guid? CompletedById { get; set; }
+        public bool IsRequired { get; set; } = true;
+
         public virtual BookingItem BookingItem { get; set; } = null!;
         public virtual Procedure? Procedure { get; set; }
         public virtual NailArtist? CompletedBy { get; set; }

@@ -16,7 +16,8 @@ namespace Nailify.Capstone.Domain.Enums
         Cancelled,
         CheckedIn,
         InProgress,
-        Completed,
+        ServiceCompleted, // Thợ làm xong
+        Completed, // Khách đã thanh toán và check-out hoàn toàn
         Repaired
     }
 }

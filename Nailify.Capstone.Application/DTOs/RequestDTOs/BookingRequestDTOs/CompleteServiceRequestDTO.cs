@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
 {
-    public class CheckOutRequestDTO
+    public class CompleteServiceRequestDTO
     {
         public Guid BookingId { get; set; }
+        public List<string> CompleteImagesUrl { get; set; } = new();
     }
 }

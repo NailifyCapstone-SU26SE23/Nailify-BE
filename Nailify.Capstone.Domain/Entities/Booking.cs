@@ -96,18 +96,32 @@ namespace Nailify.Capstone.Domain.Entities
                 "Khách hàng đã check-in."
             ));
         }
-        public void CheckOut(string finalUrls)
+        public void CompleteService(string finalUrls)
+        {
+            var oldStatus = Status;
+            Status = BookingStatus.ServiceCompleted;
+            CheckOutImagesUrl = finalUrls;
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                oldStatus,
+                BookingStatus.ServiceCompleted,
+                "ServiceCompleted",
+                $"Thợ nail đã hoàn thành các dịch vụ. Ảnh trạng thái tay sau khi làm: {finalUrls}"
+            ));
+        }
+
+        public void CheckOut()
         {
             var oldStatus = Status;
             Status = BookingStatus.Completed;
-            CheckOutImagesUrl = finalUrls;
             UpdatedAt = DateTime.UtcNow;
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.Completed,
                 "Completed",
-                $"Hoàn thành dịch vụ. Ảnh trạng thái tay sau khi làm: {finalUrls}"
+                "Khách hàng đã thanh toán hóa đơn và hoàn thành thủ tục check-out."
             ));
         }
         public void Updated(decimal oldPrice, int oldDuration)

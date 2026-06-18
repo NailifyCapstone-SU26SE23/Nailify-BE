@@ -14,6 +14,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int? Duration { get; set; }
         public string Status { get; set; } = "Active";
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
+        public bool IsRequired { get; set; } = true;
         public virtual ICollection<NailProcedure> NailProcedures { get; set; } = new List<NailProcedure>();
     }
 }

@@ -40,7 +40,8 @@ namespace Nailify.Capstone.Application.Services
                     ProcedureName = y.Procedure.Name,
                     Description = y.Procedure.Description,
                     StepOrder = y.StepOrder,
-                    Status = BookingProcedureStatus.Pending
+                    Status = BookingProcedureStatus.Pending,
+                    IsRequired = y.Procedure.IsRequired
                 };
                 await _unitOfWork.BookingProcedureRepository.CreateAsync(x);
                 await _unitOfWork.SaveChangesAsync();
