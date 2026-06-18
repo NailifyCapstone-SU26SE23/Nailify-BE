@@ -752,6 +752,31 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt đơn đặt lịch thành công.");
         }
 
+        public async Task<ApiResult<BookingResponseDTO>> ManualCheckInBookingAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+            
+            booking.Status = BookingStatus.CheckedIn;
+            booking.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.BookingRepository.Update(booking);
+            var history = new BookingHistory
+            {
+                BookingHistoryId = Guid.NewGuid(),
+                BookingId = booking.BookingId,
+                EventType = "BookingCheckedIn",
+                Payload = "Tiếp tân checkin lịch hẹn bằng tay.",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Checkin lịch hẹn thành công.");
+        }
+
         public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);

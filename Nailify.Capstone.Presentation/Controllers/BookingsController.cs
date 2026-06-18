@@ -250,6 +250,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Tiếp tân checkin lịch hẹn bằng tay.
+        /// </summary>
+        [HttpPost("{id}/manual-checkin")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ManualCheckIn(Guid id)
+        {
+            var response = await _bookingService.ManualCheckInBookingAsync(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
         /// Quản lý Salon từ chối đơn đặt lịch hẹn.
         /// </summary>
         [HttpPost("{id}/reject")]

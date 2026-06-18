@@ -25,6 +25,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request);
         Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request);
         Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId);
+        Task<ApiResult<BookingResponseDTO>> ManualCheckInBookingAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId);
         Task<ApiResult<PagedList<BookingResponseDTO>>> GetMyBookingsAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null);

@@ -41,6 +41,31 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
+            [FromQuery] Guid? userId  = null,
+            [FromQuery] bool? isPublic = null,
+            [FromQuery] bool? isFavorite = null)
+        {
+            try
+            {
+                var result = await _customerNailService.GetPagedCustomerNailsAsync(
+                    pageNumber, pageSize, userId, name, isPublic, isFavorite);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách mẫu nail khách hàng authorized.
+        /// </summary>
+        [HttpGet("me")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<CustomerNailDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyCustomerNail(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null,
             [FromQuery] bool? isPublic = null,
             [FromQuery] bool? isFavorite = null)
         {
