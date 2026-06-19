@@ -42,13 +42,12 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
             [FromQuery] Guid? userId  = null,
-            [FromQuery] bool? isPublic = null,
-            [FromQuery] bool? isFavorite = null)
+            [FromQuery] bool? isPublic = null)
         {
             try
             {
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, userId, name, isPublic, isFavorite);
+                    pageNumber, pageSize, userId, name, isPublic);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -66,14 +65,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
-            [FromQuery] bool? isPublic = null,
-            [FromQuery] bool? isFavorite = null)
+            [FromQuery] bool? isPublic = null)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, currentUserId, name, isPublic, isFavorite);
+                    pageNumber, pageSize, currentUserId, name, isPublic);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)

@@ -47,6 +47,9 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Procedure> Procedures { get; set; }
         public DbSet<NailProcedure> NailProcedures { get; set; }
         public DbSet<BookingProcedure> BookingProcedures { get; set; }
+        public DbSet<FavoriteNail> FavoriteNails { get; set; }
+        public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
+        public DbSet<LoyaltyTransaction> LoyaltyTransactions { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -225,16 +228,75 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<CustomerNailComponent>()
                 .Property(cnc => cnc.FingerIndex)
                 .HasComment("-1 = whole hand, 0-9 = specific finger index");
-            /*
-            modelBuilder.Entity<Booking>().HasKey(b => b.BookingId);
-            modelBuilder.Entity<Booking>()
-                        .Property(b => b.TotalPrice)
-                        .HasPrecision(18, 2);
 
-            modelBuilder.Entity<BookingItem>()
-                        .Property(bi => bi.Price)
-                        .HasPrecision(18, 2);
-            */
+            modelBuilder.Entity<FavoriteNail>()
+                .HasIndex(f => new { f.UserId, f.NailDesignId, f.NailVariantId })
+                .IsUnique();
+
+            modelBuilder.Entity<FavoriteNail>()
+                .ToTable(table => table.HasCheckConstraint(
+                    "CK_FavoriteNail_DesignOrVariant",
+                    "\"NailDesignId\" IS NOT NULL OR \"NailVariantId\" IS NOT NULL"));
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.NailDesign)
+                .WithMany()
+                .HasForeignKey(f => f.NailDesignId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.NailVariant)
+                .WithMany()
+                .HasForeignKey(f => f.NailVariantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // In DbContext
+            modelBuilder.Entity<Customer>()
+                .HasOne(c => c.LoyaltyTier)
+                .WithMany(lt => lt.Customers)
+                .HasForeignKey(c => c.LoyaltyTierId)
+                .OnDelete(DeleteBehavior.SetNull); // Keep customer if tier is deleted
+
+            modelBuilder.Entity<LoyaltyTier>()
+                .HasIndex(lt => lt.MinLifetimePoints)
+                .IsUnique(); // Ensure unique point thresholds
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasKey(lt => lt.LoyaltyTransactionId);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .Property(lt => lt.TransactionType)
+                .HasConversion<string>()
+                .HasDefaultValue(LoyaltyTransactionType.Earned);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasIndex(lt => lt.BookingId)
+                .IsUnique();
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.Customer)
+                .WithMany(c => c.LoyaltyTransactions)
+                .HasForeignKey(lt => lt.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.Booking)
+                .WithMany()
+                .HasForeignKey(lt => lt.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.LoyaltyTier)
+                .WithMany()
+                .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Booking>(entity =>
             {
                 entity.HasKey(b => b.BookingId);

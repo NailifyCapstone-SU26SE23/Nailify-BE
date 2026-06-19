@@ -36,6 +36,9 @@ namespace Nailify.Capstone.Infrastructure
         private IProcedureRepository? _procedureRepository;
         private INailProcedureRepository? _nailProcedureRepository;
         private IBookingProcedureRepository? _bookingProcedureRepository;
+        private IFavoriteNailRepository? _favoriteNailRepository;
+        private ILoyaltyTierRepository? _loyaltyTierRepository;
+        private ILoyaltyTransactionRepository? _loyaltyTransactionRepository;
 
         public UnitOfWork(NailifyDbContext context)
         {
@@ -79,6 +82,9 @@ namespace Nailify.Capstone.Infrastructure
         public IProcedureRepository ProcedureRepository => _procedureRepository ??= new ProcedureRepository(_context);
         public INailProcedureRepository NailProcedureRepository => _nailProcedureRepository ??= new NailProcedureRepository(_context);
         public IBookingProcedureRepository BookingProcedureRepository => _bookingProcedureRepository ??= new BookingProcedureRepository(_context);
+        public IFavoriteNailRepository FavoriteNailRepository => _favoriteNailRepository ??= new FavoriteNailRepository(_context);
+        public ILoyaltyTierRepository LoyaltyTierRepository => _loyaltyTierRepository ??= new LoyaltyTierRepository(_context);
+        public ILoyaltyTransactionRepository LoyaltyTransactionRepository => _loyaltyTransactionRepository ??= new LoyaltyTransactionRepository(_context);
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
