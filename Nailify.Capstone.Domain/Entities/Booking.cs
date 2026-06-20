@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Common.Events;
+using Nailify.Capstone.Domain.Common.Events;
 using Nailify.Capstone.Domain.Common.Events.BookingEvents;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -151,44 +151,50 @@ namespace Nailify.Capstone.Domain.Entities
         public void ArtistQuote(decimal quotedPrice, int quotedDuration)
         {
             var oldStatus = Status;
-            TotalPrice = quotedPrice;
-            Price = quotedPrice.ToString("N0") + " VND";
-            TotalDuration = quotedDuration;
-            Status = BookingStatus.Reviewed;
-            UpdatedAt = DateTime.UtcNow;
             var item = BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
             if (item != null)
             {
                 item.Price = quotedPrice;
                 item.Duration = quotedDuration;
             }
+
+            TotalPrice = BookingItems.Sum(bi => bi.Price * bi.Quantity);
+            Price = TotalPrice.ToString("N0") + " VND";
+            TotalDuration = BookingItems.Sum(bi => bi.Duration * bi.Quantity);
+
+            Status = BookingStatus.Reviewed;
+            UpdatedAt = DateTime.UtcNow;
+
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.Reviewed,
                 "Reviewed",
-                $"Thợ nail đề xuất giá: {Price}, thời gian: {quotedDuration} phút."
+                $"Thợ nail đề xuất giá mẫu nail: {quotedPrice:N0} VND, thời gian: {quotedDuration} phút. Tổng đơn: {Price}."
             ));
         }
         public void ManagerApproveQuote(decimal finalPrice, int finalDuration)
         {
-            TotalPrice = finalPrice;
-            Price = finalPrice.ToString("N0") + " VND";
-            TotalDuration = finalDuration;
-            Status = BookingStatus.Pending; // Trở lại pending để chờ làm/duyệt phục vụ
-            UpdatedAt = DateTime.UtcNow;
             var item = BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
             if (item != null)
             {
                 item.Price = finalPrice;
                 item.Duration = finalDuration;
             }
+
+            TotalPrice = BookingItems.Sum(bi => bi.Price * bi.Quantity);
+            Price = TotalPrice.ToString("N0") + " VND";
+            TotalDuration = BookingItems.Sum(bi => bi.Duration * bi.Quantity);
+
+            Status = BookingStatus.Pending; // Trở lại pending để chờ làm/duyệt phục vụ
+            UpdatedAt = DateTime.UtcNow;
+
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 BookingStatus.Reviewed,
                 BookingStatus.Pending,
                 "ManagerApprovedQuote",
-                $"Quản lý đã duyệt báo giá cuối cùng: {Price}, thời gian: {finalDuration} phút. Đơn đặt lịch sẵn sàng phục vụ."
+                $"Quản lý đã duyệt báo giá mẫu nail: {finalPrice:N0} VND, thời gian: {finalDuration} phút. Đơn đặt lịch sẵn sàng phục vụ."
             ));
         }
         public void Cancel(Guid customerId, string reason)
@@ -242,6 +248,19 @@ namespace Nailify.Capstone.Domain.Entities
                 BookingStatus.InProgress,
                 "ServiceStarted",
                 "Thợ làm móng bắt đầu thực hiện các dịch vụ trong đơn."
+            ));
+        }
+        public void ReceptionistAssignArtist(Guid artistId, string artistName)
+        {
+            NailArtistId = artistId;
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                Status, // Trạng thái giữ nguyên
+                Status, // Trạng thái giữ nguyên
+                "ReceptionistAssignedArtist",
+                $"Tiếp tân đã chỉ định thợ {artistName} thực hiện dịch vụ cho đơn hàng.",
+                null // Sẽ được tự động điền ActorId từ HttpContext thông qua Event Handler
             ));
         }
     }

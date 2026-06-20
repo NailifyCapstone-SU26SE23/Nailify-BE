@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Nailify.Capstone.Application.Common.Models;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Common.Events.BookingEvents;

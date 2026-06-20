@@ -21,7 +21,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<Salon?> GetSalonWithOperatingHoursAsync(Guid salonId)
         {
             return await _dbSet.Include(x => x.OperatingHours)
-                .FirstOrDefaultAsync(x => x.SalonId == salonId && x.Status == "Active");
+                .FirstOrDefaultAsync(x => x.SalonId == salonId && x.Status == "Open");
         }
 
         public async Task<PagedList<Salon>> GetPagedSalonsAsync(SalonRequestParameters parameters)

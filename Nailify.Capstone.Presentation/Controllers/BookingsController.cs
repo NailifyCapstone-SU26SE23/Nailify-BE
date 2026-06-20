@@ -22,11 +22,12 @@ namespace Nailify.Capstone.Presentation.Controllers
     {
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
-
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary)
+        private readonly ISlotHoldService _slotHoldService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
+            _slotHoldService = slotHoldService;
         }
 
         /// <summary>
@@ -417,7 +418,60 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiResult<object>(false, $"Hoàn thành dịch vụ thất bại khi tải ảnh: {ex.Message}"));
             }
         }
-
+        /// <summary>
+        /// Giữ chỗ slot 5 phút để khách hàng có thời gian chọn dịch vụ.
+        /// </summary>
+        [HttpPost("hold-slot")]
+        [ProducesResponseType(typeof(ApiResult<SlotHoldResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> HoldSlot([FromBody] HoldSlotRequestDTO request)
+        {
+            try
+            {
+                var customerId = GetCurrentUserId();
+                var response = await _slotHoldService.HoldSlotAsync(customerId, request);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Hủy giữ chỗ slot thủ công (khi khách đổi ý).
+        /// </summary>
+        [HttpDelete("hold-slot/{holdToken}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ReleaseHold(string holdToken)
+        {
+            try
+            {
+                var customerId = GetCurrentUserId();
+                var response = await _slotHoldService.ReleaseSlotAsync(customerId, holdToken);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Kiểm tra trạng thái giữ chỗ (còn hiệu lực không, còn bao nhiêu giây).
+        /// </summary>
+        [HttpGet("hold-slot/{holdToken}/status")]
+        [ProducesResponseType(typeof(ApiResult<SlotHoldResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetHoldStatus(string holdToken)
+        {
+            var response = await _slotHoldService.GetHoldStatusAsync(holdToken);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
     }
 
     public class CheckInForm
