@@ -127,12 +127,38 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IFavoriteNailService, FavoriteNailService>();
             services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
+            services.AddScoped<ISlotHoldService, SlotHoldService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();
             if (cloudinarySettings != null)
             {
                 services.AddSingleton<ICloudinaryConfiguration>(cloudinarySettings);
+            }
+
+            var slotHoldSettings = configuration.GetSection("SlotHoldSettings")
+                                                  .Get<SlotHoldConfiguration>();
+            if(slotHoldSettings != null)
+            {
+                services.AddSingleton<ISlotHoldConfiguration>(slotHoldSettings);
+            }
+            var redisSettings = configuration.GetSection("Redis")
+                                             .Get<RedisConfiguration>();
+            if (redisSettings != null)
+            {
+                services.AddSingleton<IRedisConfiguration>(redisSettings);
+            }
+            if (redisSettings != null && redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                   options.Configuration = redisSettings?.ConnectionString;
+                   options.InstanceName = redisSettings?.InstanceName;
+                });
             }
 
             // Đăng ký FluentValidation từ tầng Application

@@ -22,14 +22,8 @@ namespace Nailify.Capstone.Application.Services
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly INailVariantService _nailVariantService;
         private readonly ILoyaltyTierService _loyaltyTierService;
-
-        public BookingService(
-            IUnitOfWork unitOfWork,
-            IMapper mapper,
-            IQRService qrService,
-            IBookingProcedureService bookingProcedureService,
-            INailVariantService nailVariantService,
-            ILoyaltyTierService loyaltyTierService)
+        private readonly ISlotHoldService _slotHoldService;
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -37,6 +31,7 @@ namespace Nailify.Capstone.Application.Services
             _bookingProcedureService = bookingProcedureService;
             _nailVariantService = nailVariantService;
             _loyaltyTierService = loyaltyTierService;
+            _slotHoldService = slotHoldService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken)
@@ -141,7 +136,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if(booking.Status != BookingStatus.ServiceCompleted)
+            if (booking.Status != BookingStatus.ServiceCompleted)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-out thanh toán khi dịch vụ đã làm xong ('ServiceCompleted'). Trạng thái hiện tại; '{booking.Status}'.");
             }
@@ -193,7 +188,24 @@ namespace Nailify.Capstone.Application.Services
 
             if (request.NailArtistId.HasValue)
             {
-                var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
+                if (!string.IsNullOrEmpty(request.HoldToken))
+                {
+                    var isValid = await _slotHoldService.ValidateHoldTokenAsync(request.HoldToken, customerId, request.NailArtistId.Value, request.BookingDate, request.StartTime);
+                    if (!isValid)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>("Mã giữ chỗ không hợp lệ hoặc đã hết hạn.");
+                    }
+                }
+                else
+                {
+                    var targetEnd = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
+                    var isHeld = await _slotHoldService.IsSlotHeldAsync(request.NailArtistId.Value, request.BookingDate, request.StartTime, targetEnd);
+                    if (isHeld)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này đang có người giữ chỗ. Vui lòng thử lại sau hoặc sử dụng mã giữ chỗ nếu bạn đã có.");
+                    }
+                }
+                    var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
                 var isConflict = await _unitOfWork.BookingRepository.HasBookingConflictAsync(
                     request.NailArtistId.Value,
                     request.BookingDate,
@@ -222,6 +234,10 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.BookingRepository.CreateAsync(booking);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
+            if(!string.IsNullOrEmpty(request.HoldToken))
+            {
+                await _slotHoldService.ConsumeHoldAsync(request.HoldToken);
+            }
             foreach (var item in booking.BookingItems)
             {
                 if (item.NailVariantId.HasValue)
@@ -267,12 +283,19 @@ namespace Nailify.Capstone.Application.Services
             {
                 var currentEnd = currentStart + slotInterval;
                 bool isAvailable = !busySlots.Any(busy => currentStart < busy.EndTime && currentEnd > busy.StartTime);
+                bool isHeld = false;
+                if (isAvailable)
+                {
+                    // Kiểm tra xem slot có bị ai giữ tạm thời trên Redis không
+                    isHeld = await _slotHoldService.IsSlotHeldAsync(request.NailArtistId, request.BookingDate, currentStart, currentEnd);
+                }
 
                 timeSlots.Add(new TimeSlotResponseDTO
                 {
                     StartTime = currentStart,
                     EndTime = currentEnd,
-                    IsAvailable = isAvailable
+                    IsAvailable = isAvailable && !isHeld,
+                    IsHeld = isHeld
                 });
 
                 currentStart = currentEnd;
@@ -294,7 +317,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request)
         {
-            if(request.BookingItems == null || !request.BookingItems.Any())
+            if (request.BookingItems == null || !request.BookingItems.Any())
             {
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Vui lòng chọn mẫu nail trước khi tìm thợ.");
             }
@@ -304,10 +327,10 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
             }
 
-            var variantIds =  _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
+            var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
             IEnumerable<NailArtist> suggestedArtist;
 
-            if(variantIds.Any())
+            if (variantIds.Any())
             {
                 suggestedArtist = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
             }
@@ -560,6 +583,44 @@ namespace Nailify.Capstone.Application.Services
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
 
+            var bookingItems = new List<BookingItem>
+            {
+                new BookingItem
+                {
+                    BookingItemId = Guid.NewGuid(),
+                    BookingId = bookingId,
+                    CustomerNailId = request.CustomerNailId,
+                    Quantity = 1,
+                    Price = 0,
+                    Duration = 0
+                }
+            };
+
+            decimal initialPrice = 0;
+            int initialDuration = 0;
+            if(request.AdditionalServices != null && request.AdditionalServices.Any())
+            {
+                foreach(var x in request.AdditionalServices)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(x.ServiceId);
+                    if (service == null || service.Status != "Active")
+                        return new ApiErrorResult<BookingResponseDTO>(
+                            $"Dịch vụ đi kèm ID {x.ServiceId} không tồn tại hoặc đã ngừng hoạt động.");
+                    int qty = x.Quantity <= 0 ? 1 : x.Quantity;
+                    bookingItems.Add(new BookingItem
+                    {
+                        BookingItemId = Guid.NewGuid(),
+                        BookingId = bookingId,
+                        ServiceId = x.ServiceId,   
+                        Quantity = qty,
+                        Price = service.Price,
+                        Duration = service.Duration
+                    });
+                    initialPrice += service.Price * qty;
+                    initialDuration += service.Duration * qty;
+                }
+            }
+
             var booking = new Booking
             {
                 BookingId = bookingId,
@@ -703,6 +764,10 @@ namespace Nailify.Capstone.Application.Services
             booking.Cancel(customerId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+            if (!string.IsNullOrEmpty(request.HoldToken))
+            {
+                await _slotHoldService.ConsumeHoldAsync(request.HoldToken);
+            }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
         }
@@ -732,7 +797,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
-            
+
             booking.Status = BookingStatus.CheckedIn;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
@@ -960,11 +1025,11 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<BookingResponseDTO>> CompleteServiceAsync(CompleteServiceRequestDTO request)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
-            if(booking == null)
+            if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch");
             }
-            if(booking.Status != BookingStatus.InProgress)
+            if (booking.Status != BookingStatus.InProgress)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể hoàn thành dịch vụ khi đơn đang ở trạng thái 'InProgress'. Trạng thái hiện tại: '{booking.Status}'.");
             }
@@ -989,9 +1054,37 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            
-            var response = _mapper.Map<BookingResponseDTO>(booking);    
+
+            var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hoàn thành dịch vụ làm móng thành công");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> ReceptionistAssignArtistAsync(Guid bookingId, AssignArtistRequestDTO request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
+            }
+
+            if(booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved && booking.Status != BookingStatus.CheckedIn)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Không thể chỉ định thợ cho lịch hẹn ở trạng thái '{booking.Status}'.");
+            }
+            var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.StaffArtistId);
+            if (artist == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin thợ.");
+            }
+            // Cập nhật thợ nail
+            booking.ReceptionistAssignArtist(request.StaffArtistId, $"{artist.Account.FirstName} {artist.Account.LastName}");
+
+            _unitOfWork.BookingRepository.Update(booking);
+            await _unitOfWork.SaveChangesAsync();
+
+            var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
+            var response = _mapper.Map<BookingResponseDTO>(savedBooking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Tiếp tân chỉ định thợ nail thành công.");
         }
     }
 }

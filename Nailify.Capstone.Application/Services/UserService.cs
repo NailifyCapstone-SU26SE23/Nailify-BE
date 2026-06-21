@@ -141,7 +141,9 @@ namespace Nailify.Capstone.Application.Services
             }
 
             await _unitOfWork.SaveChangesAsync();
-            return new ApiSuccessResult<UserDto>(_mapper.Map<UserDto>(user), "Tạo tài khoản người dùng thành công.");
+            var response = _mapper.Map<UserDto>(user);
+            await PopulateUserContextAsync(user, response);
+            return new ApiSuccessResult<UserDto>(response, "Tạo tài khoản người dùng thành công.");
         }
 
         public async Task<ApiResult<UserDto>> UpdateUserAsync(Guid id, UserUpdateRequest request)

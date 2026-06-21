@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
 {
-    public class CancelBookingRequestDTO
+    public class CustomServiceItemRequestDTO
     {
-        public string Reason { get; set; } = string.Empty;
-        public string? HoldToken { get; set; }
+        public Guid ServiceId { get; set; }
+        public int Quantity { get; set; } = 1;
     }
 }
