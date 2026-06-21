@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 
@@ -12,5 +13,11 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<CustomerNailDto>> UpdateCustomerNailAsync(int id, CustomerNailUpdateRequest request, string? imageUrl = null);
         Task<ApiResult<bool>> DeleteCustomerNailAsync(int id);
         Task RecalculateCustomerNailPriceAsync(int customerNailId);
+        Task<ApiResult<CustomerNailDto>> SubmitReviewAsync(int id, Guid customerId);
+        Task<ApiResult<CustomerNailDto>> AssignReviewerAsync(int id, AssignArtistRequestDTO request);
+        Task<ApiResult<CustomerNailDto>> ArtistQuoteAsync(int id, Guid artistId, ArtistQuoteRequestDTO request);
+        Task<ApiResult<CustomerNailDto>> ManagerApproveQuoteAsync(int id, ManagerApproveQuoteRequestDTO request);
+        Task<ApiResult<CustomerNailDto>> ManagerRejectRequestAsync(int id, RejectRequestDTO request);
+        Task<ApiResult<CustomerNailDto>> CustomerRespondQuoteAsync(int id, Guid customerId, CustomerRespondQuoteRequest request);
     }
 }
