@@ -3,6 +3,7 @@ using Nailify.Capstone.Application.Common.Models;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Common.Events.BookingEvents;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +28,50 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                 CreatedAt = DateTime.UtcNow
             };
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
-            //await _unitOfWork.SaveChangesAsync();
+
+            if (domainEvent.NewStatus == BookingStatus.Completed &&
+                domainEvent.OldStatus != BookingStatus.Completed &&
+                !await _unitOfWork.LoyaltyTransactionRepository.ExistsAsync(t => t.BookingId == domainEvent.BookingId))
+            {
+                var booking = await _unitOfWork.BookingRepository.GetByIdAsync(domainEvent.BookingId);
+                var customer = booking == null
+                    ? null
+                    : await _unitOfWork.CustomerRepository.GetByIdAsync(booking.CustomerId);
+
+                if (booking != null && customer != null)
+                {
+                    const int earnedPoints = 10;
+                    customer.LoyaltyPoint += earnedPoints;
+                    customer.LifetimePoints += earnedPoints;
+
+                    var matchedTier = _unitOfWork.LoyaltyTierRepository.FindAll()
+                        .Where(t =>
+                            (!t.MinLifetimePoints.HasValue || customer.LifetimePoints >= t.MinLifetimePoints.Value) &&
+                            (!t.MaxLifetimePoints.HasValue || customer.LifetimePoints <= t.MaxLifetimePoints.Value))
+                        .OrderByDescending(t => t.MinLifetimePoints ?? 0)
+                        .FirstOrDefault();
+
+                    matchedTier ??= _unitOfWork.LoyaltyTierRepository.FindAll()
+                        .FirstOrDefault(t => t.SortOrder == 1);
+
+                    if (matchedTier != null)
+                    {
+                        customer.LoyaltyTierId = matchedTier.LoyaltyTierId;
+                    }
+
+                    _unitOfWork.CustomerRepository.Update(customer);
+
+                    await _unitOfWork.LoyaltyTransactionRepository.CreateAsync(new LoyaltyTransaction
+                    {
+                        CustomerId = booking.CustomerId,
+                        BookingId = booking.BookingId,
+                        Points = earnedPoints,
+                        TransactionType = LoyaltyTransactionType.Earned,
+                        LoyaltyTierIdAtTime = matchedTier?.LoyaltyTierId,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
         }
     }
 }

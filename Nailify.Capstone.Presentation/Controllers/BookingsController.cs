@@ -91,6 +91,18 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        [HttpPost("price")]
+        [ProducesResponseType(typeof(ApiResult<BookingPriceResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> CalculatePrice([FromBody] BookingPriceRequestDTO request)
+        {
+            var response = await _bookingService.CalculateBookingPriceAsync(
+                GetCurrentUserId(),
+                request.BookingItems);
+            return response.IsSucceeded ? Ok(response) : BadRequest(response);
+        }
+
         /// <summary>
         /// Thực hiện chụp hình bàn tay khách cho đơn đặt lịch (Chụp hình trước khi làm).
         /// </summary>

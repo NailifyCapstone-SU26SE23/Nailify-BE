@@ -21,14 +21,16 @@ namespace Nailify.Capstone.Application.Services
         private readonly IQRService _qrService;
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly INailVariantService _nailVariantService;
+        private readonly ILoyaltyTierService _loyaltyTierService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService)
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _qrService = qrService;
             _bookingProcedureService = bookingProcedureService;
             _nailVariantService = nailVariantService;
+            _loyaltyTierService = loyaltyTierService;
             _slotHoldService = slotHoldService;
         }
 
@@ -156,56 +158,21 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var bookingId = Guid.NewGuid();
-            int totalDuration = 0;
-            decimal totalPrice = 0;
-            var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
-
-            foreach (var item in bookingItems)
+            var calculation = await BuildBookingItemsAsync(request.BookingItems, bookingId);
+            if (!calculation.IsSucceeded)
             {
-                item.BookingId = bookingId;
-
-                if (!item.NailVariantId.HasValue && !item.ServiceId.HasValue)
-                {
-                    return new ApiErrorResult<BookingResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
-                }
-
-                decimal itemPrice = 0;
-                int itemDuration = 0;
-
-                if (item.NailVariantId.HasValue)
-                {
-                    var variant = await _nailVariantService.GetNailVariantByIdAsync(item.NailVariantId.Value);
-                    if (variant?.Data != null)
-                    {
-                        itemPrice += variant.Data.Price;
-                        itemDuration += (variant.Data.Duration ?? 60);
-                    }
-                    else
-                    {
-                        return new ApiErrorResult<BookingResponseDTO>($"Không tìm thấy mẫu nail có ID {item.NailVariantId.Value}");
-                    }
-                }
-
-                if (item.ServiceId.HasValue)
-                {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if (service != null)
-                    {
-                        itemPrice += service.Price;
-                        itemDuration += service.Duration;
-                    }
-                    else
-                    {
-                        return new ApiErrorResult<BookingResponseDTO>($"Không tìm thấy dịch vụ có ID {item.ServiceId.Value}");
-                    }
-                }
-
-                item.Price = itemPrice;
-                item.Duration = itemDuration;
-
-                totalDuration += item.Duration;
-                totalPrice += item.Price;
+                return new ApiErrorResult<BookingResponseDTO>(calculation.ErrorMessage!);
             }
+
+            var priceResult = await CalculateDiscountedPriceAsync(customerId, calculation.Price);
+            if (!priceResult.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
+            }
+
+            var bookingItems = calculation.Items;
+            var totalDuration = calculation.Duration;
+            var totalPrice = priceResult.TotalPrice;
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
 
@@ -914,6 +881,139 @@ namespace Nailify.Capstone.Application.Services
             }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Lấy thông tin chi tiết đặt lịch thành công.");
+        }
+
+        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(
+            Guid customerId,
+            IEnumerable<BookingItemRequestDTO> bookingItems)
+        {
+            var calculation = await BuildBookingItemsAsync(bookingItems, Guid.Empty);
+            if (!calculation.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
+            }
+
+            var priceResult = await CalculateDiscountedPriceAsync(customerId, calculation.Price);
+            if (!priceResult.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingPriceResponseDTO>(priceResult.ErrorMessage!);
+            }
+
+            return new ApiSuccessResult<BookingPriceResponseDTO>(
+                new BookingPriceResponseDTO
+                {
+                    Price = calculation.Price,
+                    Discount = -priceResult.DiscountAmount,
+                    TotalPrice = priceResult.TotalPrice
+                },
+                "Tính giá đặt lịch thành công.");
+        }
+
+        private async Task<BookingItemsCalculation> BuildBookingItemsAsync(
+            IEnumerable<BookingItemRequestDTO> requests,
+            Guid bookingId)
+        {
+            var requestItems = requests?.ToList() ?? new List<BookingItemRequestDTO>();
+            if (!requestItems.Any())
+            {
+                return BookingItemsCalculation.Failure("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
+            }
+
+            var items = _mapper.Map<List<BookingItem>>(requestItems);
+            decimal totalPrice = 0;
+            var totalDuration = 0;
+
+            foreach (var item in items)
+            {
+                item.BookingId = bookingId;
+                item.Quantity = Math.Max(item.Quantity, 1);
+
+                if (!item.NailVariantId.HasValue && !item.ServiceId.HasValue)
+                {
+                    return BookingItemsCalculation.Failure(
+                        "Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
+                }
+
+                decimal unitPrice = 0;
+                var unitDuration = 0;
+
+                if (item.NailVariantId.HasValue)
+                {
+                    var variant = await _nailVariantService.GetNailVariantByIdAsync(item.NailVariantId.Value);
+                    if (variant?.Data == null)
+                    {
+                        return BookingItemsCalculation.Failure(
+                            $"Không tìm thấy mẫu nail có ID {item.NailVariantId.Value}");
+                    }
+
+                    unitPrice += variant.Data.Price;
+                    unitDuration += variant.Data.Duration ?? 60;
+                }
+
+                if (item.ServiceId.HasValue)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                    if (service == null)
+                    {
+                        return BookingItemsCalculation.Failure(
+                            $"Không tìm thấy dịch vụ có ID {item.ServiceId.Value}");
+                    }
+
+                    unitPrice += service.Price;
+                    unitDuration += service.Duration;
+                }
+
+                item.Price = unitPrice;
+                item.Duration = unitDuration;
+                totalPrice += unitPrice * item.Quantity;
+                totalDuration += unitDuration * item.Quantity;
+            }
+
+            return BookingItemsCalculation.Success(items, totalPrice, totalDuration);
+        }
+
+        private async Task<DiscountedPriceCalculation> CalculateDiscountedPriceAsync(
+            Guid customerId,
+            decimal price)
+        {
+            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId);
+            if (!loyaltyResult.IsSucceeded)
+            {
+                return DiscountedPriceCalculation.Failure(loyaltyResult.Message);
+            }
+
+            var discountRate = loyaltyResult.Data.LoyaltyTier.DiscountRate;
+            var discountAmount = decimal.Round(price * discountRate, 0, MidpointRounding.AwayFromZero);
+            return DiscountedPriceCalculation.Success(discountAmount, price - discountAmount);
+        }
+
+        private sealed record BookingItemsCalculation(
+            bool IsSucceeded,
+            List<BookingItem> Items,
+            decimal Price,
+            int Duration,
+            string? ErrorMessage)
+        {
+            public static BookingItemsCalculation Success(
+                List<BookingItem> items,
+                decimal price,
+                int duration) => new(true, items, price, duration, null);
+
+            public static BookingItemsCalculation Failure(string message)
+                => new(false, new List<BookingItem>(), 0, 0, message);
+        }
+
+        private sealed record DiscountedPriceCalculation(
+            bool IsSucceeded,
+            decimal DiscountAmount,
+            decimal TotalPrice,
+            string? ErrorMessage)
+        {
+            public static DiscountedPriceCalculation Success(decimal discountAmount, decimal totalPrice)
+                => new(true, discountAmount, totalPrice, null);
+
+            public static DiscountedPriceCalculation Failure(string message)
+                => new(false, 0, 0, message);
         }
 
         private PagedList<BookingResponseDTO> MapPagedBookings(PagedList<Booking> pagedBookings, int pageNumber, int pageSize)
