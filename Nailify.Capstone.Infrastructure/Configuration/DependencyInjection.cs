@@ -137,18 +137,16 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             }
 
             var slotHoldSettings = configuration.GetSection("SlotHoldSettings")
-                                                  .Get<SlotHoldConfiguration>();
-            if(slotHoldSettings != null)
-            {
-                services.AddSingleton<ISlotHoldConfiguration>(slotHoldSettings);
-            }
+                                                  .Get<SlotHoldConfiguration>()
+                                   ?? new SlotHoldConfiguration();
+            services.AddSingleton<ISlotHoldConfiguration>(slotHoldSettings);
+
             var redisSettings = configuration.GetSection("Redis")
-                                             .Get<RedisConfiguration>();
-            if (redisSettings != null)
-            {
-                services.AddSingleton<IRedisConfiguration>(redisSettings);
-            }
-            if (redisSettings != null && redisSettings.UseMemoryCache)
+                                             .Get<RedisConfiguration>()
+                                ?? new RedisConfiguration { UseMemoryCache = true };
+            services.AddSingleton<IRedisConfiguration>(redisSettings);
+
+            if (redisSettings.UseMemoryCache)
             {
                 services.AddDistributedMemoryCache();
             }
