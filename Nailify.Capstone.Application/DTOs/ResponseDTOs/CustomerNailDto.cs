@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 {
@@ -24,9 +25,14 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public NailVariantDto? BasedOnNailVariant { get; set; }
         public List<CustomerNailComponentDto> CustomerNailComponents { get; set; } = new List<CustomerNailComponentDto>();
 
+        public string Status { get; set; } = string.Empty;
+        public string? RejectReason { get; set; }
+        public Guid? ApprovedArtistId { get; set; }
+
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<CustomerNail, CustomerNailDto>();
+            profile.CreateMap<CustomerNail, CustomerNailDto>()
+                   .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
         }
     }
 }

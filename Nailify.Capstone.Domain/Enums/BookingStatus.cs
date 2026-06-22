@@ -9,8 +9,8 @@ namespace Nailify.Capstone.Domain.Enums
     public enum BookingStatus
     {
         Pending,
-        Assigned,
-        Reviewed,
+        //Assigned,
+        //Reviewed,
         Approved,
         Rejected,
         Cancelled,

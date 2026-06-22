@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -247,6 +248,91 @@ namespace Nailify.Capstone.Presentation.Controllers
 
                 await DeleteImageAsync(existingResult.Data.ImageUrl);
                 return Ok(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+
+        /// <summary>
+        /// Khách hàng gửi yêu cầu duyệt và báo giá mẫu móng custom.
+        /// </summary>
+        [HttpPost("{id}/submit-review")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SubmitReview(int id)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.SubmitReviewAsync(id, currentUserId);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Salon Manager chỉ định thợ thẩm định mẫu móng.
+        /// </summary>
+        [HttpPost("{id}/assign-reviewer")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AssignReviewer(int id, [FromBody] AssignArtistRequestDTO request)
+        {
+            var result = await _customerNailService.AssignReviewerAsync(id, request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Thợ nail được giao gửi đề xuất giá và thời gian làm.
+        /// </summary>
+        [HttpPost("{id}/artist-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ArtistQuote(int id, [FromBody] ArtistQuoteRequestDTO request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.ArtistQuoteAsync(id, currentUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Salon Manager chốt báo giá cuối cùng gửi cho khách.
+        /// </summary>
+        [HttpPost("{id}/manager-approve-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerApproveQuote(int id, [FromBody] ManagerApproveQuoteRequestDTO request)
+        {
+            var result = await _customerNailService.ManagerApproveQuoteAsync(id, request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Salon Manager từ chối yêu cầu duyệt móng custom (kèm lý do).
+        /// </summary>
+        [HttpPost("{id}/manager-reject")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerReject(int id, [FromBody] RejectRequestDTO request)
+        {
+            var result = await _customerNailService.ManagerRejectRequestAsync(id, request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Khách hàng đồng ý hoặc từ chối mức báo giá.
+        /// </summary>
+        [HttpPost("{id}/customer-respond-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CustomerRespondQuote(int id, [FromBody] CustomerRespondQuoteRequest request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.CustomerRespondQuoteAsync(id, currentUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
             }
             catch (UnauthorizedAccessException)
             {

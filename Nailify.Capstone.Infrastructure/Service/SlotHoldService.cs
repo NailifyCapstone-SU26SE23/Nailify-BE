@@ -169,6 +169,15 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
                 }
 
+                if (item.CustomerNailId.HasValue)
+                {
+                    var customNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(item.CustomerNailId.Value);
+                    if (customNail != null)
+                    {
+                        itemDuration += (customNail.Duration ?? 60);
+                    }
+                }
+
                 durationMinutes += itemDuration * item.Quantity;
             }
 
