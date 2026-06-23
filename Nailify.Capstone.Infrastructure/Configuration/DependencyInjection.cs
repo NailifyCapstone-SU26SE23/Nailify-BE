@@ -113,6 +113,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailComponentService, NailComponentService>();
             services.AddScoped<ICustomerComponentService, CustomerComponentService>();
             services.AddScoped<ICustomerNailService, CustomerNailService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             services.AddScoped<ICustomerNailComponentService, CustomerNailComponentService>();
             services.AddScoped<ISkillTypeService, SkillTypeService>();
             services.AddScoped<INailArtistSkillService, NailArtistSkillService>();
@@ -128,6 +129,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();

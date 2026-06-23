@@ -369,6 +369,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+
+
         private async Task<string> UploadImageAsync(IFormFile? image)
         {
             if (image == null || image.Length == 0)

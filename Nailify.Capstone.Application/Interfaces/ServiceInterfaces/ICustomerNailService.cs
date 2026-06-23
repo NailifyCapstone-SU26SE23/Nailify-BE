@@ -21,5 +21,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerApproveQuoteAsync(Guid id, Guid managerUserId, ManagerApproveQuoteRequestDTO request);
         Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerRejectRequestAsync(Guid id, Guid managerUserId, RejectRequestDTO request);
         Task<ApiResult<CustomerNailRequestResponseDTO>> CustomerRespondQuoteAsync(Guid id, Guid customerId, CustomerRespondQuoteRequest request);
+        Task<ApiResult<PagedList<CustomerNailRequestResponseDTO>>> GetPagedCustomerNailRequestsAsync(int pageNumber, int pageSize, Guid? salonId = null, CustomerNailStatus? status = null, Guid? customerId = null, Guid? approvedArtistId = null);
+        Task<ApiResult<CustomerNailRequestResponseDTO>> GetCustomerNailRequestByIdAsync(Guid requestId);
     }
 }

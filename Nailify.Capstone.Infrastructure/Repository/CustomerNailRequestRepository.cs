@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -18,7 +18,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
         }
         public async Task<PagedList<CustomerNailRequest>> GetPagedCustomerNailRequestsAsync(
-            int pageNumber, int pageSize, Guid? salonId = null, CustomerNailStatus? status = null, Guid? customerId = null)
+            int pageNumber, int pageSize, Guid? salonId = null, CustomerNailStatus? status = null, Guid? customerId = null, Guid? approvedArtistId = null)
         {
             var query = FindByCondition(x => true)
                        .Include(x => x.CustomerNail)
@@ -31,6 +31,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 query = query.Where(x => x.Status == status.Value);
             if (customerId.HasValue)
                 query = query.Where(x => x.CustomerNail.UserId == customerId.Value);
+            if (approvedArtistId.HasValue)
+                query = query.Where(x => x.ApprovedArtistId == approvedArtistId.Value);
             query = query.OrderByDescending(x => x.CreatedAt);
             var totalItems = await query.CountAsync();
             var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();

@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -12,7 +12,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface ICustomerNailRequestRepository : IGenericRepository<CustomerNailRequest>
     {
         Task<PagedList<CustomerNailRequest>> GetPagedCustomerNailRequestsAsync(
-            int pageNumber, int pageSize, Guid? salonId = null, CustomerNailStatus? status = null, Guid? customerId = null);
+            int pageNumber, int pageSize, Guid? salonId = null, CustomerNailStatus? status = null, Guid? customerId = null, Guid? approvedArtistId = null);
 
         Task<CustomerNailRequest?> GetCustomerNailRequestDetailAsync(Guid requestId);
         Task<CustomerNailRequest?> GetApprovedRequestAsync(int customerNailId, Guid salonId);
