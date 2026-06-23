@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 
 namespace Nailify.Capstone.Infrastructure.Repository
@@ -12,7 +13,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
         }
 
-        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
+        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null, Guid? salonId = null, CustomerNailStatus? status = null)
         {
             var query = BuildCustomerNailQuery();
 
@@ -30,6 +31,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
             if (isPublic.HasValue)
             {
                 query = query.Where(nail => nail.IsPublic == isPublic.Value);
+            }
+            if (salonId.HasValue)
+            {     
+                query = query.Where(nail => nail.SalonId == salonId.Value);
+            }
+            if (status.HasValue)
+            {
+                query = query.Where(nail => nail.Status == status.Value);
             }
 
             var count = await query.CountAsync();

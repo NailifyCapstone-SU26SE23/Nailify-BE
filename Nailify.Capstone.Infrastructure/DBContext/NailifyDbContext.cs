@@ -201,6 +201,13 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .WithMany()
                 .HasForeignKey(cn => cn.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<CustomerNail>()
+                        .HasOne(cn => cn.Salon)
+                        .WithMany()
+                        .HasForeignKey(cn => cn.SalonId)
+                        .IsRequired(false)
+                        .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CustomerNail>()
                 .HasOne(cn => cn.NailShape)

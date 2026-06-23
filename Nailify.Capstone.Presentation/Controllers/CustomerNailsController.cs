@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -14,7 +15,7 @@ namespace Nailify.Capstone.Presentation.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class CustomerNailsController : BaseApiController 
+    public class CustomerNailsController : BaseApiController
     {
         private readonly ICustomerNailService _customerNailService;
         private readonly CloudinaryService _cloudinaryService;
@@ -42,13 +43,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
-            [FromQuery] Guid? userId  = null,
-            [FromQuery] bool? isPublic = null)
+            [FromQuery] Guid? userId = null,
+            [FromQuery] bool? isPublic = null,
+            [FromQuery] Guid? salonId = null,
+            [FromQuery] CustomerNailStatus? status = null)
         {
             try
             {
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, userId, name, isPublic);
+                    pageNumber, pageSize, userId, name, isPublic, salonId, status);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -97,15 +100,16 @@ namespace Nailify.Capstone.Presentation.Controllers
                 {
                     var currentUserId = GetCurrentUserId();
                     if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
-                    {
-                        return UnauthorizedResponse();
-                    }
+                        if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
+                        {
+                            return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
+                        }
                 }
                 catch (UnauthorizedAccessException)
                 {
                     if (!result.Data.IsPublic)
                     {
-                        return UnauthorizedResponse();
+                        return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
                     }
                 }
             }
@@ -260,12 +264,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/submit-review")]
         [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> SubmitReview(int id)
+        public async Task<IActionResult> SubmitReview(int id, [FromQuery] Guid salonId)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
-                var result = await _customerNailService.SubmitReviewAsync(id, currentUserId);
+                var result = await _customerNailService.SubmitReviewAsync(id, currentUserId, salonId);
                 return result.IsSucceeded ? Ok(result) : BadRequest(result);
             }
             catch (UnauthorizedAccessException)
@@ -280,8 +284,17 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AssignReviewer(int id, [FromBody] AssignArtistRequestDTO request)
         {
-            var result = await _customerNailService.AssignReviewerAsync(id, request);
-            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+
+                var result = await _customerNailService.AssignReviewerAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
         }
         /// <summary>
         /// Thợ nail được giao gửi đề xuất giá và thời gian làm.
@@ -308,8 +321,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ManagerApproveQuote(int id, [FromBody] ManagerApproveQuoteRequestDTO request)
         {
-            var result = await _customerNailService.ManagerApproveQuoteAsync(id, request);
-            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+                var result = await _customerNailService.ManagerApproveQuoteAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
         }
         /// <summary>
         /// Salon Manager từ chối yêu cầu duyệt móng custom (kèm lý do).
@@ -318,8 +339,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ManagerReject(int id, [FromBody] RejectRequestDTO request)
         {
-            var result = await _customerNailService.ManagerRejectRequestAsync(id, request);
-            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+                var result = await _customerNailService.ManagerRejectRequestAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
         }
         /// <summary>
         /// Khách hàng đồng ý hoặc từ chối mức báo giá.
