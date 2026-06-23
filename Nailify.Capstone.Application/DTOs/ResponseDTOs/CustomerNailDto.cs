@@ -19,6 +19,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public DateTime CreatedAt { get; set; }
         public bool IsPublic { get; set; }
         public int? BasedOnNailVariantId { get; set; }
+        public Guid? SalonId { get; set; }
+
         public NailShapeDto? NailShape { get; set; }
         public NailSurfaceDto? NailSurface { get; set; }
         public NailVariantDto? BasedOnNailVariant { get; set; }
