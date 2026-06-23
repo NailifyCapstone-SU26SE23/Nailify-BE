@@ -211,12 +211,12 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> AssignReviewerAsync(Guid id, Guid managerUserId, AssignArtistRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
-            if(customerNail == null)
+            var nailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
+            if(nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
-            if (customerNail.Status != CustomerNailStatus.PendingReview && customerNail.Status != CustomerNailStatus.Assigned)
+            if (nailRequest.Status != CustomerNailStatus.PendingReview && nailRequest.Status != CustomerNailStatus.Assigned)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Yêu cầu duyệt mẫu móng không ở trạng thái hợp lệ để phân thợ.");
             }
@@ -226,7 +226,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
             }
            
-            if (customerNail.SalonId != manager.SalonId)
+            if (nailRequest.SalonId != manager.SalonId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chỉ định thợ cho mẫu móng ở chi nhánh khác.");
             }
@@ -236,14 +236,14 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy thợ nail.");
             }
-            if (artist.Account?.SalonId != customerNail.SalonId)
+            if (artist.Account?.SalonId != nailRequest.SalonId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Thợ làm móng được chỉ định không thuộc chi nhánh cần thẩm định mẫu nail.");
             }
-            customerNail.Status = CustomerNailStatus.Assigned;
-            customerNail.ApprovedArtistId = request.StaffArtistId;
-            customerNail.UpdatedAt = DateTime.UtcNow;
-            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
+            nailRequest.Status = CustomerNailStatus.Assigned;
+            nailRequest.ApprovedArtistId = request.StaffArtistId;
+            nailRequest.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -252,12 +252,12 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> ArtistQuoteAsync(Guid id, Guid artistAccountId, ArtistQuoteRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
-            if(customerNail == null)
+            var nailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
+            if(nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
-            if(customerNail.Status != CustomerNailStatus.Assigned)
+            if(nailRequest.Status != CustomerNailStatus.Assigned)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng không ở trạng thái chờ Thợ Báo Giá.");
             }
@@ -266,14 +266,15 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Tài khoản của bạn không được cấu hình là thợ nail hoặc thợ nail không hoạt động.");
             }
-            if(customerNail.ApprovedArtistId != artist.NailArtistId)
+            if(nailRequest.ApprovedArtistId != artist.NailArtistId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền báo giá mẫu nail này.");
             }
-            customerNail.Price = request.QuotedPrice;
-            customerNail.Duration = request.QuotedDuration;
-            customerNail.Status = CustomerNailStatus.Reviewed;
-            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
+            nailRequest.Price = request.QuotedPrice;
+            nailRequest.Duration = request.QuotedDuration;
+            nailRequest.Status = CustomerNailStatus.Reviewed;
+            nailRequest.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -282,12 +283,12 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerApproveQuoteAsync(Guid id, Guid managerUserId, ManagerApproveQuoteRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
-            if(customerNail == null)
+            var nailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
+            if(nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
-            if(customerNail.Status != CustomerNailStatus.Reviewed)
+            if(nailRequest.Status != CustomerNailStatus.Reviewed)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng không ở trạng thái chờ Quản Lý Duyệt Báo Giá.");
             }
@@ -296,16 +297,16 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
             }
-            if (customerNail.SalonId != manager.SalonId)
+            if (nailRequest.SalonId != manager.SalonId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chốt báo giá mẫu móng của chi nhánh khác.");
             }
 
-            customerNail.Price = request.FinalPrice;
-            customerNail.Duration = request.FinalDuration;
-            customerNail.Status = CustomerNailStatus.Quoted;
-            customerNail.UpdatedAt = DateTime.UtcNow;
-            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
+            nailRequest.Price = request.FinalPrice;
+            nailRequest.Duration = request.FinalDuration;
+            nailRequest.Status = CustomerNailStatus.Quoted;
+            nailRequest.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -314,12 +315,12 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerRejectRequestAsync(Guid id, Guid managerUserId, RejectRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
-            if(customerNail == null)
+            var nailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
+            if(nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
-            if(customerNail.Status != CustomerNailStatus.PendingReview && customerNail.Status != CustomerNailStatus.Assigned)
+            if(nailRequest.Status != CustomerNailStatus.PendingReview && nailRequest.Status != CustomerNailStatus.Assigned)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Yêu cầu duyệt mẫu không ở trạng thái có thể từ chối.");
             }
@@ -328,18 +329,18 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
             }
-            if (customerNail.SalonId != manager.SalonId)
+            if (nailRequest.SalonId != manager.SalonId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền từ chối yêu cầu duyệt mẫu móng của chi nhánh khác.");
             }
-            customerNail.Status = CustomerNailStatus.Rejected;
-            customerNail.RejectReason = request.Reason;
-            customerNail.Price = null;
-            customerNail.Duration = null;
-            customerNail.ApprovedArtistId = null;
-            customerNail.UpdatedAt = DateTime.UtcNow;
+            nailRequest.Status = CustomerNailStatus.Rejected;
+            nailRequest.RejectReason = request.Reason;
+            nailRequest.Price = null;
+            nailRequest.Duration = null;
+            nailRequest.ApprovedArtistId = null;
+            nailRequest.UpdatedAt = DateTime.UtcNow;
 
-            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
+            _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);

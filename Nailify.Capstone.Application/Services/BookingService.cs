@@ -666,6 +666,11 @@ namespace Nailify.Capstone.Application.Services
 
             booking.Updated(oldPrice, oldDuration, actorId);
 
+            booking.Customer = null!;
+            booking.Salon = null!;
+            booking.NailArtist = null;
+            booking.BookingHistories.Clear();
+
             _unitOfWork.BookingRepository.Update(booking);
 
             foreach (var item in bookingItems)
