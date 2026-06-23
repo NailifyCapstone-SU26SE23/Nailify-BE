@@ -20,7 +20,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string ArtistName { get; set; } = string.Empty;
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
-        public decimal TotalPrice { get; set; }
+        public decimal? Price { get; set; }
+        public decimal? Discount { get; set; }
+        public decimal? TotalPrice { get; set; }
         public string Status { get; set; } = string.Empty;
         public int TotalDuration { get; set; }
         public string? CheckInImageUrl { get; set; }

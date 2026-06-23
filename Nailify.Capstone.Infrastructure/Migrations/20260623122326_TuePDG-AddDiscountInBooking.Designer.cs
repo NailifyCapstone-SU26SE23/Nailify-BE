@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260623122326_TuePDG-AddDiscountInBooking")]
+    partial class TuePDGAddDiscountInBooking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -428,6 +431,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("RejectReason")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SalonId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -443,6 +449,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasIndex("NailShapeId");
 
                     b.HasIndex("NailSurfaceId");
+
+                    b.HasIndex("SalonId");
 
                     b.HasIndex("UserId");
 
@@ -1364,6 +1372,11 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("NailSurfaceId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
+                        .WithMany()
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1375,6 +1388,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailShape");
 
                     b.Navigation("NailSurface");
+
+                    b.Navigation("Salon");
 
                     b.Navigation("User");
                 });

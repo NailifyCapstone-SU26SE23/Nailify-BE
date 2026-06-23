@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
                 .ForMember(dest => dest.CustomerId, opt => opt.Ignore())
                 .ForMember(dest => dest.TotalPrice, opt => opt.Ignore())
                 .ForMember(dest => dest.Price, opt => opt.Ignore())
+                .ForMember(dest => dest.Discount, opt => opt.Ignore())
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "Pending"))
                 .ForMember(dest => dest.TotalDuration, opt => opt.Ignore())
                 .ForMember(dest => dest.CheckInImageUrl, opt => opt.Ignore())

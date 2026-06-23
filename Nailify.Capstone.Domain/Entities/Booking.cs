@@ -18,10 +18,10 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid? NailArtistId { get; set; }
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
-        public decimal TotalPrice { get; set; }
-        //public string Status { get; set; }
         public BookingStatus Status { get; set; }
-        public string Price { get; set; }
+        public decimal? Price { get; set; } 
+        public decimal? Discount { get; set; }
+        public decimal? TotalPrice { get; set; }
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public string? CheckInImageUrl { get; set; }
