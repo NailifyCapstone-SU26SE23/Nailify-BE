@@ -552,11 +552,6 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != BookingStatus.Pending)
-            {
-                return new ApiErrorResult<BookingResponseDTO>("Không thể cập nhật đơn đặt lịch đã được xử lý hoặc đã hủy.");
-            }
-
             if (request.BookingItems == null || !request.BookingItems.Any())
             {
                 return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
