@@ -50,6 +50,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<FavoriteNail> FavoriteNails { get; set; }
         public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
         public DbSet<LoyaltyTransaction> LoyaltyTransactions { get; set; }
+        public DbSet<CustomerNailRequest> CustomerNailRequests { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -203,13 +204,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .OnDelete(DeleteBehavior.Restrict);
             
             modelBuilder.Entity<CustomerNail>()
-                        .HasOne(cn => cn.Salon)
-                        .WithMany()
-                        .HasForeignKey(cn => cn.SalonId)
-                        .IsRequired(false)
-                        .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<CustomerNail>()
                 .HasOne(cn => cn.NailShape)
                 .WithMany()
                 .HasForeignKey(cn => cn.NailShapeId)
@@ -225,12 +219,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .Property(cn => cn.Status)
                 .HasConversion<string>()
                 .HasMaxLength(30);
-
-            modelBuilder.Entity<CustomerNail>()
-                .HasOne(cn => cn.ApprovedArtist)
-                .WithMany()
-                .HasForeignKey(cn => cn.ApprovedArtistId)
-                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CustomerNailComponent>()
                 .HasKey(cnc => cnc.CustomerNailComponentId);
@@ -372,7 +360,30 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .Property(s => s.Price)
                 .HasPrecision(18, 2);
             */
+            modelBuilder.Entity<CustomerNailRequest>(entity =>
+            {
+                entity.HasKey(cnr => cnr.CustomerNailRequestId);
 
+                entity.Property(cnr => cnr.CustomerNailRequestId)
+                      .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(cnr => cnr.Price)
+                      .HasPrecision(18, 2);
+                entity.Property(cnr => cnr.Status)
+                      .HasConversion<string>()
+                      .HasMaxLength(30);
+                entity.HasOne(cnr => cnr.CustomerNail)
+                      .WithMany(cn => cn.CustomerNailRequests)
+                      .HasForeignKey(cnr => cnr.CustomerNailId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(cnr => cnr.Salon)
+                      .WithMany()
+                      .HasForeignKey(cnr => cnr.SalonId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(cnr => cnr.ApprovedArtist)
+                      .WithMany()
+                      .HasForeignKey(cnr => cnr.ApprovedArtistId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
             modelBuilder.Entity<CustomerNailComponent>()
                 .HasOne(cnc => cnc.CustomerNail)
                 .WithMany(cn => cn.CustomerNailComponents)

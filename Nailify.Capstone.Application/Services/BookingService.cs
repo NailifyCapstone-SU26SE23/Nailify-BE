@@ -162,23 +162,25 @@ namespace Nailify.Capstone.Application.Services
             var customNailItem = request.BookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
             if (customNailItem != null)
             {
-                var customNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailItem.CustomerNailId!.Value);
+                var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailItem.CustomerNailId!.Value);
                 if (customNail == null)
                 {
                     return new ApiErrorResult<BookingResponseDTO>($"Không tìm thấy mẫu móng custom ID {customNailItem.CustomerNailId.Value}");
                 }
 
-                if (customNail.Status != CustomerNailStatus.Approved)
+                // Tìm bản ghi CustomerNailRequest đã được Approved tại salon này
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(customNailItem.CustomerNailId.Value, request.SalonId);
+                if (customNailRequest == null)
                 {
-                    return new ApiErrorResult<BookingResponseDTO>($"Mẫu móng custom '{customNail.Name}' chưa được duyệt báo giá hoặc đã bị từ chối.");
+                    return new ApiErrorResult<BookingResponseDTO>($"Mẫu móng custom '{customNail.Name}' chưa được duyệt báo giá hoặc đã bị từ chối tại chi nhánh này.");
                 }
 
-                if (!customNail.ApprovedArtistId.HasValue)
+                if (!customNailRequest.ApprovedArtistId.HasValue)
                 {
                     return new ApiErrorResult<BookingResponseDTO>($"Mẫu móng custom '{customNail.Name}' không có thông tin thợ duyệt.");
                 }
 
-                var approvedArtistId = customNail.ApprovedArtistId.Value;
+                var approvedArtistId = customNailRequest.ApprovedArtistId.Value;
 
                 if (request.NailArtistId.HasValue && request.NailArtistId.Value != approvedArtistId)
                 {
@@ -194,7 +196,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var bookingId = Guid.NewGuid();
-            var calculation = await BuildBookingItemsAsync(request.BookingItems, bookingId, request.NailArtistId);
+            var calculation = await BuildBookingItemsAsync(request.BookingItems, bookingId, request.SalonId, request.NailArtistId);
             if (!calculation.IsSucceeded)
             {
                 return new ApiErrorResult<BookingResponseDTO>(calculation.ErrorMessage!);
@@ -364,9 +366,26 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Vui lòng chọn mẫu nail trước khi tìm thợ.");
             }
             var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
-            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue))
+            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue && !item.CustomerNailId.HasValue))
             {
-                return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ hoặc một mẫu nail.");
+                return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
+            }
+
+            // Custom: Nếu là đặt lịch mẫu custom, chỉ hiển thị thợ đã duyệt báo giá mẫu này
+            var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
+            if (customNailItem != null)
+            {
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(customNailItem.CustomerNailId.Value, request.SalonId);
+                if (customNailRequest != null && customNailRequest.ApprovedArtistId.HasValue)
+                {
+                    var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
+                    if (approvedArtist != null && approvedArtist.Status == "Active")
+                    {
+                        var responseList = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
+                        return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(responseList, "Lấy danh sách thợ đề xuất thành công.");
+                    }
+                }
+                return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(new List<SuggestedArtistResponseDTO>(), "Không tìm thấy thợ được chỉ định duyệt mẫu móng này.");
             }
 
             var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
@@ -394,6 +413,11 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
+            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue && !item.CustomerNailId.HasValue))
+            {
+                return new ApiErrorResult<SuggestedArtistResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
+            }
+
             int totalDuration = 0;
 
             foreach (var item in bookingItems)
@@ -415,19 +439,60 @@ namespace Nailify.Capstone.Application.Services
                         totalDuration += service.Duration;
                     }
                 }
+
+                if (item.CustomerNailId.HasValue)
+                {
+                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, request.SalonId);
+                    if (customNailRequest != null && customNailRequest.Duration.HasValue)
+                    {
+                        totalDuration += customNailRequest.Duration.Value;
+                    }
+                    else
+                    {
+                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                        if (customNail != null)
+                        {
+                            totalDuration += (customNail.Duration ?? 60);
+                        }
+                    }
+                }
             }
 
-            var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
             IEnumerable<NailArtist> qualifiedArtists;
+            var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
 
-            if (variantIds.Any())
+            if (customNailItem != null)
             {
-                qualifiedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(customNailItem.CustomerNailId.Value, request.SalonId);
+                if (customNailRequest != null && customNailRequest.ApprovedArtistId.HasValue)
+                {
+                    var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
+                    if (approvedArtist != null && approvedArtist.Status == "Active")
+                    {
+                        qualifiedArtists = new List<NailArtist> { approvedArtist };
+                    }
+                    else
+                    {
+                        qualifiedArtists = new List<NailArtist>();
+                    }
+                }
+                else
+                {
+                    qualifiedArtists = new List<NailArtist>();
+                }
             }
             else
             {
-                var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(request.SalonId);
-                qualifiedArtists = activeArtists.Where(x => x.Status == "Active");
+                var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
+                if (variantIds.Any())
+                {
+                    qualifiedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+                }
+                else
+                {
+                    var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(request.SalonId);
+                    qualifiedArtists = activeArtists.Where(x => x.Status == "Active");
+                }
             }
 
             var availableArtists = new List<NailArtist>();
@@ -693,7 +758,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<BookingResponseDTO>(response, "Checkin lịch hẹn thành công.");
         }
 
-        public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId)
+        public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
             if (booking == null)
@@ -704,7 +769,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            booking.Reject(actorId);
+            booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<BookingResponseDTO>(booking);
@@ -765,7 +830,7 @@ namespace Nailify.Capstone.Application.Services
             Guid customerId,
             IEnumerable<BookingItemRequestDTO> bookingItems)
         {
-            var calculation = await BuildBookingItemsAsync(bookingItems, Guid.Empty);
+            var calculation = await BuildBookingItemsAsync(bookingItems, Guid.Empty, null);
             if (!calculation.IsSucceeded)
             {
                 return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
@@ -790,6 +855,7 @@ namespace Nailify.Capstone.Application.Services
         private async Task<BookingItemsCalculation> BuildBookingItemsAsync(
             IEnumerable<BookingItemRequestDTO> requests,
             Guid bookingId,
+            Guid? salonId,
             Guid? customerPassedArtistId = null)
         {
             var requestItems = requests?.ToList() ?? new List<BookingItemRequestDTO>();
@@ -818,14 +884,24 @@ namespace Nailify.Capstone.Application.Services
 
                 if (item.CustomerNailId.HasValue)
                 {
-                    var customNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(item.CustomerNailId.Value);
+                    var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
                     if (customNail == null)
                     {
                         return BookingItemsCalculation.Failure(
                             $"Không tìm thấy mẫu móng custom ID {item.CustomerNailId.Value}");
                     }
 
-                    if (customNail.Status != CustomerNailStatus.Approved)
+                    CustomerNailRequest? customNailRequest = null;
+                    if (salonId.HasValue && salonId.Value != Guid.Empty)
+                    {
+                        customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, salonId.Value);
+                    }
+                    else
+                    {
+                        customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetAnyApprovedRequestAsync(item.CustomerNailId.Value);
+                    }
+
+                    if (customNailRequest == null)
                     {
                         return BookingItemsCalculation.Failure(
                             $"Mẫu móng custom '{customNail.Name}' chưa được duyệt báo giá hoặc đã bị từ chối.");
@@ -833,17 +909,17 @@ namespace Nailify.Capstone.Application.Services
 
                     if (customerPassedArtistId.HasValue && customerPassedArtistId.Value != Guid.Empty)
                     {
-                        if (customerPassedArtistId.Value != customNail.ApprovedArtistId)
+                        if (customerPassedArtistId.Value != customNailRequest.ApprovedArtistId)
                         {
-                            var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNail.ApprovedArtistId.Value);
+                            var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId ?? Guid.Empty);
                             string artistName = artist != null ? $"{artist.Account.FirstName} {artist.Account.LastName}" : "thợ ban đầu";
                             return BookingItemsCalculation.Failure(
                                 $"Mẫu móng custom '{customNail.Name}' chỉ được phép đặt lịch với thợ {artistName} (người đã thẩm định mẫu).");
                         }
                     }
 
-                    unitPrice += customNail.Price ?? 0;
-                    unitDuration += customNail.Duration ?? 60;
+                    unitPrice += customNailRequest.Price ?? 0;
+                    unitDuration += customNailRequest.Duration ?? 60;
                 }
 
                 if (item.NailVariantId.HasValue)
@@ -1010,28 +1086,32 @@ namespace Nailify.Capstone.Application.Services
             var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
             if (customNailItem != null)
             {
-                var customNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailItem.CustomerNailId!.Value);
-                if (customNail != null && customNail.ApprovedArtistId.HasValue)
+                var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailItem.CustomerNailId!.Value);
+                if (customNail != null)
                 {
-                    var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNail.ApprovedArtistId.Value);
-                    if (approvedArtist != null && approvedArtist.Status == "Active")
+                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(customNailItem.CustomerNailId.Value, booking.SalonId);
+                    if (customNailRequest != null && customNailRequest.ApprovedArtistId.HasValue)
                     {
-                        var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(approvedArtist.NailArtistId, booking.BookingDate);
-                        if (schedule != null && booking.StartTime >= schedule.ShiftStart && targetEndTime <= schedule.ShiftEnd)
+                        var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
+                        if (approvedArtist != null && approvedArtist.Status == "Active")
                         {
-                            var isConflict = await _unitOfWork.BookingRepository.HasBookingConflictAsync(
-                                                                                                         approvedArtist.NailArtistId,
-                                                                                                         booking.BookingDate,
-                                                                                                         booking.StartTime,
-                                                                                                         targetEndTime);
-                            if (!isConflict)
+                            var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(approvedArtist.NailArtistId, booking.BookingDate);
+                            if (schedule != null && booking.StartTime >= schedule.ShiftStart && targetEndTime <= schedule.ShiftEnd)
                             {
-                                var singleArtistDto = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
-                                return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(singleArtistDto, "Lấy thợ rảnh thành công.");
+                                var isConflict = await _unitOfWork.BookingRepository.HasBookingConflictAsync(
+                                                                                                             approvedArtist.NailArtistId,
+                                                                                                             booking.BookingDate,
+                                                                                                             booking.StartTime,
+                                                                                                             targetEndTime);
+                                if (!isConflict)
+                                {
+                                    var singleArtistDto = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
+                                    return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(singleArtistDto, "Lấy thợ rảnh thành công.");
+                                }
                             }
+                            // Nếu thợ đã duyệt bận hoặc không có ca làm, trả về danh sách trống để Lễ tân báo khách hàng
+                            return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(new List<SuggestedArtistResponseDTO>(), "Thợ đã thẩm định mẫu custom hiện đang bận hoặc không có lịch làm việc hôm nay.");
                         }
-                        // Nếu thợ đã duyệt bận hoặc không có ca làm, trả về danh sách trống để Lễ tân báo khách hàng
-                        return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(new List<SuggestedArtistResponseDTO>(), "Thợ đã thẩm định mẫu custom hiện đang bận hoặc không có lịch làm việc hôm nay.");
                     }
                 }
             }

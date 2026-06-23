@@ -6,7 +6,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
 {
     public interface ICustomerNailRepository : IGenericRepository<CustomerNail>
     {
-        Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null, Guid? salonId = null, CustomerNailStatus? status = null);
+        Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null);
         Task<CustomerNail?> GetCustomerNailDetailAsync(int customerNailId);
     }
 }

@@ -19,7 +19,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public DateTime CreatedAt { get; set; }
         public bool IsPublic { get; set; }
         public int? BasedOnNailVariantId { get; set; }
-        public Guid? SalonId { get; set; }
 
         public NailShapeDto? NailShape { get; set; }
         public NailSurfaceDto? NailSurface { get; set; }
@@ -27,8 +26,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public List<CustomerNailComponentDto> CustomerNailComponents { get; set; } = new List<CustomerNailComponentDto>();
 
         public string Status { get; set; } = string.Empty;
-        public string? RejectReason { get; set; }
-        public Guid? ApprovedArtistId { get; set; }
 
         public void Mapping(Profile profile)
         {

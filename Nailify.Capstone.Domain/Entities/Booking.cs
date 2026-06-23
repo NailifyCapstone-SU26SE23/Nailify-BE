@@ -168,7 +168,7 @@ namespace Nailify.Capstone.Domain.Entities
                 actorId
             ));
         }
-        public void Reject(Guid actorId)
+        public void Reject(Guid actorId, string reason)
         {
             var oldStatus = Status;
             Status = BookingStatus.Rejected;
@@ -178,7 +178,7 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.Rejected,
                 "BookingRejected",
-                "Quản lý Salon từ chối đơn đặt lịch.",
+               $"Quản lý Salon từ chối đơn đặt lịch. Lý do: {reason}",
                 actorId
             ));
         }
