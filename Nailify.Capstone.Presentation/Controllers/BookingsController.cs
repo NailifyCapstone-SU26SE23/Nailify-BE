@@ -227,10 +227,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> Reject(Guid id)
+        public async Task<IActionResult> Reject(Guid id, [FromBody] RejectRequestDTO request)
         {
             var currentUserId = GetCurrentUserId();
-            var response = await _bookingService.RejectBookingAsync(id, currentUserId);
+            var response = await _bookingService.RejectBookingAsync(id, currentUserId, request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }

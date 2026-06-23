@@ -21,7 +21,7 @@ namespace Nailify.Capstone.Domain.Entities
         public decimal TotalPrice { get; set; }
         //public string Status { get; set; }
         public BookingStatus Status { get; set; }
-        public string Price { get; set; }
+        public string Price { get; set; } = string.Empty;
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public string? CheckInImageUrl { get; set; }
@@ -168,7 +168,7 @@ namespace Nailify.Capstone.Domain.Entities
                 actorId
             ));
         }
-        public void Reject(Guid actorId)
+        public void Reject(Guid actorId, string reason)
         {
             var oldStatus = Status;
             Status = BookingStatus.Rejected;
@@ -178,7 +178,7 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.Rejected,
                 "BookingRejected",
-                "Quản lý Salon từ chối đơn đặt lịch.",
+               $"Quản lý Salon từ chối đơn đặt lịch. Lý do: {reason}",
                 actorId
             ));
         }

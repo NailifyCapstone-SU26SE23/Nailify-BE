@@ -3,6 +3,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.CustomerNailRequestResponseDTO;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -22,9 +23,9 @@ namespace Nailify.Capstone.Application.Services
         }
         #endregion Constructor
         #region CRUD Operations
-        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null, Guid? salonId = null, CustomerNailStatus? status = null)
+        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
         {
-            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name, isPublic,salonId,status);
+            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name, isPublic);
             var mappedItems = _mapper.Map<List<CustomerNailDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<CustomerNailDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
@@ -110,12 +111,12 @@ namespace Nailify.Capstone.Application.Services
         {
             var customerNailDetail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId);
 
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customerNailId);
-            if (customerNail == null || customerNailDetail == null)
+            if (customerNailDetail == null)
             {
                 return;
             }
 
+            var customerNail = customerNailDetail;
             customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, customerNailId);
             customerNail.Duration = (customerNailDetail.NailShape?.Duration ?? 0)
               + (customerNailDetail.NailSurface?.Duration ?? 0)
@@ -174,196 +175,213 @@ namespace Nailify.Capstone.Application.Services
             return null;
         }
 
-        public async Task<ApiResult<CustomerNailDto>> SubmitReviewAsync(int id, Guid customerId, Guid salonId)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> SubmitReviewAsync(CustomerNailRequestCreateRequest requestDto, Guid customerId)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
+            var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(requestDto.CustomerNailId);
             if(customerNail == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
             if(customerNail.UserId != customerId)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền gửi mẫu nail này để xem xét.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền gửi mẫu nail này để xem xét.");
             }
-            if(customerNail.Status != CustomerNailStatus.Draft)
-            {
-                return new ApiErrorResult<CustomerNailDto>($"Không thể gửi yêu cầu duyệt mẫu khi mẫu móng ở trạng thái '{customerNail.Status}'.");
-            }
-            var salon = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
+            var salon = await _unitOfWork.SalonRepository.GetByIdAsync(requestDto.SalonId);
             if (salon == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy chi nhánh/salon được chọn.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy chi nhánh/salon được chọn.");
             }
-            customerNail.SalonId = salonId;
-            customerNail.Status = CustomerNailStatus.PendingReview;
-            customerNail.RejectReason = null;
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            var hasPendingRequest = await _unitOfWork.CustomerNailRequestRepository.ExistsAsync(
+                                           x => x.CustomerNailId == requestDto.CustomerNailId
+                                           && x.SalonId == requestDto.SalonId
+                                           && (x.Status == CustomerNailStatus.PendingReview || x.Status == CustomerNailStatus.Assigned)
+                                           );
+            if (hasPendingRequest) 
+            {
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng này đang trong quá trình duyệt tại chi nhánh này.");
+            }
+            var request = _mapper.Map<CustomerNailRequest>(requestDto);
+            await _unitOfWork.CustomerNailRequestRepository.CreateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, "Gửi yêu cầu duyệt báo giá mẫu nail thành công.");
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(request.CustomerNailRequestId);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Gửi yêu cầu duyệt báo giá mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> AssignReviewerAsync(int id, Guid managerUserId, AssignArtistRequestDTO request)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> AssignReviewerAsync(Guid id, Guid managerUserId, AssignArtistRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
+            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
             if(customerNail == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
-            if(customerNail.Status != CustomerNailStatus.PendingReview && customerNail.Status != CustomerNailStatus.Assigned)
+            if (customerNail.Status != CustomerNailStatus.PendingReview && customerNail.Status != CustomerNailStatus.Assigned)
             {
-                return new ApiErrorResult<CustomerNailDto>("Yêu cầu duyệt mẫu móng không ở trạng thái hợp lệ để phân thợ.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Yêu cầu duyệt mẫu móng không ở trạng thái hợp lệ để phân thợ.");
             }
             var manager = await _unitOfWork.UserRepository.GetByIdAsync(managerUserId);
             if (manager == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy tài khoản quản lý.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
             }
+           
             if (customerNail.SalonId != manager.SalonId)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền chỉ định thợ cho mẫu móng ở chi nhánh khác.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chỉ định thợ cho mẫu móng ở chi nhánh khác.");
             }
             //var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(request.StaffArtistId);
             var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.StaffArtistId);
             if (artist == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy thợ nail.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy thợ nail.");
             }
             if (artist.Account?.SalonId != customerNail.SalonId)
             {
-                return new ApiErrorResult<CustomerNailDto>("Thợ làm móng được chỉ định không thuộc chi nhánh cần thẩm định mẫu nail.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Thợ làm móng được chỉ định không thuộc chi nhánh cần thẩm định mẫu nail.");
             }
             customerNail.Status = CustomerNailStatus.Assigned;
             customerNail.ApprovedArtistId = request.StaffArtistId;
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            customerNail.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, "Chỉ định thợ thẩm định mẫu nail thành công.");
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Chỉ định thợ thẩm định mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> ArtistQuoteAsync(int id, Guid artistAccountId, ArtistQuoteRequestDTO request)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> ArtistQuoteAsync(Guid id, Guid artistAccountId, ArtistQuoteRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
+            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
             if(customerNail == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
             if(customerNail.Status != CustomerNailStatus.Assigned)
             {
-                return new ApiErrorResult<CustomerNailDto>("Mẫu móng không ở trạng thái chờ Thợ Báo Giá.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng không ở trạng thái chờ Thợ Báo Giá.");
             }
             var artist = await _unitOfWork.NailArtistRepository.GetNailArtistByAccountIdAsync(artistAccountId);
             if (artist == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Tài khoản của bạn không được cấu hình là thợ nail hoặc thợ nail không hoạt động.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Tài khoản của bạn không được cấu hình là thợ nail hoặc thợ nail không hoạt động.");
             }
             if(customerNail.ApprovedArtistId != artist.NailArtistId)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền báo giá mẫu nail này.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền báo giá mẫu nail này.");
             }
             customerNail.Price = request.QuotedPrice;
             customerNail.Duration = request.QuotedDuration;
             customerNail.Status = CustomerNailStatus.Reviewed;
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, "Thợ nail đề xuất báo giá thành công.");
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Thợ nail đề xuất báo giá thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> ManagerApproveQuoteAsync(int id, Guid managerUserId, ManagerApproveQuoteRequestDTO request)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerApproveQuoteAsync(Guid id, Guid managerUserId, ManagerApproveQuoteRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
+            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
             if(customerNail == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
             if(customerNail.Status != CustomerNailStatus.Reviewed)
             {
-                return new ApiErrorResult<CustomerNailDto>("Mẫu móng không ở trạng thái chờ Quản Lý Duyệt Báo Giá.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng không ở trạng thái chờ Quản Lý Duyệt Báo Giá.");
             }
             var manager = await _unitOfWork.UserRepository.GetByIdAsync(managerUserId);
-            if (manager == null || customerNail.SalonId != manager.SalonId)
+            if (manager == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền chốt báo giá mẫu móng của chi nhánh khác.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
+            }
+            if (customerNail.SalonId != manager.SalonId)
+            {
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chốt báo giá mẫu móng của chi nhánh khác.");
             }
 
             customerNail.Price = request.FinalPrice;
             customerNail.Duration = request.FinalDuration;
             customerNail.Status = CustomerNailStatus.Quoted;
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            customerNail.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, "Quản lý chốt giá gửi khách hàng thành công.");
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Quản lý chốt giá gửi khách hàng thành công.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> ManagerRejectRequestAsync(int id, Guid managerUserId, RejectRequestDTO request)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> ManagerRejectRequestAsync(Guid id, Guid managerUserId, RejectRequestDTO request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
+            var customerNail = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
             if(customerNail == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy mẫu nail tùy chỉnh.");
             }
             if(customerNail.Status != CustomerNailStatus.PendingReview && customerNail.Status != CustomerNailStatus.Assigned)
             {
-                return new ApiErrorResult<CustomerNailDto>("Yêu cầu duyệt mẫu không ở trạng thái có thể từ chối.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Yêu cầu duyệt mẫu không ở trạng thái có thể từ chối.");
             }
             var manager = await _unitOfWork.UserRepository.GetByIdAsync(managerUserId);
-            if (manager == null || customerNail.SalonId != manager.SalonId)
+            if (manager == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền từ chối yêu cầu duyệt mẫu móng của chi nhánh khác.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy tài khoản quản lý.");
+            }
+            if (customerNail.SalonId != manager.SalonId)
+            {
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền từ chối yêu cầu duyệt mẫu móng của chi nhánh khác.");
             }
             customerNail.Status = CustomerNailStatus.Rejected;
             customerNail.RejectReason = request.Reason;
             customerNail.Price = null;
             customerNail.Duration = null;
             customerNail.ApprovedArtistId = null;
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            customerNail.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.CustomerNailRequestRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, "Yêu cầu duyệt mẫu nail đã bị từ chối.");
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Yêu cầu duyệt mẫu nail đã bị từ chối.");
         }
 
-        public async Task<ApiResult<CustomerNailDto>> CustomerRespondQuoteAsync(int id, Guid customerId, CustomerRespondQuoteRequest request)
+        public async Task<ApiResult<CustomerNailRequestResponseDTO>> CustomerRespondQuoteAsync(Guid id, Guid customerId, CustomerRespondQuoteRequest request)
         {
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(id);
-            if (customerNail == null)
+            var nailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(id);
+            if (nailRequest == null)
             {
-                return new ApiErrorResult<CustomerNailDto>("Không tìm thấy mẫu nail tùy chỉnh.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy yêu cầu duyệt.");
             }
-            if (customerNail.UserId != customerId)
+            var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(nailRequest.CustomerNailId);
+            if (customerNail == null || customerNail.UserId != customerId)
             {
-                return new ApiErrorResult<CustomerNailDto>("Bạn không có quyền phản hồi mẫu nail này.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền phản hồi mẫu nail này.");
             }
-            if (customerNail.Status != CustomerNailStatus.Quoted)
+            if (nailRequest.Status != CustomerNailStatus.Quoted)
             {
-                return new ApiErrorResult<CustomerNailDto>("Mẫu móng không ở trạng thái Chờ Khách Xác Nhận.");
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng không ở trạng thái Chờ Khách Xác Nhận.");
             }
             if (request.IsAccepted)
             {
-                customerNail.Status = CustomerNailStatus.Approved;
-                customerNail.RejectReason = null;
+                nailRequest.Status = CustomerNailStatus.Approved;
+                nailRequest.RejectReason = null;
             }
             else
             {
-                customerNail.Status = CustomerNailStatus.Rejected;
-                customerNail.RejectReason = request.RejectReason ?? "Khách hàng từ chối báo giá.";
-                customerNail.Price = null;
-                customerNail.Duration = null;
-                customerNail.ApprovedArtistId = null;
+                nailRequest.Status = CustomerNailStatus.Rejected;
+                nailRequest.RejectReason = request.RejectReason ?? "Khách hàng từ chối báo giá.";
+                nailRequest.Price = null;
+                nailRequest.Duration = null;
+                nailRequest.ApprovedArtistId = null;
             }
-
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
+            nailRequest.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
-            var updatedNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
+            var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             string message = request.IsAccepted ? "Đồng ý báo giá thành công. Bạn đã có thể đặt lịch làm mẫu này." : "Từ chối báo giá thành công.";
-            var response = _mapper.Map<CustomerNailDto>(updatedNail);
-            return new ApiSuccessResult<CustomerNailDto>(response, message);
+            var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
+            return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, message);
         }
         #endregion Additional Operations
     }

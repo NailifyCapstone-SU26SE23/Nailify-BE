@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.CustomerNailRequestResponseDTO;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
@@ -44,14 +45,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
             [FromQuery] Guid? userId = null,
-            [FromQuery] bool? isPublic = null,
-            [FromQuery] Guid? salonId = null,
-            [FromQuery] CustomerNailStatus? status = null)
+            [FromQuery] bool? isPublic = null
+            )
         {
             try
             {
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, userId, name, isPublic, salonId, status);
+                    pageNumber, pageSize, userId, name, isPublic);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -262,14 +262,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Khách hàng gửi yêu cầu duyệt và báo giá mẫu móng custom.
         /// </summary>
-        [HttpPost("{id}/submit-review")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> SubmitReview(int id, [FromQuery] Guid salonId)
+        [HttpPost("requests/submit")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SubmitReview([FromBody] CustomerNailRequestCreateRequest request)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
-                var result = await _customerNailService.SubmitReviewAsync(id, currentUserId, salonId);
+                var result = await _customerNailService.SubmitReviewAsync(request, currentUserId);
                 return result.IsSucceeded ? Ok(result) : BadRequest(result);
             }
             catch (UnauthorizedAccessException)
@@ -280,9 +280,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Salon Manager chỉ định thợ thẩm định mẫu móng.
         /// </summary>
-        [HttpPost("{id}/assign-reviewer")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> AssignReviewer(int id, [FromBody] AssignArtistRequestDTO request)
+        [HttpPost("requests/{id}/assign-reviewer")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AssignReviewer(Guid id, [FromBody] AssignArtistRequestDTO request)
         {
             try
             {
@@ -299,9 +299,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Thợ nail được giao gửi đề xuất giá và thời gian làm.
         /// </summary>
-        [HttpPost("{id}/artist-quote")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ArtistQuote(int id, [FromBody] ArtistQuoteRequestDTO request)
+        [HttpPost("requests/{id}/artist-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ArtistQuote(Guid id, [FromBody] ArtistQuoteRequestDTO request)
         {
             try
             {
@@ -317,9 +317,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Salon Manager chốt báo giá cuối cùng gửi cho khách.
         /// </summary>
-        [HttpPost("{id}/manager-approve-quote")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ManagerApproveQuote(int id, [FromBody] ManagerApproveQuoteRequestDTO request)
+        [HttpPost("requests/{id}/manager-approve-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerApproveQuote(Guid id, [FromBody] ManagerApproveQuoteRequestDTO request)
         {
             try
             {
@@ -335,9 +335,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Salon Manager từ chối yêu cầu duyệt móng custom (kèm lý do).
         /// </summary>
-        [HttpPost("{id}/manager-reject")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ManagerReject(int id, [FromBody] RejectRequestDTO request)
+        [HttpPost("requests/{id}/manager-reject")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerReject(Guid id, [FromBody] RejectRequestDTO request)
         {
             try
             {
@@ -353,9 +353,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Khách hàng đồng ý hoặc từ chối mức báo giá.
         /// </summary>
-        [HttpPost("{id}/customer-respond-quote")]
-        [ProducesResponseType(typeof(ApiResult<CustomerNailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> CustomerRespondQuote(int id, [FromBody] CustomerRespondQuoteRequest request)
+        [HttpPost("requests/{id}/customer-respond-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CustomerRespondQuote(Guid id, [FromBody] CustomerRespondQuoteRequest request)
         {
             try
             {
