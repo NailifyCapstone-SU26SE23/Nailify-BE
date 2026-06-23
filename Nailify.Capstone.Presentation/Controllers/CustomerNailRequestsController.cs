@@ -46,6 +46,22 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy danh sách yêu cầu duyệt mẫu móng (có phân trang và lọc theo Salon, Khách hàng, Thợ nail, Trạng thái).
+        /// </summary>
+        [HttpGet("me")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<CustomerNailRequestResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAuthPagedRequests(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] CustomerNailStatus? status = null)
+        {
+            var customerId = GetCurrentUserId();
+            var result = await _customerNailRequestsService.GetPagedCustomerNailRequestsAsync(
+                pageNumber, pageSize, null, status, customerId, null);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Lấy chi tiết yêu cầu duyệt mẫu móng theo ID.
         /// </summary>
         [HttpGet("{id}")]
