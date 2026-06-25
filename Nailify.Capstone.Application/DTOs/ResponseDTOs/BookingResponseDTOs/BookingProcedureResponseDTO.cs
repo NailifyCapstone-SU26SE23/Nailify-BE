@@ -21,7 +21,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public DateTime? CompletedAt { get; set; }
         public Guid? CompletedById { get; set; }
         public string? CompletedByName { get; set; }
-
+        public bool IsRequired { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<BookingProcedure, BookingProcedureResponseDTO>()

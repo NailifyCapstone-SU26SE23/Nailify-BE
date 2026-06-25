@@ -1,9 +1,12 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.CustomerNailRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.CustomerNailRequestResponseDTO;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -13,7 +16,7 @@ namespace Nailify.Capstone.Presentation.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class CustomerNailsController : BaseApiController 
+    public class CustomerNailsController : BaseApiController
     {
         private readonly ICustomerNailService _customerNailService;
         private readonly CloudinaryService _cloudinaryService;
@@ -41,14 +44,38 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
-            [FromQuery] bool? isPublic = null,
-            [FromQuery] bool? isFavorite = null)
+            [FromQuery] Guid? userId = null,
+            [FromQuery] bool? isPublic = null
+            )
+        {
+            try
+            {
+                var result = await _customerNailService.GetPagedCustomerNailsAsync(
+                    pageNumber, pageSize, userId, name, isPublic);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách mẫu nail khách hàng authorized.
+        /// </summary>
+        [HttpGet("me")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<CustomerNailDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyCustomerNail(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? name = null,
+            [FromQuery] bool? isPublic = null)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, currentUserId, name, isPublic, isFavorite);
+                    pageNumber, pageSize, currentUserId, name, isPublic);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -73,15 +100,16 @@ namespace Nailify.Capstone.Presentation.Controllers
                 {
                     var currentUserId = GetCurrentUserId();
                     if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
-                    {
-                        return UnauthorizedResponse();
-                    }
+                        if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
+                        {
+                            return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
+                        }
                 }
                 catch (UnauthorizedAccessException)
                 {
                     if (!result.Data.IsPublic)
                     {
-                        return UnauthorizedResponse();
+                        return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
                     }
                 }
             }
@@ -230,6 +258,118 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return UnauthorizedResponse();
             }
         }
+
+        /// <summary>
+        /// Khách hàng gửi yêu cầu duyệt và báo giá mẫu móng custom.
+        /// </summary>
+        [HttpPost("requests/submit")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SubmitReview([FromBody] CustomerNailRequestCreateRequest request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.SubmitReviewAsync(request, currentUserId);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Salon Manager chỉ định thợ thẩm định mẫu móng.
+        /// </summary>
+        [HttpPost("requests/{id}/assign-reviewer")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AssignReviewer(Guid id, [FromBody] AssignArtistRequestDTO request)
+        {
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+
+                var result = await _customerNailService.AssignReviewerAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Thợ nail được giao gửi đề xuất giá và thời gian làm.
+        /// </summary>
+        [HttpPost("requests/{id}/artist-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ArtistQuote(Guid id, [FromBody] ArtistQuoteRequestDTO request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.ArtistQuoteAsync(id, currentUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Salon Manager chốt báo giá cuối cùng gửi cho khách.
+        /// </summary>
+        [HttpPost("requests/{id}/manager-approve-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerApproveQuote(Guid id, [FromBody] ManagerApproveQuoteRequestDTO request)
+        {
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+                var result = await _customerNailService.ManagerApproveQuoteAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Salon Manager từ chối yêu cầu duyệt móng custom (kèm lý do).
+        /// </summary>
+        [HttpPost("requests/{id}/manager-reject")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerReject(Guid id, [FromBody] RejectRequestDTO request)
+        {
+            try
+            {
+                var managerUserId = GetCurrentUserId();
+                var result = await _customerNailService.ManagerRejectRequestAsync(id, managerUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Khách hàng đồng ý hoặc từ chối mức báo giá.
+        /// </summary>
+        [HttpPost("requests/{id}/customer-respond-quote")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailRequestResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CustomerRespondQuote(Guid id, [FromBody] CustomerRespondQuoteRequest request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var result = await _customerNailService.CustomerRespondQuoteAsync(id, currentUserId, request);
+                return result.IsSucceeded ? Ok(result) : BadRequest(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+
+
 
         private async Task<string> UploadImageAsync(IFormFile? image)
         {

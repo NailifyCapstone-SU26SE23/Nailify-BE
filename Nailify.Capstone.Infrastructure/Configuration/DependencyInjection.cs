@@ -1,7 +1,10 @@
 using FluentValidation;
+using MediatR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -9,10 +12,8 @@ using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
-using System.Reflection;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Text;
 
 namespace Nailify.Capstone.Infrastructure.Configuration
@@ -93,6 +94,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IProcedureRepository, ProcedureRepository>();
             services.AddScoped<INailProcedureRepository, NailProcedureRepository>();
             services.AddScoped<IBookingProcedureRepository, BookingProcedureRepository>();
+            services.AddScoped<IFavoriteNailRepository, FavoriteNailRepository>();
+            services.AddScoped<ILoyaltyTierRepository, LoyaltyTierRepository>();
+            services.AddScoped<ILoyaltyTransactionRepository, LoyaltyTransactionRepository>();
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -109,6 +113,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailComponentService, NailComponentService>();
             services.AddScoped<ICustomerComponentService, CustomerComponentService>();
             services.AddScoped<ICustomerNailService, CustomerNailService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             services.AddScoped<ICustomerNailComponentService, CustomerNailComponentService>();
             services.AddScoped<ISkillTypeService, SkillTypeService>();
             services.AddScoped<INailArtistSkillService, NailArtistSkillService>();
@@ -120,6 +125,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IServicesService, ServicesService>();
             services.AddScoped<IBookingProcedureService, BookingProcedureService>();
             services.AddScoped<IProcedureService, ProcedureService>();
+            services.AddScoped<IFavoriteNailService, FavoriteNailService>();
+            services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
+            services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
+            services.AddScoped<ISlotHoldService, SlotHoldService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();
@@ -128,11 +138,38 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                 services.AddSingleton<ICloudinaryConfiguration>(cloudinarySettings);
             }
 
+            var slotHoldSettings = configuration.GetSection("SlotHoldSettings")
+                                                  .Get<SlotHoldConfiguration>()
+                                   ?? new SlotHoldConfiguration();
+            services.AddSingleton<ISlotHoldConfiguration>(slotHoldSettings);
+
+            var redisSettings = configuration.GetSection("Redis")
+                                             .Get<RedisConfiguration>()
+                                ?? new RedisConfiguration { UseMemoryCache = true };
+            services.AddSingleton<IRedisConfiguration>(redisSettings);
+
+            if (redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                   options.Configuration = redisSettings?.ConnectionString;
+                   options.InstanceName = redisSettings?.InstanceName;
+                });
+            }
+
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);
 
             // Đăng ký AutoMapper
             services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
+
+            // Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
+            services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
+
 
             return services;
         }

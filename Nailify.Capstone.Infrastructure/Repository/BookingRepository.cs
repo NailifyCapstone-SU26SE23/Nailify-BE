@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
@@ -53,24 +54,25 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .ToListAsync();
         }
 
-        public async Task<IEnumerable<Booking>> GetBookingsByCustomerAsync(Guid customerId)
-            => await FindByCondition(x => x.CustomerId == customerId)
-                                    .Include(x => x.Salon)
-                                    .Include(x => x.NailArtist)
-                                        .ThenInclude(x => x.Account)
-                                    .OrderByDescending(x => x.BookingDate)
-                                    .ThenByDescending(x => x.StartTime)
-                                    .ToListAsync();
-
-        public async Task<IEnumerable<Booking>> GetBookingsBySalonAsync(Guid salonId)
+        public async Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null)
         {
-            return await FindByCondition(b => b.SalonId == salonId)
-                         .Include(b => b.Customer)
-                            .ThenInclude(c => c.User)
-                         .Include(b => b.NailArtist)
-                            .ThenInclude(na => na.Account)
-                          .OrderByDescending(b => b.BookingDate)
-                          .ToListAsync();
+            var query = BuildBookingQuery()
+                .Where(x => x.CustomerId == customerId);
+
+            query = ApplyBookingFilters(query, startDate, endDate, status);
+
+            return await ToPagedListAsync(query, pageNumber, pageSize);
+        }
+
+        public async Task<PagedList<Booking>> GetBookingsBySalonAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null)
+        {
+            var query = BuildBookingQuery()
+                .Where(b => b.SalonId == salonId);
+
+            query = ApplyBookingFilters(query, startDate, endDate, status);
+            query = ApplyCustomerSearch(query, search);
+
+            return await ToPagedListAsync(query, pageNumber, pageSize);
         }
 
         public async Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime)
@@ -85,13 +87,79 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return bookings.Any(x => x.BookingId != currentBookingId && x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
         }
 
-        public async Task<IEnumerable<Booking>> GetBookingsByArtistAsync(Guid artistId)
-             => await FindByCondition(x => x.NailArtistId == artistId)
-                            .Include(x => x.Salon)
-                            .Include(x => x.Customer)
-                                .ThenInclude(x => x.User)
-                            .OrderByDescending(x => x.BookingDate)
-                            .ThenByDescending(x => x.StartTime)
-                            .ToListAsync();
+        public async Task<PagedList<Booking>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null)
+        {
+            var query = BuildBookingQuery()
+                .Where(x => x.NailArtistId == artistId);
+
+            query = ApplyBookingFilters(query, startDate, endDate, status);
+            query = ApplyCustomerSearch(query, search);
+
+            return await ToPagedListAsync(query, pageNumber, pageSize);
+        }
+
+        private IQueryable<Booking> BuildBookingQuery()
+        {
+            return _dbSet
+                .Include(x => x.Customer)
+                    .ThenInclude(x => x.User)
+                .Include(x => x.Salon)
+                .Include(x => x.NailArtist)
+                    .ThenInclude(x => x.Account)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.NailVariant)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.Service)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.CustomerNail);
+        }
+
+        private IQueryable<Booking> ApplyBookingFilters(IQueryable<Booking> query, DateTime? startDate, DateTime? endDate, BookingStatus? status)
+        {
+            if (startDate.HasValue)
+            {
+                var range = GetDateRangeUtc(startDate.Value);
+                query = query.Where(x => x.BookingDate >= range.start);
+            }
+
+            if (endDate.HasValue)
+            {
+                var range = GetDateRangeUtc(endDate.Value);
+                query = query.Where(x => x.BookingDate <= range.end);
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(x => x.Status == status.Value);
+            }
+
+            return query;
+        }
+
+        private static IQueryable<Booking> ApplyCustomerSearch(IQueryable<Booking> query, string? search)
+        {
+            if (string.IsNullOrWhiteSpace(search))
+            {
+                return query;
+            }
+
+            var keyword = search.Trim().ToLower();
+            return query.Where(x =>
+                (x.Customer.User.FirstName + " " + x.Customer.User.LastName).ToLower().Contains(keyword)
+                || (x.Customer.User.Phone != null && x.Customer.User.Phone.Contains(keyword)));
+        }
+
+        private static async Task<PagedList<Booking>> ToPagedListAsync(IQueryable<Booking> query, int pageNumber, int pageSize)
+        {
+            var count = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(x => x.BookingDate)
+                .ThenByDescending(x => x.StartTime)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedList<Booking>(items, count, pageNumber, pageSize);
+        }
     }
 }

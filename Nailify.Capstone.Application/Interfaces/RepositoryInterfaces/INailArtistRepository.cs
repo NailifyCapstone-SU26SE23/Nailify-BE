@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,5 +12,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<NailArtist>> GetNailArtistsBySalonIdAsync(Guid salonId);
         Task<NailArtist?> GetNailArtistWithProfileAsync(Guid artistId);
         Task<List<NailArtist>> GetSuggestedArtistsAsync(Guid salonId, List<int> nailVariantIds);
+        Task<NailArtist?> GetNailArtistByAccountIdAsync(Guid accountId);
     }
 }

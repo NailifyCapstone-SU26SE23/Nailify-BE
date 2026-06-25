@@ -15,6 +15,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public BookingProcedureRepository(NailifyDbContext context) : base(context)
         {
         }
+
+        public async Task<List<BookingProcedure>> GetProceduresByBookingIdAsync(Guid bookingId)
+            => await FindByCondition(x => x.BookingItem.BookingId == bookingId)
+                     .Include(x => x.CompletedBy)
+                          .ThenInclude(x =>x.Account)
+                     .OrderBy(x => x.StepOrder)
+                     .ToListAsync();
+
         public async Task<List<BookingProcedure>> GetProceduresByBookingItemIdAsync(Guid bookingItemId)
         {
             return await FindByCondition(bp => bp.BookingItemId == bookingItemId)

@@ -1,17 +1,21 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Infrastructure.Extensions;
 
 namespace Nailify.Capstone.Infrastructure.DBContext
 {
     public class NailifyDbContext : DbContext
     {
+        private readonly IMediator? _mediator;
         public NailifyDbContext()
         {
         }
-        public NailifyDbContext(DbContextOptions<NailifyDbContext> options) : base(options)
+        public NailifyDbContext(DbContextOptions<NailifyDbContext> options, IMediator mediator) : base(options)
         {
+            _mediator = mediator;
         }
         #region initial DBSet
         public DbSet<User> Users { get; set; }
@@ -43,6 +47,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Procedure> Procedures { get; set; }
         public DbSet<NailProcedure> NailProcedures { get; set; }
         public DbSet<BookingProcedure> BookingProcedures { get; set; }
+        public DbSet<FavoriteNail> FavoriteNails { get; set; }
+        public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
+        public DbSet<LoyaltyTransaction> LoyaltyTransactions { get; set; }
+        public DbSet<CustomerNailRequest> CustomerNailRequests { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -194,7 +202,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .WithMany()
                 .HasForeignKey(cn => cn.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
-
+            
             modelBuilder.Entity<CustomerNail>()
                 .HasOne(cn => cn.NailShape)
                 .WithMany()
@@ -206,6 +214,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .WithMany()
                 .HasForeignKey(cn => cn.NailSurfaceId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerNail>()
+                .Property(cn => cn.Status)
+                .HasConversion<string>()
+                .HasMaxLength(30);
 
             modelBuilder.Entity<CustomerNailComponent>()
                 .HasKey(cnc => cnc.CustomerNailComponentId);
@@ -221,16 +234,75 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<CustomerNailComponent>()
                 .Property(cnc => cnc.FingerIndex)
                 .HasComment("-1 = whole hand, 0-9 = specific finger index");
-            /*
-            modelBuilder.Entity<Booking>().HasKey(b => b.BookingId);
-            modelBuilder.Entity<Booking>()
-                        .Property(b => b.TotalPrice)
-                        .HasPrecision(18, 2);
 
-            modelBuilder.Entity<BookingItem>()
-                        .Property(bi => bi.Price)
-                        .HasPrecision(18, 2);
-            */
+            modelBuilder.Entity<FavoriteNail>()
+                .HasIndex(f => new { f.UserId, f.NailDesignId, f.NailVariantId })
+                .IsUnique();
+
+            modelBuilder.Entity<FavoriteNail>()
+                .ToTable(table => table.HasCheckConstraint(
+                    "CK_FavoriteNail_DesignOrVariant",
+                    "\"NailDesignId\" IS NOT NULL OR \"NailVariantId\" IS NOT NULL"));
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.NailDesign)
+                .WithMany()
+                .HasForeignKey(f => f.NailDesignId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FavoriteNail>()
+                .HasOne(f => f.NailVariant)
+                .WithMany()
+                .HasForeignKey(f => f.NailVariantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // In DbContext
+            modelBuilder.Entity<Customer>()
+                .HasOne(c => c.LoyaltyTier)
+                .WithMany(lt => lt.Customers)
+                .HasForeignKey(c => c.LoyaltyTierId)
+                .OnDelete(DeleteBehavior.SetNull); // Keep customer if tier is deleted
+
+            modelBuilder.Entity<LoyaltyTier>()
+                .HasIndex(lt => lt.MinLifetimePoints)
+                .IsUnique(); // Ensure unique point thresholds
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasKey(lt => lt.LoyaltyTransactionId);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .Property(lt => lt.TransactionType)
+                .HasConversion<string>()
+                .HasDefaultValue(LoyaltyTransactionType.Earned);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasIndex(lt => lt.BookingId)
+                .IsUnique();
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.Customer)
+                .WithMany(c => c.LoyaltyTransactions)
+                .HasForeignKey(lt => lt.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.Booking)
+                .WithMany()
+                .HasForeignKey(lt => lt.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LoyaltyTransaction>()
+                .HasOne(lt => lt.LoyaltyTier)
+                .WithMany()
+                .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Booking>(entity =>
             {
                 entity.HasKey(b => b.BookingId);
@@ -288,7 +360,30 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .Property(s => s.Price)
                 .HasPrecision(18, 2);
             */
+            modelBuilder.Entity<CustomerNailRequest>(entity =>
+            {
+                entity.HasKey(cnr => cnr.CustomerNailRequestId);
 
+                entity.Property(cnr => cnr.CustomerNailRequestId)
+                      .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(cnr => cnr.Price)
+                      .HasPrecision(18, 2);
+                entity.Property(cnr => cnr.Status)
+                      .HasConversion<string>()
+                      .HasMaxLength(30);
+                entity.HasOne(cnr => cnr.CustomerNail)
+                      .WithMany(cn => cn.CustomerNailRequests)
+                      .HasForeignKey(cnr => cnr.CustomerNailId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(cnr => cnr.Salon)
+                      .WithMany()
+                      .HasForeignKey(cnr => cnr.SalonId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(cnr => cnr.ApprovedArtist)
+                      .WithMany()
+                      .HasForeignKey(cnr => cnr.ApprovedArtistId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
             modelBuilder.Entity<CustomerNailComponent>()
                 .HasOne(cnc => cnc.CustomerNail)
                 .WithMany(cn => cn.CustomerNailComponents)
@@ -324,11 +419,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);
 
-            modelBuilder.Entity<Salon>()
-                .HasOne(s => s.Manager)
-                .WithOne()
-                .HasForeignKey<Salon>(s => s.ManagerId)
-                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalonOperatingHour>()
                 .HasKey(soh => soh.OperatingHourId);
@@ -356,12 +446,17 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .HasForeignKey<NailArtist>(na => na.AccountId)
                         .OnDelete(DeleteBehavior.Restrict);
 
-            // Cấu hình mối quan hệ Nhiều-1 giữa NailArtist và Salon
-            modelBuilder.Entity<NailArtist>()
-                        .HasOne(na => na.Salon)
-                        .WithMany(s => s.NailArtists)
-                        .HasForeignKey(na => na.SalonId)
-                        .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Salon)
+                .WithMany()
+                .HasForeignKey(u => u.SalonId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                        .Property(u => u.Role)
+                        .HasConversion<string>();
+
 
             modelBuilder.Entity<Customer>(entity =>
             {
@@ -483,6 +578,19 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .HasDefaultValue("Active");
                 }
             }
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Dispatch domain events TRƯỚC khi commit:
+            // → Handler (vd: BookingStatusChangedEventHandler) sẽ track BookingHistory vào cùng DbContext này
+            // → base.SaveChangesAsync() commit tất cả trong 1 transaction duy nhất
+            // → Nếu lỗi xảy ra → cả Booking state lẫn BookingHistory đều rollback, không mất data
+            if (_mediator != null)
+            {
+                await _mediator.DispatchDomainEventsAsync(this);
+            }
+            return await base.SaveChangesAsync(cancellationToken);
         }
     }
 }

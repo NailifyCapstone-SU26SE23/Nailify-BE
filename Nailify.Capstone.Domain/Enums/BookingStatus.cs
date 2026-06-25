@@ -9,14 +9,15 @@ namespace Nailify.Capstone.Domain.Enums
     public enum BookingStatus
     {
         Pending,
-        Assigned,
-        Reviewed,
+        //Assigned,
+        //Reviewed,
         Approved,
         Rejected,
         Cancelled,
         CheckedIn,
         InProgress,
-        Completed,
+        ServiceCompleted, // Thợ làm xong
+        Completed, // Khách đã thanh toán và check-out hoàn toàn
         Repaired
     }
 }

@@ -13,9 +13,6 @@ namespace Nailify.Capstone.Application.Validation.NailDesignRequestDTOs
 
             RuleFor(x => x.Description)
                 .MaximumLength(500).WithMessage("Mo ta khong duoc vuot qua 500 ky tu");
-
-            RuleForEach(x => x.NailVariantIds)
-                .GreaterThan(0).WithMessage("ID bien the mong khong hop le");
         }
     }
 }

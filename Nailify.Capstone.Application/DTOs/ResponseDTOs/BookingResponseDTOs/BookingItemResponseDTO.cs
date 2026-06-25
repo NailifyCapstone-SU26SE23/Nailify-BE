@@ -16,6 +16,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string ServiceName { get; set; } = string.Empty;
         public int? NailVariantId { get; set; }
         public string NailVariantName { get; set; } = string.Empty;
+        public string NailVariantImageUrl { get; set; } = string.Empty;
         public int? CustomerNailId { get; set; }
         public string CustomerNailName { get; set; } = string.Empty;
         public string CustomerNailImageUrl { get; set; } = string.Empty;
@@ -27,6 +28,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
             profile.CreateMap<BookingItem, BookingItemResponseDTO>()
                 .ForMember(dest => dest.ServiceName, opt => opt.MapFrom(src => src.Service != null ? src.Service.Name : ""))
                 .ForMember(dest => dest.NailVariantName, opt => opt.MapFrom(src => src.NailVariant != null ? src.NailVariant.Name : ""))
+                .ForMember(dest => dest.NailVariantImageUrl, opt => opt.MapFrom(src => src.NailVariant != null ? src.NailVariant.ImageUrl : ""))
                 .ForMember(dest => dest.CustomerNailName, opt => opt.MapFrom(src => src.CustomerNail != null ? src.CustomerNail.Name : ""))
                 .ForMember(dest => dest.CustomerNailImageUrl, opt => opt.MapFrom(src => src.CustomerNail != null ? src.CustomerNail.ImageUrl : ""));
         }

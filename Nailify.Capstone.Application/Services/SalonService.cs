@@ -64,6 +64,7 @@ namespace Nailify.Capstone.Application.Services
             if (salon == null)
                 return new ApiResult<bool>(false, "Không tìm thấy chi nhánh để xóa.");
             _unitOfWork.SalonRepository.Delete(salon);
+            salon.Status = "Closed";
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Xóa chi nhánh thành công.");
         }

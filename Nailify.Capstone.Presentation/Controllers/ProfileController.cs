@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
@@ -29,7 +31,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Lấy thông tin người dùng.
         /// </summary>
         [HttpGet]
-        //[HasRole("Admin", "Customer", "Staff_Artist", "Manager")] // Cho phép tất cả các role gọi
+        [Produces("application/json")]
+        [ProducesResponseType(typeof(ApiResult<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> GetMyProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -108,7 +113,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự truy xuất thông tin hồ sơ cá nhân tổng hợp (Gồm cả bảng User và Customer)
         /// </summary>
         [HttpGet("customers")]
-        [HasRole("Customer")]
         public async Task<IActionResult> GetMyCustomerProfile()
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -130,7 +134,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự cập nhật đặc điểm da và lối sống cá nhân phục vụ gợi ý móng mẫu thích hợp
         /// </summary>
         [HttpPut("customers/preferences")]
-        [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyPreferences([FromBody] CustomerPreferencesUpdateRequest request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -152,7 +155,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Khách hàng tự cập nhật đầy đủ hồ sơ và đặc điểm da/lối sống cá nhân (Persona).
         /// </summary>
         [HttpPut("customers")]
-        [HasRole("Customer")]
         public async Task<IActionResult> UpdateMyCustomerProfile([FromBody] CustomerSelfProfileUpdateRequest request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value

@@ -9,5 +9,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
     public class CancelBookingRequestDTO
     {
         public string Reason { get; set; } = string.Empty;
+        public string? HoldToken { get; set; }
     }
 }

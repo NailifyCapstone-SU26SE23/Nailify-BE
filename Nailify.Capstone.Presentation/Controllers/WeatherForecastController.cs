@@ -65,7 +65,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                         LastName = target.LastName,
                         AvatarUrl = "https://res.cloudinary.com/dym0se5if/image/upload/v1780309663/khay123_a7bsjq.jpg",
                         Status = "Active",
-                        Role = target.Role // Gán đúng vai trò theo danh sách thiết lập
+                        //Role = target.Role // Gán đúng vai trò theo danh sách thiết lập
                     };
                     usersToAdd.Add(newSpamUser);
                 }

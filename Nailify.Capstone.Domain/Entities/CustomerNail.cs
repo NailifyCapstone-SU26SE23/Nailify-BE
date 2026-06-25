@@ -1,3 +1,5 @@
+using Nailify.Capstone.Domain.Enums;
+
 namespace Nailify.Capstone.Domain.Entities
 {
     public class CustomerNail
@@ -8,16 +10,17 @@ namespace Nailify.Capstone.Domain.Entities
         public string ImageUrl { get; set; } = string.Empty;
         public int? NailShapeId { get; set; }
         public int? NailSurfaceId { get; set; }
-        public decimal Price { get; set; }
+        public decimal? Price { get; set; }
         public string? CustomColor { get; set; }
         public int? Duration { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public bool IsFavorite { get; set; }
-        public bool IsPublic { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public bool IsPublic { get; set; } = false;
         public string Status { get; set; } = "Active";
         public virtual User User { get; set; } = null!;
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;
+        public virtual Salon? Salon { get; set; }
         public virtual ICollection<CustomerNailComponent> CustomerNailComponents { get; set; } = new List<CustomerNailComponent>();
+        public virtual ICollection<CustomerNailRequest> CustomerNailRequests { get; set; } = new List<CustomerNailRequest>();
     }
 }
