@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Mã đặt lịch trong QR không hợp lệ.");
             }
 
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -100,7 +100,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -132,7 +132,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CheckOutBookingAsync(CheckOutRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -687,7 +687,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -716,7 +716,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -728,13 +728,14 @@ namespace Nailify.Capstone.Application.Services
             booking.Confirm(actorId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<BookingResponseDTO>(booking);
+            var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
+            var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt đơn đặt lịch thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> ManualCheckInBookingAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -760,7 +761,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -778,7 +779,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -1009,7 +1010,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CompleteServiceAsync(CompleteServiceRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch");
@@ -1046,7 +1047,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> ReceptionistAssignArtistAsync(Guid bookingId, AssignArtistRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
