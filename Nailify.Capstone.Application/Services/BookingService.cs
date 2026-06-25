@@ -210,15 +210,21 @@ namespace Nailify.Capstone.Application.Services
 
             var bookingItems = calculation.Items;
             var totalDuration = calculation.Duration;
-            var totalPrice = priceResult.TotalPrice;
+            var bookingPrice = new BookingPriceResponseDTO
+            {
+                Price = calculation.Price,
+                Discount = -priceResult.DiscountAmount,
+                TotalPrice = priceResult.TotalPrice
+            };
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
 
             var booking = _mapper.Map<Booking>(request);
             booking.BookingId = bookingId;
             booking.CustomerId = customerId;
-            booking.TotalPrice = totalPrice;
-            booking.Price = totalPrice.ToString("N0") + " VND";
+            booking.Price = bookingPrice.Price;
+            booking.Discount = bookingPrice.Discount;
+            booking.TotalPrice = bookingPrice.TotalPrice;
             booking.TotalDuration = totalDuration;
             booking.QRCode = qrCodeBase64;
             booking.Status = BookingStatus.Pending;
@@ -546,17 +552,12 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != BookingStatus.Pending)
-            {
-                return new ApiErrorResult<BookingResponseDTO>("Không thể cập nhật đơn đặt lịch đã được xử lý hoặc đã hủy.");
-            }
-
             if (request.BookingItems == null || !request.BookingItems.Any())
             {
                 return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
             }
 
-            decimal oldPrice = booking.TotalPrice;
+            decimal oldPrice = (decimal)booking.TotalPrice;
             int oldDuration = booking.TotalDuration;
 
             int totalDuration = 0;
@@ -648,8 +649,15 @@ namespace Nailify.Capstone.Application.Services
             booking.BookingDate = request.BookingDate;
             booking.StartTime = request.StartTime;
             booking.NailArtistId = request.NailArtistId;
-            booking.TotalPrice = totalPrice;
-            booking.Price = totalPrice.ToString("N0") + " VND";
+            var priceResult = await CalculateDiscountedPriceAsync(booking.CustomerId, totalPrice);
+            if (!priceResult.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
+            }
+
+            booking.Price = totalPrice;
+            booking.Discount = -priceResult.DiscountAmount;
+            booking.TotalPrice = priceResult.TotalPrice;
             booking.TotalDuration = totalDuration;
             booking.UpdatedAt = DateTime.UtcNow;
 
@@ -657,6 +665,11 @@ namespace Nailify.Capstone.Application.Services
             booking.BookingItems.Clear();
 
             booking.Updated(oldPrice, oldDuration, actorId);
+
+            booking.Customer = null!;
+            booking.Salon = null!;
+            booking.NailArtist = null;
+            booking.BookingHistories.Clear();
 
             _unitOfWork.BookingRepository.Update(booking);
 
