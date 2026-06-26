@@ -39,6 +39,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         ILoyaltyTierRepository LoyaltyTierRepository { get; }
         ILoyaltyTransactionRepository LoyaltyTransactionRepository { get; }
         ICustomerNailRequestRepository CustomerNailRequestRepository { get; }
+        IBookingRatingRepository BookingRatingRepository { get; }
         Task<int> SaveChangesAsync();
     }
 }

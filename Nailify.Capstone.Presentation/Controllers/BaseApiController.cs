@@ -11,7 +11,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim))
             {
-                throw new UnauthorizedAccessException("Token không hợp lệ!");
+                throw new UnauthorizedAccessException("Đã hết hạn token. Vui lòng đăng nhập lại");
             }
 
             return Guid.Parse(userIdClaim);
@@ -23,7 +23,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 isSucceeded = false,
                 status = 401,
-                message = "Token không hợp lệ!"
+                message = "Đã hết hạn token. Vui lòng đăng nhập lại"
             });
         }
 
