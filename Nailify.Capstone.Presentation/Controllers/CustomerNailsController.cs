@@ -172,16 +172,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             try
             {
-                var currentUserId = GetCurrentUserId();
                 var existingResult = await _customerNailService.GetCustomerNailByIdAsync(id);
                 if (!existingResult.IsSucceeded)
                 {
                     return NotFound(existingResult);
-                }
-
-                if (existingResult.Data.UserId != currentUserId)
-                {
-                    return UnauthorizedResponse();
                 }
 
                 var validationResult = await _updateValidator.ValidateAsync(request);
