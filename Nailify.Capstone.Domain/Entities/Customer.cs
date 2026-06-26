@@ -21,6 +21,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual User User { get; set; } = null!;
         public virtual LoyaltyTier? LoyaltyTier { get; set; }
         public virtual ICollection<LoyaltyTransaction> LoyaltyTransactions { get; set; } = new List<LoyaltyTransaction>();
+        public virtual ICollection<BookingRating> BookingRatings { get; set; } = new List<BookingRating>();
 
     }
 }

@@ -30,6 +30,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Customer Customer { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }
+        public virtual BookingRating? Rating { get; set; }
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
 

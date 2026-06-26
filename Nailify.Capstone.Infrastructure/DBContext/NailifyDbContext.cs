@@ -51,6 +51,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
         public DbSet<LoyaltyTransaction> LoyaltyTransactions { get; set; }
         public DbSet<CustomerNailRequest> CustomerNailRequests { get; set; }
+        public DbSet<BookingRating> BookingRatings { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -346,6 +347,34 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany(b => b.BookingHistories)
                       .HasForeignKey(bh => bh.BookingId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<BookingRating>(entity =>
+            {
+                entity.HasKey(br => br.BookingRatingId);
+                entity.Property(br => br.BookingRatingId)
+                      .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(br => br.Comment)
+                      .HasMaxLength(1000);
+                entity.Property(br => br.ImageUrl)
+                      .HasMaxLength(500);
+                entity.Property(br => br.Status)
+                      .HasDefaultValue("Active")
+                      .HasMaxLength(20);
+                entity.HasIndex(br => br.BookingId)
+                      .IsUnique();
+                entity.HasIndex(br => br.CustomerId);
+                entity.HasIndex(br => br.CreatedAt);
+                entity.ToTable(table => table.HasCheckConstraint(
+                    "CK_BookingRating_Scores",
+                    "\"OverallScore\" BETWEEN 1 AND 5 AND (\"ServiceQuality\" IS NULL OR \"ServiceQuality\" BETWEEN 1 AND 5) AND (\"Punctuality\" IS NULL OR \"Punctuality\" BETWEEN 1 AND 5) AND (\"Cleanliness\" IS NULL OR \"Cleanliness\" BETWEEN 1 AND 5)"));
+                entity.HasOne(br => br.Booking)
+                      .WithOne(b => b.Rating)
+                      .HasForeignKey<BookingRating>(br => br.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(br => br.Customer)
+                      .WithMany(c => c.BookingRatings)
+                      .HasForeignKey(br => br.CustomerId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
             /*
             modelBuilder.Entity<BookingItem>().HasKey(bi => bi.BookingItemId);
