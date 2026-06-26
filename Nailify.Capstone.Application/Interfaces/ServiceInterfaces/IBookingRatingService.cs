@@ -8,7 +8,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetAllAsync(BookingRatingRequestParameters parameters);
         Task<ApiResult<BookingRatingResponseDTO>> GetByIdAsync(Guid id);
-        Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByBookingIdAsync(Guid bookingId, BookingRatingRequestParameters parameters);
+        Task<ApiResult<BookingRatingResponseDTO>> GetByBookingIdAsync(Guid bookingId);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetBySalonIdAsync(Guid salonId, BookingRatingRequestParameters parameters);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters);

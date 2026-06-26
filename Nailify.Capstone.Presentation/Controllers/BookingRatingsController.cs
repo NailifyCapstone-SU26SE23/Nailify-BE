@@ -4,7 +4,6 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRatingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingRatingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
-using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -28,6 +27,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             => Ok(await _bookingRatingService.GetAllAsync(parameters));
 
         [HttpGet("{id:guid}")]
+        [ProducesResponseType(typeof(ApiResult<BookingRatingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(Guid id)
         {
             var result = await _bookingRatingService.GetByIdAsync(id);
@@ -35,18 +36,26 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         [HttpGet("by-booking/{bookingId:guid}")]
-        public async Task<IActionResult> GetByBookingId(Guid bookingId, [FromQuery] BookingRatingRequestParameters parameters)
-            => Ok(await _bookingRatingService.GetByBookingIdAsync(bookingId, parameters));
+        [ProducesResponseType(typeof(ApiResult<BookingRatingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetByBookingId(Guid bookingId)
+        {
+            var result = await _bookingRatingService.GetByBookingIdAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
+        }
 
         [HttpGet("by-salon/{salonId:guid}")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingRatingResponseDTO>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetBySalonId(Guid salonId, [FromQuery] BookingRatingRequestParameters parameters)
             => Ok(await _bookingRatingService.GetBySalonIdAsync(salonId, parameters));
 
         [HttpGet("by-nail-artist/{nailArtistId:guid}")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingRatingResponseDTO>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByNailArtistId(Guid nailArtistId, [FromQuery] BookingRatingRequestParameters parameters)
             => Ok(await _bookingRatingService.GetByNailArtistIdAsync(nailArtistId, parameters));
 
         [HttpGet("me")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingRatingResponseDTO>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCustomerId([FromQuery] BookingRatingRequestParameters parameters)
         {
             var customerId = GetCurrentUserId();
@@ -55,6 +64,8 @@ namespace Nailify.Capstone.Presentation.Controllers
 
         [HttpPost]
         [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResult<BookingRatingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] BookingRatingCreateRequest request, IFormFile? image)
         {
             string? imageUrl = null;
@@ -76,6 +87,8 @@ namespace Nailify.Capstone.Presentation.Controllers
 
         [HttpPut("{id:guid}")]
         [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResult<BookingRatingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Update(Guid id, [FromForm] BookingRatingUpdateRequest request, IFormFile? image)
         {
             string? imageUrl = null;
@@ -99,6 +112,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         [HttpDelete("{id:guid}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(Guid id)
         {
             var existing = await _bookingRatingService.GetByIdAsync(id);

@@ -31,8 +31,13 @@ namespace Nailify.Capstone.Application.Services
                 : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lay danh gia thanh cong.");
         }
 
-        public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByBookingIdAsync(Guid bookingId, BookingRatingRequestParameters parameters)
-            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByBookingIdAsync(bookingId, parameters), parameters, "Lay danh gia theo booking thanh cong.");
+        public async Task<ApiResult<BookingRatingResponseDTO>> GetByBookingIdAsync(Guid bookingId)
+        {
+            var rating = await _unitOfWork.BookingRatingRepository.GetByBookingIdAsync(bookingId);
+            return rating == null
+                ? new ApiErrorResult<BookingRatingResponseDTO>("Khong tim thay danh gia cua booking.")
+                : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lay danh gia theo booking thanh cong.");
+        }
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetBySalonIdAsync(Guid salonId, BookingRatingRequestParameters parameters)
             => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetBySalonIdAsync(salonId, parameters), parameters, "Lay danh gia theo salon thanh cong.");
