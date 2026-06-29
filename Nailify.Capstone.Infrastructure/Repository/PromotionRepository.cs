@@ -70,7 +70,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     p.Status == "Active" &&
                     p.StartDate <= atUtc &&
                     (!p.EndDate.HasValue || p.EndDate.Value >= atUtc) &&
-                    (!p.UsageLimit.HasValue || p.CurrentUsageCount < p.UsageLimit.Value));
+                    (p.Scope == PromotionScope.FirstTimeUser ||
+                     !p.UsageLimit.HasValue ||
+                     p.CurrentUsageCount < p.UsageLimit.Value));
 
             if (selectedIds.Count > 0)
             {
@@ -82,6 +84,28 @@ namespace Nailify.Capstone.Infrastructure.Repository
             }
 
             return await query.ToListAsync();
+        }
+
+        public async Task<List<Promotion>> GetActivePromotionsForDisplayAsync(DateTime atUtc, PromotionType? type = null)
+        {
+            var query = _dbSet
+                .Where(promotion =>
+                    promotion.Status == "Active" &&
+                    promotion.StartDate <= atUtc &&
+                    (!promotion.EndDate.HasValue || promotion.EndDate.Value >= atUtc) &&
+                    (promotion.Scope == PromotionScope.FirstTimeUser ||
+                     !promotion.UsageLimit.HasValue ||
+                     promotion.CurrentUsageCount < promotion.UsageLimit.Value));
+
+            if (type.HasValue)
+            {
+                query = query.Where(promotion => promotion.Type == type.Value);
+            }
+
+            return await query
+                .OrderByDescending(promotion => promotion.StartDate)
+                .ThenBy(promotion => promotion.Name)
+                .ToListAsync();
         }
 
         private static IQueryable<Promotion> ApplyPromotionFilters(

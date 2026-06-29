@@ -47,6 +47,58 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai thanh cong.");
         }
 
+        public async Task<ApiResult<PagedList<PromotionDto>>> GetTodayPagedAsync(
+            int pageNumber,
+            int pageSize,
+            PromotionType? type = null,
+            Guid? customerId = null)
+        {
+            var promotions = await _unitOfWork.PromotionRepository.GetActivePromotionsForDisplayAsync(DateTime.UtcNow, type);
+
+            if (customerId.HasValue)
+            {
+                var eligiblePromotions = new List<Promotion>();
+
+                foreach (var promotion in promotions)
+                {
+                    if (promotion.Scope == PromotionScope.FirstTimeUser &&
+                        await HasUserCompletedBookingAsync(customerId.Value))
+                    {
+                        continue;
+                    }
+
+                    if (promotion.UserLimit.HasValue)
+                    {
+                        var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
+                            customerId.Value,
+                            promotion.PromotionId);
+
+                        if (usage != null && usage.UsageCount >= promotion.UserLimit.Value)
+                        {
+                            continue;
+                        }
+                    }
+
+                    eligiblePromotions.Add(promotion);
+                }
+
+                promotions = eligiblePromotions;
+            }
+
+            var pagedItems = promotions
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedList<PromotionDto>(
+                _mapper.Map<List<PromotionDto>>(pagedItems),
+                promotions.Count,
+                pageNumber,
+                pageSize);
+
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai hom nay thanh cong.");
+        }
+
         public async Task<ApiResult<PromotionDto>> GetByIdAsync(int id)
         {
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
@@ -88,6 +140,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var promotion = _mapper.Map<Promotion>(request);
+            NormalizePromotionLimits(promotion);
             promotion.ImageUrl = imageUrl ?? string.Empty;
             await _unitOfWork.PromotionRepository.CreateAsync(promotion);
             await _unitOfWork.SaveChangesAsync();
@@ -110,6 +163,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             _mapper.Map(request, promotion);
+            NormalizePromotionLimits(promotion);
             if (!string.IsNullOrWhiteSpace(imageUrl))
             {
                 promotion.ImageUrl = imageUrl;
@@ -284,13 +338,31 @@ namespace Nailify.Capstone.Application.Services
             return duplicate ? "Ten khuyen mai da ton tai." : null;
         }
 
+        private static void NormalizePromotionLimits(Promotion promotion)
+        {
+            if (promotion.Scope != PromotionScope.FirstTimeUser)
+            {
+                return;
+            }
+
+            promotion.UsageLimit = null;
+            promotion.UserLimit = 1;
+        }
+
         private Task<bool> HasUserBookedBeforeAsync(Guid customerId)
         {
             var hasBooking = _unitOfWork.BookingRepository
-                .FindByCondition(booking => booking.CustomerId == customerId)
+                .FindByCondition(booking => booking.CustomerId == customerId && booking.Status == BookingStatus.Completed)
                 .Any();
 
             return Task.FromResult(hasBooking);
+        }
+
+        private Task<bool> HasUserCompletedBookingAsync(Guid customerId)
+        {
+            return _unitOfWork.BookingRepository.ExistsAsync(booking =>
+                booking.CustomerId == customerId &&
+                booking.Status == BookingStatus.Completed);
         }
 
         private async Task<List<Promotion>> SelectApplicablePromotionsAsync(

@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
+using System.Security.Claims;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -40,6 +41,21 @@ namespace Nailify.Capstone.Presentation.Controllers
                 discountType,
                 startDate,
                 endDate);
+
+            return Ok(result);
+        }
+
+        [HttpGet("today")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<PromotionDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetTodayPaged(
+           [FromQuery] int pageNumber = 1,
+           [FromQuery] int pageSize = 10)
+        {
+            var result = await _promotionService.GetTodayPagedAsync(
+                pageNumber,
+                pageSize,
+                PromotionType.Voucher,
+                GetCurrentUserIdOrNull());
 
             return Ok(result);
         }
@@ -179,6 +195,12 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 await _cloudinaryService.DeleteImageAsync(imageUrl);
             }
+        }
+
+        private Guid? GetCurrentUserIdOrNull()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }
 }

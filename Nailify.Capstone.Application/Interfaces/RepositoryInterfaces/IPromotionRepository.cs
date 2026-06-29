@@ -18,5 +18,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<Promotion>> GetByCategoryTypeIdAsync(int categoryTypeId);
         Task<List<Promotion>> GetByNailDesignIdAsync(int nailDesignId);
         Task<List<Promotion>> GetActivePromotionsAsync(DateTime atUtc, IEnumerable<int>? selectedPromotionIds = null);
+        Task<List<Promotion>> GetActivePromotionsForDisplayAsync(DateTime atUtc, PromotionType? type = null);
     }
 }

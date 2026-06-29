@@ -16,6 +16,11 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             DiscountType? discountType = null,
             DateTime? startDate = null,
             DateTime? endDate = null);
+        Task<ApiResult<PagedList<PromotionDto>>> GetTodayPagedAsync(
+            int pageNumber,
+            int pageSize,
+            PromotionType? type = null,
+            Guid? customerId = null);
         Task<ApiResult<PromotionDto>> GetByIdAsync(int id);
         Task<ApiResult<List<PromotionDto>>> GetByCategoryIdAsync(int categoryId);
         Task<ApiResult<List<PromotionDto>>> GetByCategoryTypeIdAsync(int categoryTypeId);
