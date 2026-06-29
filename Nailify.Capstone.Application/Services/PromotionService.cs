@@ -1,0 +1,387 @@
+using AutoMapper;
+using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
+
+namespace Nailify.Capstone.Application.Services
+{
+    public class PromotionService : IPromotionService
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IMapper _mapper;
+
+        public PromotionService(IUnitOfWork unitOfWork, IMapper mapper)
+        {
+            _unitOfWork = unitOfWork;
+            _mapper = mapper;
+        }
+
+        public async Task<ApiResult<PagedList<PromotionDto>>> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            PromotionType? type = null,
+            PromotionScope? scope = null,
+            DiscountType? discountType = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null)
+        {
+            var pagedPromotions = await _unitOfWork.PromotionRepository.GetPagedPromotionsAsync(
+                pageNumber,
+                pageSize,
+                type,
+                scope,
+                discountType,
+                startDate,
+                endDate);
+
+            var result = new PagedList<PromotionDto>(
+                _mapper.Map<List<PromotionDto>>(pagedPromotions.Items),
+                pagedPromotions.MetaData.TotalItems,
+                pageNumber,
+                pageSize);
+
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai thanh cong.");
+        }
+
+        public async Task<ApiResult<PromotionDto>> GetByIdAsync(int id)
+        {
+            var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
+            return promotion == null
+                ? new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.")
+                : new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Lay khuyen mai thanh cong.");
+        }
+
+        public async Task<ApiResult<List<PromotionDto>>> GetByCategoryIdAsync(int categoryId)
+        {
+            var promotions = await _unitOfWork.PromotionRepository.GetByCategoryIdAsync(categoryId);
+            return new ApiSuccessResult<List<PromotionDto>>(
+                _mapper.Map<List<PromotionDto>>(promotions),
+                "Lay danh sach khuyen mai theo danh muc thanh cong.");
+        }
+
+        public async Task<ApiResult<List<PromotionDto>>> GetByCategoryTypeIdAsync(int categoryTypeId)
+        {
+            var promotions = await _unitOfWork.PromotionRepository.GetByCategoryTypeIdAsync(categoryTypeId);
+            return new ApiSuccessResult<List<PromotionDto>>(
+                _mapper.Map<List<PromotionDto>>(promotions),
+                "Lay danh sach khuyen mai theo loai danh muc thanh cong.");
+        }
+
+        public async Task<ApiResult<List<PromotionDto>>> GetByNailDesignIdAsync(int nailDesignId)
+        {
+            var promotions = await _unitOfWork.PromotionRepository.GetByNailDesignIdAsync(nailDesignId);
+            return new ApiSuccessResult<List<PromotionDto>>(
+                _mapper.Map<List<PromotionDto>>(promotions),
+                "Lay danh sach khuyen mai theo mau nail thanh cong.");
+        }
+
+        public async Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null)
+        {
+            var validationError = await ValidateAsync(request);
+            if (validationError != null)
+            {
+                return new ApiErrorResult<PromotionDto>(validationError);
+            }
+
+            var promotion = _mapper.Map<Promotion>(request);
+            promotion.ImageUrl = imageUrl ?? string.Empty;
+            await _unitOfWork.PromotionRepository.CreateAsync(promotion);
+            await _unitOfWork.SaveChangesAsync();
+
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Tao khuyen mai thanh cong.");
+        }
+
+        public async Task<ApiResult<PromotionDto>> UpdateAsync(int id, PromotionRequest request, string? imageUrl = null)
+        {
+            var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
+            if (promotion == null)
+            {
+                return new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.");
+            }
+
+            var validationError = await ValidateAsync(request, id);
+            if (validationError != null)
+            {
+                return new ApiErrorResult<PromotionDto>(validationError);
+            }
+
+            _mapper.Map(request, promotion);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                promotion.ImageUrl = imageUrl;
+            }
+
+            _unitOfWork.PromotionRepository.Update(promotion);
+            await _unitOfWork.SaveChangesAsync();
+
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Cap nhat khuyen mai thanh cong.");
+        }
+
+        public async Task<ApiResult<bool>> DeleteAsync(int id)
+        {
+            var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
+            if (promotion == null)
+            {
+                return new ApiErrorResult<bool>("Khong tim thay khuyen mai.");
+            }
+
+            _unitOfWork.PromotionRepository.Delete(promotion);
+            await _unitOfWork.SaveChangesAsync();
+            return new ApiSuccessResult<bool>(true, "Xoa khuyen mai thanh cong.");
+        }
+
+        public async Task<List<Promotion>> GetApplicablePromotionsAsync(
+    Guid customerId,
+    ICollection<BookingItem> items,
+    IEnumerable<int>? selectedPromotionIds = null)
+        {
+            var promotions = await _unitOfWork.PromotionRepository.GetActivePromotionsAsync(DateTime.UtcNow, selectedPromotionIds);
+            var hasBookedBefore = await HasUserBookedBeforeAsync(customerId);
+            var applicable = new List<Promotion>();
+
+            foreach (var promotion in promotions.Where(promotion => promotion.IsValid()))
+            {
+                if (promotion.IsSelectable)
+                {
+                    if (selectedPromotionIds == null || !selectedPromotionIds.Contains(promotion.PromotionId))
+                    {
+                        continue; 
+                    }
+                }
+
+                if (promotion.Scope == PromotionScope.FirstTimeUser && hasBookedBefore)
+                {
+                    continue;
+                }
+
+                if (promotion.UserLimit.HasValue)
+                {
+                    var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(customerId, promotion.PromotionId);
+                    if (usage != null && usage.UsageCount >= promotion.UserLimit.Value)
+                    {
+                        continue;
+                    }
+                }
+
+                foreach (var item in items)
+                {
+                    if (await IsItemEligibleForPromotionAsync(item, promotion))
+                    {
+                        applicable.Add(promotion);
+                        break;
+                    }
+                }
+            }
+
+            return applicable;
+        }
+
+        public async Task<(decimal totalDiscount, List<BookingDiscount> appliedDiscounts)> CalculateDiscountsAsync(
+            Booking booking,
+            List<Promotion> applicablePromotions)
+        {
+            decimal totalDiscount = 0;
+            var appliedDiscounts = new List<BookingDiscount>();
+            var usedPromotions = new HashSet<int>();
+
+            foreach (var item in booking.BookingItems)
+            {
+                var selectedPromotions = await SelectApplicablePromotionsAsync(item, applicablePromotions, usedPromotions);
+                if (!selectedPromotions.Any())
+                {
+                    SetFinalPriceIfMissing(item);
+                    continue;
+                }
+
+                foreach (var selectedPromotion in selectedPromotions)
+                {
+                    var discountAmount = CalculateItemDiscount(item, selectedPromotion);
+                    if (discountAmount <= 0)
+                    {
+                        continue;
+                    }
+
+                    usedPromotions.Add(selectedPromotion.PromotionId);
+                    totalDiscount += discountAmount;
+
+                    item.DiscountAmount += discountAmount;
+                    item.FinalPrice = Math.Max(0, GetLineAmount(item) - item.DiscountAmount);
+                    item.DiscountAmount = Math.Min(item.DiscountAmount, GetLineAmount(item));
+
+                    appliedDiscounts.Add(new BookingDiscount
+                    {
+                        BookingId = booking.BookingId,
+                        Name = selectedPromotion.Name,
+                        DiscountAmount = discountAmount,
+                        IsAutoApplied = !selectedPromotion.IsSelectable,
+                        AppliedDate = DateTime.UtcNow,
+                        PromotionId = selectedPromotion.PromotionId
+                    });
+                }
+            }
+
+            return (totalDiscount, appliedDiscounts);
+        }
+
+        public async Task UpdateUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts)
+        {
+            var promotionIds = appliedDiscounts
+                .Where(discount => discount.PromotionId.HasValue)
+                .Select(discount => discount.PromotionId!.Value)
+                .Distinct()
+                .ToList();
+
+            foreach (var promotionId in promotionIds)
+            {
+                var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(promotionId);
+                if (promotion == null)
+                {
+                    continue;
+                }
+
+                promotion.CurrentUsageCount++;
+                _unitOfWork.PromotionRepository.Update(promotion);
+
+                var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(userId, promotionId);
+                if (usage == null)
+                {
+                    await _unitOfWork.UserPromotionUsageRepository.CreateAsync(new UserPromotionUsage
+                    {
+                        UserId = userId,
+                        PromotionId = promotionId,
+                        UsageCount = 1,
+                        LastUsedDate = DateTime.UtcNow
+                    });
+                }
+                else
+                {
+                    usage.UsageCount++;
+                    usage.LastUsedDate = DateTime.UtcNow;
+                    _unitOfWork.UserPromotionUsageRepository.Update(usage);
+                }
+            }
+        }
+
+        private async Task<string?> ValidateAsync(PromotionRequest request, int? excludedId = null)
+        {
+            if (string.IsNullOrWhiteSpace(request.Name)) return "Ten khuyen mai khong duoc de trong.";
+            if (request.DiscountValue <= 0) return "Gia tri giam gia phai lon hon 0.";
+            if (request.DiscountType == DiscountType.Percentage && request.DiscountValue > 100) return "Phan tram giam gia khong duoc lon hon 100.";
+            if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate) return "Ngay ket thuc khong duoc truoc ngay bat dau.";
+            if (request.UsageLimit < 0 || request.UserLimit < 0) return "Gioi han su dung khong duoc am.";
+
+            var promotion = _mapper.Map<Promotion>(request);
+            if (!promotion.IsValid()) return "Pham vi khuyen mai khong khop voi doi tuong ap dung.";
+
+            var duplicate = await _unitOfWork.PromotionRepository.ExistsAsync(promotionEntity =>
+                promotionEntity.PromotionId != excludedId &&
+                promotionEntity.Name.ToLower() == request.Name.Trim().ToLower());
+
+            return duplicate ? "Ten khuyen mai da ton tai." : null;
+        }
+
+        private Task<bool> HasUserBookedBeforeAsync(Guid customerId)
+        {
+            var hasBooking = _unitOfWork.BookingRepository
+                .FindByCondition(booking => booking.CustomerId == customerId)
+                .Any();
+
+            return Task.FromResult(hasBooking);
+        }
+
+        private async Task<List<Promotion>> SelectApplicablePromotionsAsync(
+            BookingItem item,
+            IEnumerable<Promotion> promotions,
+            ISet<int> usedPromotionIds)
+        {
+            var variant = await GetVariantAsync(item);
+            var design = variant?.NailDesign;
+            var selectedPromotions = new List<Promotion>();
+
+            foreach (var scope in GetPriorityScopes())
+            {
+                selectedPromotions.AddRange(promotions.Where(promotion =>
+                    promotion.Scope == scope
+                    && promotion.Status == "Active"
+                    && !usedPromotionIds.Contains(promotion.PromotionId)
+                    && IsPromotionMatched(design, promotion)));
+            }
+
+            return selectedPromotions;
+        }
+
+        private async Task<bool> IsItemEligibleForPromotionAsync(BookingItem item, Promotion promotion)
+        {
+            var variant = await GetVariantAsync(item);
+            return IsPromotionMatched(variant?.NailDesign, promotion);
+        }
+
+        private async Task<NailVariant?> GetVariantAsync(BookingItem item)
+        {
+            if (item.NailVariant != null)
+            {
+                return item.NailVariant;
+            }
+
+            return item.NailVariantId.HasValue
+                ? await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(item.NailVariantId.Value)
+                : null;
+        }
+
+        private static bool IsPromotionMatched(NailDesign? design, Promotion promotion)
+        {
+            return promotion.Scope switch
+            {
+                PromotionScope.NailDesign => design?.NailDesignId == promotion.NailDesignId,
+                PromotionScope.Category => design?.NailCategories.Any(nailCategory =>
+                    nailCategory.CategoryId == promotion.CategoryId) == true,
+                PromotionScope.CategoryType => design?.NailCategories.Any(nailCategory =>
+                    nailCategory.Category.CategoryTypeId == promotion.CategoryTypeId) == true,
+                PromotionScope.All => true,
+                PromotionScope.FirstTimeUser => true,
+                _ => false
+            };
+        }
+
+        private static IReadOnlyList<PromotionScope> GetPriorityScopes()
+        {
+            return
+            [
+                PromotionScope.NailDesign,
+                PromotionScope.Category,
+                PromotionScope.CategoryType,
+                PromotionScope.FirstTimeUser,
+                PromotionScope.All
+            ];
+        }
+
+        private static decimal CalculateItemDiscount(BookingItem item, Promotion promotion)
+        {
+            var lineAmount = GetLineAmount(item);
+
+            return promotion.DiscountType switch
+            {
+                DiscountType.Percentage => lineAmount * (promotion.DiscountValue / 100),
+                DiscountType.FixedAmount => Math.Min(promotion.DiscountValue, lineAmount),
+                _ => 0
+            };
+        }
+
+        private static decimal GetLineAmount(BookingItem item)
+        {
+            return item.Price * Math.Max(item.Quantity, 1);
+        }
+
+        private static void SetFinalPriceIfMissing(BookingItem item)
+        {
+            if (item.FinalPrice <= 0 && item.DiscountAmount <= 0)
+            {
+                item.FinalPrice = GetLineAmount(item);
+            }
+        }
+    }
+}

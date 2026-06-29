@@ -3,6 +3,7 @@ using Nailify.Capstone.Infrastructure.Configuration;
 using Nailify.Capstone.Presentation.Extensions;
 using Nailify.Capstone.Presentation.Filters;
 using Nailify.Capstone.Presentation.Middlewares;
+using System.Text.Json.Serialization;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -15,7 +16,8 @@ builder.Services.AddControllers(options =>
 })
 .AddJsonOptions(options =>
 {
-    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 }); 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

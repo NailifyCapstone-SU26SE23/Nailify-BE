@@ -39,6 +39,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                        .ThenInclude(x => x.Service)
                                     .Include(x => x.BookingItems)
                                        .ThenInclude(x => x.CustomerNail)
+                                    .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
                                     .FirstOrDefaultAsync();
 
@@ -111,7 +112,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(x => x.Service)
                 .Include(x => x.BookingItems)
-                    .ThenInclude(x => x.CustomerNail);
+                    .ThenInclude(x => x.CustomerNail)
+                .Include(x => x.BookingDiscounts);
         }
 
         private IQueryable<Booking> ApplyBookingFilters(IQueryable<Booking> query, DateTime? startDate, DateTime? endDate, BookingStatus? status)

@@ -33,6 +33,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual BookingRating? Rating { get; set; }
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
+        public virtual ICollection<BookingDiscount> BookingDiscounts { get; set; } = new List<BookingDiscount>();
 
         public void Created(Guid customerId)
         {

@@ -41,6 +41,9 @@ namespace Nailify.Capstone.Infrastructure
         private ILoyaltyTransactionRepository? _loyaltyTransactionRepository;
         private ICustomerNailRequestRepository? _customerNailRequestRepository;
         private IBookingRatingRepository? _bookingRatingRepository;
+        private IPromotionRepository? _promotionRepository;
+        private IBookingDiscountRepository? _bookingDiscountRepository;
+        private IUserPromotionUsageRepository? _userPromotionUsageRepository;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -89,6 +92,9 @@ namespace Nailify.Capstone.Infrastructure
 
         public ICustomerNailRequestRepository CustomerNailRequestRepository => _customerNailRequestRepository ??= new CustomerNailRequestRepository(_context);
         public IBookingRatingRepository BookingRatingRepository => _bookingRatingRepository ??= new BookingRatingRepository(_context);
+        public IPromotionRepository PromotionRepository => _promotionRepository ??= new PromotionRepository(_context);
+        public IBookingDiscountRepository BookingDiscountRepository => _bookingDiscountRepository ??= new BookingDiscountRepository(_context);
+        public IUserPromotionUsageRepository UserPromotionUsageRepository => _userPromotionUsageRepository ??= new UserPromotionUsageRepository(_context);
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();

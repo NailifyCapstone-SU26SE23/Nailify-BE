@@ -17,8 +17,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<ArtistAvailabilityResponseDTO>> GetArtistAvailableSlotAsync(GetArtistAvailableSlotsRequestDTO request);
         Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request);
         Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(
-            Guid customerId,
-            IEnumerable<BookingItemRequestDTO> bookingItems);
+   Guid customerId,
+   IEnumerable<BookingItemRequestDTO> bookingItems,
+   List<int>? selectedPromotionIds = null);
         Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> CheckOutBookingAsync(CheckOutRequestDTO request, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request, Guid actorId);
