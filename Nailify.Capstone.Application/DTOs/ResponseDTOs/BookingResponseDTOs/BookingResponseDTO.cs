@@ -29,6 +29,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
+        public bool IsRated { get; set; }
         public List<BookingItemResponseDTO> BookingItems { get; set; } = new();
         public List<SimpleDiscountDto> Discounts { get; set; } = new();
         public void Mapping(Profile profile)

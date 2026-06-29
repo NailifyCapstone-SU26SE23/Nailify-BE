@@ -27,6 +27,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
+        public bool IsRated { get; set; } = false;
         public virtual Customer Customer { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }

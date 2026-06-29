@@ -78,6 +78,8 @@ namespace Nailify.Capstone.Application.Services
             };
 
             await _unitOfWork.BookingRatingRepository.CreateAsync(rating);
+            booking.IsRated = true;
+            _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
 
             var created = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(rating.BookingRatingId);
