@@ -1,5 +1,9 @@
+using Hangfire;
 using Microsoft.OpenApi.Models;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Configuration;
+using Nailify.Capstone.Infrastructure.Extensions;
+using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Extensions;
 using Nailify.Capstone.Presentation.Filters;
 using Nailify.Capstone.Presentation.Middlewares;
@@ -16,7 +20,8 @@ builder.Services.AddControllers(options =>
 .AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-}); 
+});
+builder.Services.AddNailifyHangfireAndSignalR(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -67,9 +72,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(
-                  "http://localhost:5173",
-                  "http://localhost:5174")
+        // policy.WithOrigins(
+        //           "http://localhost:5173",
+        //           "http://localhost:5174")
+          policy.SetIsOriginAllowed(origin => true) 
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -86,5 +92,28 @@ app.UseAuthentication();
 app.UseMiddleware<RoleAuthorizationMiddleware>();
 
 app.UseInfrastructure();
+app.MapHub<NotificationHub>("/notifications");
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    DashboardTitle = "Nailify Background Jobs Dashboard",
+    Authorization = new[] { new HangfireNoAuthFilter() } 
+});
+RegisterRecurringJobs();
+app.Run();
+void RegisterRecurringJobs()
+{
+    // A. Quét và hủy lịch trễ check-in quá 15 phút (Chạy định kỳ mỗi 10 phút)
+    RecurringJob.AddOrUpdate<IBookingJobExecutor>(
+        "cancel-late-bookings",
+        executor => executor.CancelLateBookingsAsync(),
+        "*/10 * * * *"
+    );
+    // B. Reset dọn dẹp hàng chờ vào 0h đêm mỗi ngày (Cron: 0 0 * * *)
+    RecurringJob.AddOrUpdate<IWaitlistJobExecutor>(
+        "clear-daily-waitlist",
+        executor => executor.ClearDailyWaitlistAsync(),
+        "0 0 * * *"
+    );
+}
 
 app.Run();

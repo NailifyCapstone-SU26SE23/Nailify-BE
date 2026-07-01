@@ -97,6 +97,8 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IFavoriteNailRepository, FavoriteNailRepository>();
             services.AddScoped<ILoyaltyTierRepository, LoyaltyTierRepository>();
             services.AddScoped<ILoyaltyTransactionRepository, LoyaltyTransactionRepository>();
+            services.AddScoped<IBookingWaitlistRepository, BookingWaitlistRepository>();
+            services.AddScoped<IWalkInQueueRepository, WalkInQueueRepository>();
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -130,6 +132,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
             services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
+            services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();
+            services.AddScoped<IWalkInQueueService, WalkInQueueService>();
+            services.AddScoped<IEmailService, SmtpEmailService>();
+            services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();
@@ -160,6 +166,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                    options.InstanceName = redisSettings?.InstanceName;
                 });
             }
+
+            var emailSettings = configuration.GetSection("SMTPEmailSettings")
+                                  .Get<SmtpEmailConfiguration>()
+                    ?? new SmtpEmailConfiguration();
+            services.AddSingleton<IEmailConfiguration>(emailSettings);
 
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);

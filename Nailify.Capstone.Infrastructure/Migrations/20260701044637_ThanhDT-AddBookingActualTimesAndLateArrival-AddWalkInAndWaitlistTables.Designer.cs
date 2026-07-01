@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701044637_ThanhDT-AddBookingActualTimesAndLateArrival-AddWalkInAndWaitlistTables")]
+    partial class ThanhDTAddBookingActualTimesAndLateArrivalAddWalkInAndWaitlistTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -243,9 +246,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid?>("PreferredNailArtistId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("RequestedDate")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("RequesetedDate");
+                    b.Property<DateTime>("RequesetedDate")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<TimeSpan>("RequestedStartTime")
                         .HasColumnType("interval");

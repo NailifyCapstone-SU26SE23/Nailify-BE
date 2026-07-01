@@ -161,5 +161,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return new PagedList<Booking>(items, count, pageNumber, pageSize);
         }
+
+        public async Task<IEnumerable<Booking>> GetOverdueApprovedBookingsAsync(DateTime date, TimeSpan thresholdTime, bool trackChanges = false)
+        {
+            return await FindByCondition(x => x.Status == BookingStatus.Approved
+                                         && (x.BookingDate.Date < date.Date
+                                             || (x.BookingDate.Date == date.Date && x.StartTime < thresholdTime)), trackChanges)
+                        .ToListAsync();
+        }
+
     }
 }
