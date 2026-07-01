@@ -43,6 +43,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IPromotionRepository PromotionRepository { get; }
         IBookingDiscountRepository BookingDiscountRepository { get; }
         IUserPromotionUsageRepository UserPromotionUsageRepository { get; }
+        IBookingWaitlistRepository BookingWaitlistRepository { get; }
+        IWalkInQueueRepository WalkInQueueRepository { get; }
         Task<int> SaveChangesAsync();
     }
 }

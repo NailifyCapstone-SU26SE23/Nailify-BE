@@ -55,6 +55,8 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Promotion> Promotions { get; set; }
         public DbSet<BookingDiscount> BookingDiscounts { get; set; }
         public DbSet<UserPromotionUsage> UserPromotionUsages { get; set; }
+        public DbSet<BookingWaitlist> BookingWaitlists { get; set; }
+        public DbSet<WalkInQueue> WalkInQueues { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -657,6 +659,56 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany()
                       .HasForeignKey(bp => bp.CompletedById)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<BookingWaitlist>(entity =>
+            {
+                entity.HasKey(bw => bw.WailistId);
+                entity.Property(bw => bw.Status)
+                    .HasConversion(
+                        v => v.ToString(),
+                        v => (WaitlistStatus)Enum.Parse(typeof(WaitlistStatus), v))
+                    .HasMaxLength(20);
+                entity.HasOne(bw => bw.Customer)
+                    .WithMany()
+                    .HasForeignKey(bw => bw.CustomerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(bw => bw.Salon)
+                    .WithMany()
+                    .HasForeignKey(bw => bw.SalonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(bw => bw.PreferredNailArtist)
+                    .WithMany()
+                    .HasForeignKey(bw => bw.PreferredNailArtistId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(bw => bw.ConvertedBooking)
+                    .WithMany()
+                    .HasForeignKey(bw => bw.ConvertedBookingId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+            modelBuilder.Entity<WalkInQueue>(entity =>
+            {
+                entity.HasKey(wq => wq.QueueId);
+                entity.Property(wq => wq.Status)
+                    .HasConversion(
+                        v => v.ToString(),
+                        v => (QueueStatus)Enum.Parse(typeof(QueueStatus), v))
+                    .HasMaxLength(20);
+                entity.HasOne(wq => wq.Salon)
+                    .WithMany()
+                    .HasForeignKey(wq => wq.SalonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(wq => wq.Customer)
+                    .WithMany()
+                    .HasForeignKey(wq => wq.CustomerId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(wq => wq.OriginalBooking)
+                    .WithMany()
+                    .HasForeignKey(wq => wq.OriginalBookingId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(wq => wq.AssignedNailArtist)
+                    .WithMany()
+                    .HasForeignKey(wq => wq.AssignedNailArtistId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             ConfigureStatusDefaults(modelBuilder);

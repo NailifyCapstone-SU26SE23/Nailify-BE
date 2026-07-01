@@ -580,6 +580,11 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
+            //if (booking.Status != BookingStatus.Pending)
+            //{
+            //    return new ApiErrorResult<BookingResponseDTO>("Không thể cập nhật đơn đặt lịch đã được xử lý hoặc đã hủy.");
+            //}
+
             if (request.BookingItems == null || !request.BookingItems.Any())
             {
                 return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
@@ -736,10 +741,6 @@ namespace Nailify.Capstone.Application.Services
             booking.Cancel(customerId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            if (!string.IsNullOrEmpty(request.HoldToken))
-            {
-                await _slotHoldService.ConsumeHoldAsync(request.HoldToken);
-            }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
         }
@@ -780,7 +781,7 @@ namespace Nailify.Capstone.Application.Services
                 BookingId = booking.BookingId,
                 EventType = "BookingCheckedIn",
                 Payload = "Tiếp tân checkin lịch hẹn bằng tay.",
-                ActorId = actorId,
+                ActorId = actorId == Guid.Empty ? null : actorId,
                 CreatedAt = DateTime.UtcNow
             };
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);

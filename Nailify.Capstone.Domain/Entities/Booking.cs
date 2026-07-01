@@ -28,6 +28,11 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
         public bool IsRated { get; set; } = false;
+        // ThanhDT
+        public DateTime? ActualCheckInTime { get; set; }
+        public DateTime? ActualStartTime { get; set; }
+        public bool IsLateArrival { get; set; }
+        // ThanhDT
         public virtual Customer Customer { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }
@@ -156,6 +161,7 @@ namespace Nailify.Capstone.Domain.Entities
                 $"Hủy đơn từ trạng thái '{oldStatus}' sang 'Cancelled'. Lý do: {reason}",
                 customerId
             ));
+            AddDomainEvent(new SlotFreedEvent(SalonId, NailArtistId, BookingDate, StartTime, TotalDuration));
         }
         public void Confirm(Guid actorId)
         {
@@ -184,6 +190,7 @@ namespace Nailify.Capstone.Domain.Entities
                $"Quản lý Salon từ chối đơn đặt lịch. Lý do: {reason}",
                 actorId
             ));
+            AddDomainEvent(new SlotFreedEvent(SalonId, NailArtistId, BookingDate, StartTime, TotalDuration));
         }
         public void StartService(Guid actorId)
         {
