@@ -18,7 +18,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs
         public int? NailDesignId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }
-        public bool IsSelectable { get; set; }
         public int? UsageLimit { get; set; }
         public int? UserLimit { get; set; }
 

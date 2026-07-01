@@ -134,6 +134,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null)
         {
             var validationError = await ValidateAsync(request);
+            
             if (validationError != null)
             {
                 return new ApiErrorResult<PromotionDto>(validationError);
@@ -142,6 +143,14 @@ namespace Nailify.Capstone.Application.Services
             var promotion = _mapper.Map<Promotion>(request);
             NormalizePromotionLimits(promotion);
             promotion.ImageUrl = imageUrl ?? string.Empty;
+
+            if (request.Type == PromotionType.Voucher)
+            {
+                promotion.IsSelectable = true;
+            } else {
+                promotion.IsSelectable = false;
+            }
+
             await _unitOfWork.PromotionRepository.CreateAsync(promotion);
             await _unitOfWork.SaveChangesAsync();
 
@@ -167,6 +176,15 @@ namespace Nailify.Capstone.Application.Services
             if (!string.IsNullOrWhiteSpace(imageUrl))
             {
                 promotion.ImageUrl = imageUrl;
+            }
+
+            if (request.Type == PromotionType.Voucher)
+            {
+                promotion.IsSelectable = true;
+            }
+            else
+            {
+                promotion.IsSelectable = false;
             }
 
             _unitOfWork.PromotionRepository.Update(promotion);
