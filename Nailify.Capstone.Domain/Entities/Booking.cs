@@ -27,6 +27,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
+        public bool IsRated { get; set; } = false;
         // ThanhDT
         public DateTime? ActualCheckInTime { get; set; }
         public DateTime? ActualStartTime { get; set; }
@@ -35,8 +36,10 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Customer Customer { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }
+        public virtual BookingRating? Rating { get; set; }
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
+        public virtual ICollection<BookingDiscount> BookingDiscounts { get; set; } = new List<BookingDiscount>();
 
         public void Created(Guid customerId)
         {

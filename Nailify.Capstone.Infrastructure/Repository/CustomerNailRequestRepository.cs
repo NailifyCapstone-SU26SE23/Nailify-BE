@@ -55,7 +55,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await FindByCondition(r =>
                 r.CustomerNailId == customerNailId &&
                 r.SalonId == salonId &&
-                r.Status == CustomerNailStatus.Approved)
+                r.Status == CustomerNailStatus.Approved || r.Status == CustomerNailStatus.Quoted)
                 .FirstOrDefaultAsync();
         }
 

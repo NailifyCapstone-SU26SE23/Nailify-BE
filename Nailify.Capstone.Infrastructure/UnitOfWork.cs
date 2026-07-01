@@ -40,6 +40,10 @@ namespace Nailify.Capstone.Infrastructure
         private ILoyaltyTierRepository? _loyaltyTierRepository;
         private ILoyaltyTransactionRepository? _loyaltyTransactionRepository;
         private ICustomerNailRequestRepository? _customerNailRequestRepository;
+        private IBookingRatingRepository? _bookingRatingRepository;
+        private IPromotionRepository? _promotionRepository;
+        private IBookingDiscountRepository? _bookingDiscountRepository;
+        private IUserPromotionUsageRepository? _userPromotionUsageRepository;
         private IBookingWaitlistRepository? _bookingWaitlistRepository;
         private IWalkInQueueRepository? _walkInQueueRepository;
         public UnitOfWork(NailifyDbContext context)
@@ -89,6 +93,10 @@ namespace Nailify.Capstone.Infrastructure
         public ILoyaltyTransactionRepository LoyaltyTransactionRepository => _loyaltyTransactionRepository ??= new LoyaltyTransactionRepository(_context);
 
         public ICustomerNailRequestRepository CustomerNailRequestRepository => _customerNailRequestRepository ??= new CustomerNailRequestRepository(_context);
+        public IBookingRatingRepository BookingRatingRepository => _bookingRatingRepository ??= new BookingRatingRepository(_context);
+        public IPromotionRepository PromotionRepository => _promotionRepository ??= new PromotionRepository(_context);
+        public IBookingDiscountRepository BookingDiscountRepository => _bookingDiscountRepository ??= new BookingDiscountRepository(_context);
+        public IUserPromotionUsageRepository UserPromotionUsageRepository => _userPromotionUsageRepository ??= new UserPromotionUsageRepository(_context);
 
         public IBookingWaitlistRepository BookingWaitlistRepository => _bookingWaitlistRepository ??= new BookingWaitlistRepository(_context);
 

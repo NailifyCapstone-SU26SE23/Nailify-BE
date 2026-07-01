@@ -6,12 +6,7 @@ using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -24,7 +19,8 @@ namespace Nailify.Capstone.Application.Services
         private readonly INailVariantService _nailVariantService;
         private readonly ILoyaltyTierService _loyaltyTierService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService)
+        private readonly IPromotionService _promotionService;
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -33,6 +29,7 @@ namespace Nailify.Capstone.Application.Services
             _nailVariantService = nailVariantService;
             _loyaltyTierService = loyaltyTierService;
             _slotHoldService = slotHoldService;
+            _promotionService = promotionService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -53,7 +50,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Mã đặt lịch trong QR không hợp lệ.");
             }
 
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -100,7 +97,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -132,7 +129,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CheckOutBookingAsync(CheckOutRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
@@ -202,19 +199,48 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>(calculation.ErrorMessage!);
             }
 
-            var priceResult = await CalculateDiscountedPriceAsync(customerId, calculation.Price);
-            if (!priceResult.IsSucceeded)
+            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId);
+            if (!loyaltyResult.IsSucceeded)
             {
-                return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
+                return new ApiErrorResult<BookingResponseDTO>(loyaltyResult.Message);
             }
 
             var bookingItems = calculation.Items;
+            var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                customerId,
+                bookingItems,
+                request.SelectedPromotionIds);
+            var (promotionDiscountAmount, appliedPromotionDiscounts) =
+                await _promotionService.CalculateDiscountsAsync(new Booking
+                {
+                    BookingId = bookingId,
+                    CustomerId = customerId,
+                    BookingItems = bookingItems
+                }, applicablePromotions);
+            var loyaltyDiscountAmount = decimal.Round(
+                calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                0,
+                MidpointRounding.AwayFromZero);
+
+            if (loyaltyDiscountAmount > 0)
+            {
+                appliedPromotionDiscounts.Add(new BookingDiscount
+                {
+                    BookingId = bookingId,
+                    Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                    DiscountAmount = loyaltyDiscountAmount,
+                    IsAutoApplied = true,
+                    AppliedDate = DateTime.UtcNow,
+                    LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                });
+            }
             var totalDuration = calculation.Duration;
+            var totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
             var bookingPrice = new BookingPriceResponseDTO
             {
                 Price = calculation.Price,
-                Discount = -priceResult.DiscountAmount,
-                TotalPrice = priceResult.TotalPrice
+                Discount = -totalDiscountAmount,
+                TotalPrice = Math.Max(0, calculation.Price - totalDiscountAmount)
             };
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
@@ -229,6 +255,7 @@ namespace Nailify.Capstone.Application.Services
             booking.QRCode = qrCodeBase64;
             booking.Status = BookingStatus.Pending;
             booking.BookingItems = bookingItems;
+            booking.BookingDiscounts = appliedPromotionDiscounts;
 
             if (request.NailArtistId.HasValue)
             {
@@ -276,6 +303,7 @@ namespace Nailify.Capstone.Application.Services
 
 
             await _unitOfWork.BookingRepository.CreateAsync(booking);
+            await _promotionService.UpdateUsageAsync(customerId, appliedPromotionDiscounts);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
             if (!string.IsNullOrEmpty(request.HoldToken))
@@ -616,6 +644,8 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 item.Price = itemPrice;
+                item.DiscountAmount = 0;
+                item.FinalPrice = itemPrice * Math.Max(item.Quantity, 1);
                 item.Duration = itemDuration;
 
                 totalDuration += item.Duration;
@@ -692,7 +722,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -717,7 +747,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -729,13 +759,14 @@ namespace Nailify.Capstone.Application.Services
             booking.Confirm(actorId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<BookingResponseDTO>(booking);
+            var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
+            var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt đơn đặt lịch thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> ManualCheckInBookingAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -761,7 +792,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -779,7 +810,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> StartServiceAsync(Guid bookingId, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
@@ -828,8 +859,9 @@ namespace Nailify.Capstone.Application.Services
         }
 
         public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(
-            Guid customerId,
-            IEnumerable<BookingItemRequestDTO> bookingItems)
+    Guid customerId,
+    IEnumerable<BookingItemRequestDTO> bookingItems,
+    List<int>? selectedPromotionIds = null)
         {
             var calculation = await BuildBookingItemsAsync(bookingItems, Guid.Empty, null);
             if (!calculation.IsSucceeded)
@@ -837,19 +869,63 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
             }
 
-            var priceResult = await CalculateDiscountedPriceAsync(customerId, calculation.Price);
-            if (!priceResult.IsSucceeded)
+            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId);
+            if (!loyaltyResult.IsSucceeded)
             {
-                return new ApiErrorResult<BookingPriceResponseDTO>(priceResult.ErrorMessage!);
+                return new ApiErrorResult<BookingPriceResponseDTO>(loyaltyResult.Message);
+            }
+
+            var bookingItemsList = calculation.Items.ToList();
+            var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                customerId,
+                bookingItemsList,
+                selectedPromotionIds);
+
+            var (promotionDiscountAmount, appliedPromotionDiscounts) =
+                await _promotionService.CalculateDiscountsAsync(new Booking
+                {
+                    CustomerId = customerId,
+                    BookingItems = bookingItemsList
+                }, applicablePromotions);
+
+            var loyaltyDiscountAmount = decimal.Round(
+                calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                0,
+                MidpointRounding.AwayFromZero);
+
+            var totalDiscountAmount = promotionDiscountAmount + loyaltyDiscountAmount;
+            var finalPrice = Math.Max(0, calculation.Price - totalDiscountAmount);
+
+            var response = new BookingPriceResponseDTO
+            {
+                Price = calculation.Price,
+                Discount = -totalDiscountAmount,
+                TotalPrice = finalPrice,
+                DiscountBreakdown = new List<DiscountBreakdownDTO>()
+            };
+
+            foreach (var discount in appliedPromotionDiscounts)
+            {
+                response.DiscountBreakdown.Add(new DiscountBreakdownDTO
+                {
+                    Name = discount.Name,
+                    Amount = discount.DiscountAmount,
+                    Type = "Promotion"
+                });
+            }
+
+            if (loyaltyDiscountAmount > 0)
+            {
+                response.DiscountBreakdown.Add(new DiscountBreakdownDTO
+                {
+                    Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                    Amount = loyaltyDiscountAmount,
+                    Type = "Loyalty"
+                });
             }
 
             return new ApiSuccessResult<BookingPriceResponseDTO>(
-                new BookingPriceResponseDTO
-                {
-                    Price = calculation.Price,
-                    Discount = -priceResult.DiscountAmount,
-                    TotalPrice = priceResult.TotalPrice
-                },
+                response,
                 "Tính giá đặt lịch thành công.");
         }
 
@@ -950,6 +1026,8 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 item.Price = unitPrice;
+                item.DiscountAmount = 0;
+                item.FinalPrice = unitPrice * Math.Max(item.Quantity, 1);
                 item.Duration = unitDuration;
                 totalPrice += unitPrice * item.Quantity;
                 totalDuration += unitDuration * item.Quantity;
@@ -1010,7 +1088,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> CompleteServiceAsync(CompleteServiceRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch");
@@ -1047,7 +1125,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingResponseDTO>> ReceptionistAssignArtistAsync(Guid bookingId, AssignArtistRequestDTO request, Guid actorId)
         {
-            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");

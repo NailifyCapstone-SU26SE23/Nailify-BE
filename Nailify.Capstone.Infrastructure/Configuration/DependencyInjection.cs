@@ -97,6 +97,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IFavoriteNailRepository, FavoriteNailRepository>();
             services.AddScoped<ILoyaltyTierRepository, LoyaltyTierRepository>();
             services.AddScoped<ILoyaltyTransactionRepository, LoyaltyTransactionRepository>();
+            services.AddScoped<IBookingRatingRepository, BookingRatingRepository>();
+            services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<IBookingDiscountRepository, BookingDiscountRepository>();
+            services.AddScoped<IUserPromotionUsageRepository, UserPromotionUsageRepository>();
             services.AddScoped<IBookingWaitlistRepository, BookingWaitlistRepository>();
             services.AddScoped<IWalkInQueueRepository, WalkInQueueRepository>();
             // Đăng ký Services
@@ -130,6 +134,8 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IFavoriteNailService, FavoriteNailService>();
             services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
+            services.AddScoped<IBookingRatingService, BookingRatingService>();
+            services.AddScoped<IPromotionService, PromotionService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
             services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();

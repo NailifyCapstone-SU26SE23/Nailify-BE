@@ -1,4 +1,5 @@
 using AutoMapper;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -28,7 +29,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
+        public bool IsRated { get; set; }
         public List<BookingItemResponseDTO> BookingItems { get; set; } = new();
+        public List<SimpleDiscountDto> Discounts { get; set; } = new();
         public void Mapping(Profile profile)
         {
             // Tự động map các mối quan hệ lồng ghép và tên
@@ -36,7 +39,14 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                 .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.User.FirstName + " " + src.Customer.User.LastName))
                 .ForMember(dest => dest.SalonName, opt => opt.MapFrom(src => src.Salon.Name))
                 .ForMember(dest => dest.ArtistName, opt => opt.MapFrom(src => src.NailArtist != null ? src.NailArtist.Account.FirstName + " " + src.NailArtist.Account.LastName : "Chưa chỉ định"))
-                .ForMember(dest => dest.BookingItems, opt => opt.MapFrom(src => src.BookingItems));
+                .ForMember(dest => dest.BookingItems, opt => opt.MapFrom(src => src.BookingItems))
+                .ForMember(dest => dest.Discounts, opt => opt.MapFrom(src => src.BookingDiscounts
+                    .Select(discount => new SimpleDiscountDto
+                    {
+                        Name = discount.Name,
+                        Amount = discount.DiscountAmount,
+                        Type = discount.PromotionId.HasValue ? "Promotion" : "Loyalty"
+                    })));
         }
     }
 }

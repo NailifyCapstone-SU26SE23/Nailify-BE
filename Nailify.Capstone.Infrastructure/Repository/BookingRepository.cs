@@ -26,8 +26,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return (start, end);
         }
 
-        public async Task<Booking?> GetBookingDetailAsync(Guid bookingId)
-           => await FindByCondition(x => x.BookingId == bookingId)
+        public async Task<Booking?> GetBookingDetailAsync(Guid bookingId, bool trackChanges = false)
+           => await FindByCondition(x => x.BookingId == bookingId, trackChanges)
                                     .Include(x => x.Customer)
                                        .ThenInclude(x => x.User)
                                     .Include(x => x.Salon)
@@ -39,6 +39,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                        .ThenInclude(x => x.Service)
                                     .Include(x => x.BookingItems)
                                        .ThenInclude(x => x.CustomerNail)
+                                    .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
                                     .FirstOrDefaultAsync();
 
@@ -111,7 +112,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(x => x.Service)
                 .Include(x => x.BookingItems)
-                    .ThenInclude(x => x.CustomerNail);
+                    .ThenInclude(x => x.CustomerNail)
+                .Include(x => x.BookingDiscounts);
         }
 
         private IQueryable<Booking> ApplyBookingFilters(IQueryable<Booking> query, DateTime? startDate, DateTime? endDate, BookingStatus? status)

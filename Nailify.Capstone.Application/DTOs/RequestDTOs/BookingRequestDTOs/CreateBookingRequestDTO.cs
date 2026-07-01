@@ -17,6 +17,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public Guid? NailArtistId { get; set; }
         public string? HoldToken { get; set; }
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
+        public List<int>? SelectedPromotionIds { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CreateBookingRequestDTO, Booking>()

@@ -51,6 +51,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
         public DbSet<LoyaltyTransaction> LoyaltyTransactions { get; set; }
         public DbSet<CustomerNailRequest> CustomerNailRequests { get; set; }
+        public DbSet<BookingRating> BookingRatings { get; set; }
+        public DbSet<Promotion> Promotions { get; set; }
+        public DbSet<BookingDiscount> BookingDiscounts { get; set; }
+        public DbSet<UserPromotionUsage> UserPromotionUsages { get; set; }
         public DbSet<BookingWaitlist> BookingWaitlists { get; set; }
         public DbSet<WalkInQueue> WalkInQueues { get; set; }
         #endregion initial DBSet
@@ -264,6 +268,69 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasForeignKey(f => f.NailVariantId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Promotion>(entity =>
+            {
+                entity.HasKey(p => p.PromotionId);
+                entity.Property(p => p.Type).HasConversion<string>().HasMaxLength(30);
+                entity.Property(p => p.Scope).HasConversion<string>().HasMaxLength(30);
+                entity.Property(p => p.DiscountType).HasConversion<string>().HasMaxLength(30);
+                entity.Property(p => p.DiscountValue).HasPrecision(18, 2);
+                entity.Property(p => p.Status).HasDefaultValue("Active").HasMaxLength(20);
+                entity.HasIndex(p => p.Name).IsUnique();
+                entity.HasIndex(p => p.Status);
+                entity.HasIndex(p => new { p.StartDate, p.EndDate });
+                entity.HasOne(p => p.Category)
+                      .WithMany(c => c.Promotions)
+                      .HasForeignKey(p => p.CategoryId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(p => p.CategoryType)
+                      .WithMany(ct => ct.Promotions)
+                      .HasForeignKey(p => p.CategoryTypeId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(p => p.NailDesign)
+                      .WithMany(nd => nd.Promotions)
+                      .HasForeignKey(p => p.NailDesignId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<BookingDiscount>(entity =>
+            {
+                entity.HasKey(bd => bd.BookingDiscountId);
+                entity.Property(bd => bd.Name).HasMaxLength(200);
+                entity.Property(bd => bd.DiscountAmount).HasPrecision(18, 2);
+                entity.HasIndex(bd => bd.BookingId);
+                entity.HasOne(bd => bd.Booking)
+                      .WithMany(b => b.BookingDiscounts)
+                      .HasForeignKey(bd => bd.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(bd => bd.Promotion)
+                      .WithMany(p => p.BookingDiscounts)
+                      .HasForeignKey(bd => bd.PromotionId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(bd => bd.LoyaltyTier)
+                      .WithMany()
+                      .HasForeignKey(bd => bd.LoyaltyTierId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(bd => bd.LoyaltyTransaction)
+                      .WithMany()
+                      .HasForeignKey(bd => bd.LoyaltyTransactionId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<UserPromotionUsage>(entity =>
+            {
+                entity.HasKey(upu => upu.UserPromotionUsageId);
+                entity.HasIndex(upu => new { upu.UserId, upu.PromotionId }).IsUnique();
+                entity.HasOne(upu => upu.User)
+                      .WithMany()
+                      .HasForeignKey(upu => upu.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(upu => upu.Promotion)
+                      .WithMany(p => p.UserPromotionUsages)
+                      .HasForeignKey(upu => upu.PromotionId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
             // In DbContext
             modelBuilder.Entity<Customer>()
                 .HasOne(c => c.LoyaltyTier)
@@ -308,7 +375,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<Booking>(entity =>
             {
                 entity.HasKey(b => b.BookingId);
+                entity.Property(b => b.Price).HasPrecision(18, 2);
+                entity.Property(b => b.Discount).HasPrecision(18, 2);
                 entity.Property(b => b.TotalPrice).HasPrecision(18, 2);
+                entity.Property(b => b.IsRated).HasDefaultValue(false);
                 entity.Property(b => b.Status)
                     .HasConversion(
                             v => v.ToString(),
@@ -326,6 +396,8 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             {
                 entity.HasKey(bi => bi.BookingItemId);
                 entity.Property(bi => bi.Price).HasPrecision(18, 2);
+                entity.Property(bi => bi.FinalPrice).HasPrecision(18, 2);
+                entity.Property(bi => bi.DiscountAmount).HasPrecision(18, 2);
                 // Thiết lập các mối quan hệ khóa ngoại
                 entity.HasOne(bi => bi.Booking)
                       .WithMany(b => b.BookingItems)
@@ -348,6 +420,34 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany(b => b.BookingHistories)
                       .HasForeignKey(bh => bh.BookingId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<BookingRating>(entity =>
+            {
+                entity.HasKey(br => br.BookingRatingId);
+                entity.Property(br => br.BookingRatingId)
+                      .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(br => br.Comment)
+                      .HasMaxLength(1000);
+                entity.Property(br => br.ImageUrl)
+                      .HasMaxLength(500);
+                entity.Property(br => br.Status)
+                      .HasDefaultValue("Active")
+                      .HasMaxLength(20);
+                entity.HasIndex(br => br.BookingId)
+                      .IsUnique();
+                entity.HasIndex(br => br.CustomerId);
+                entity.HasIndex(br => br.CreatedAt);
+                entity.ToTable(table => table.HasCheckConstraint(
+                    "CK_BookingRating_Scores",
+                    "\"OverallScore\" BETWEEN 1 AND 5 AND (\"ServiceQuality\" IS NULL OR \"ServiceQuality\" BETWEEN 1 AND 5) AND (\"Punctuality\" IS NULL OR \"Punctuality\" BETWEEN 1 AND 5) AND (\"Cleanliness\" IS NULL OR \"Cleanliness\" BETWEEN 1 AND 5)"));
+                entity.HasOne(br => br.Booking)
+                      .WithOne(b => b.Rating)
+                      .HasForeignKey<BookingRating>(br => br.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(br => br.Customer)
+                      .WithMany(c => c.BookingRatings)
+                      .HasForeignKey(br => br.CustomerId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
             /*
             modelBuilder.Entity<BookingItem>().HasKey(bi => bi.BookingItemId);

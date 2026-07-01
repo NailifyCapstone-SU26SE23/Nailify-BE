@@ -71,20 +71,51 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerNailDto>("Không tìm thấy móng tùy chỉnh.");
             }
 
-            var validationError = await ValidateReferencesAsync(request.NailShapeId, request.NailSurfaceId);
-            if (validationError != null)
+            var hasChanges = false;
+
+            if (!string.IsNullOrWhiteSpace(request.Name))
             {
-                return new ApiErrorResult<CustomerNailDto>(validationError);
+                customerNail.Name = request.Name;
+                hasChanges = true;
             }
 
-            _mapper.Map(request, customerNail);
+            if (request.NailShapeId.HasValue)
+            {
+                customerNail.NailShapeId = request.NailShapeId;
+                hasChanges = true;
+            }
+
+            if (request.NailSurfaceId.HasValue)
+            {
+                customerNail.NailSurfaceId = request.NailSurfaceId;
+                hasChanges = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.CustomColor))
+            {
+                customerNail.CustomColor = request.CustomColor;
+                hasChanges = true;
+            }
+
+            if (request.IsPublic.HasValue)
+            {
+                customerNail.IsPublic = request.IsPublic.Value;
+                hasChanges = true;
+            }
+
             if (!string.IsNullOrWhiteSpace(imageUrl))
             {
                 customerNail.ImageUrl = imageUrl;
+                hasChanges = true;
             }
 
-            customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, id);
-            customerNail.Duration = await CalculateCustomerNailDurationAsync(request.NailShapeId, request.NailSurfaceId, id);
+            if (!hasChanges)
+            {
+                return new ApiErrorResult<CustomerNailDto>("Khong co thong tin nao de cap nhat.");
+            }
+
+            customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, id);
+            customerNail.Duration = await CalculateCustomerNailDurationAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, id);
             _unitOfWork.CustomerNailRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
 
