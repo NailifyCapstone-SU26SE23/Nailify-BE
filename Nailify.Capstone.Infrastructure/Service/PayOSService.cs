@@ -181,7 +181,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                 }
 
                 var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                var status = paymentResult.GetProperty("data").GetProperty("status").GetString();
+                var data = paymentResult.GetProperty("data");
+                var status = data.GetProperty("status").GetString();
+
+                await SyncLocalTransactionStatusAsync(orderCode, status);
+
                 return (true, "Lay trang thai thanh toan thanh cong!", status);
             }
             catch (Exception ex)
@@ -276,6 +280,33 @@ namespace Nailify.Capstone.Infrastructure.Service
                 "EXPIRED" => TransactionStatus.Overdue,
                 _ => TransactionStatus.Pending
             };
+        }
+
+        private async Task SyncLocalTransactionStatusAsync(long orderCode, string? payOSStatus)
+        {
+            var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(
+                orderCode.ToString(CultureInfo.InvariantCulture),
+                trackChanges: true);
+
+            if (transaction == null)
+            {
+                return;
+            }
+
+            var newStatus = ParseStatus(payOSStatus);
+            if (transaction.Status == newStatus && (newStatus != TransactionStatus.Paid || transaction.PaidAt.HasValue))
+            {
+                return;
+            }
+
+            transaction.Status = newStatus;
+            if (newStatus == TransactionStatus.Paid && !transaction.PaidAt.HasValue)
+            {
+                transaction.PaidAt = DateTime.UtcNow;
+            }
+
+            _unitOfWork.TransactionRepository.Update(transaction);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         private static PaymentResponseDto ToResponse(Transaction transaction)
