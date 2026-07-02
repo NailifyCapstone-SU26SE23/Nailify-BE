@@ -103,6 +103,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IUserPromotionUsageRepository, UserPromotionUsageRepository>();
             services.AddScoped<IBookingWaitlistRepository, BookingWaitlistRepository>();
             services.AddScoped<IWalkInQueueRepository, WalkInQueueRepository>();
+            services.AddScoped<ITransactionRepository, TransactionRepository>();
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -142,6 +143,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IWalkInQueueService, WalkInQueueService>();
             services.AddScoped<IEmailService, SmtpEmailService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+            services.AddHttpClient();
+            services.AddScoped<PayOSHelper>();
+            services.AddScoped<PayOSService>();
+            services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();
@@ -177,6 +182,16 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                   .Get<SmtpEmailConfiguration>()
                     ?? new SmtpEmailConfiguration();
             services.AddSingleton<IEmailConfiguration>(emailSettings);
+
+            var paymentSettings = configuration.GetSection("PayOSSettings")
+                                  .Get<PayOSSettings>()
+                    ?? new PayOSSettings();
+            services.AddSingleton<IPayOSSettings>(paymentSettings);
+
+            var paymentUrls = configuration.GetSection("PaymentUrls")
+                                  .Get<PaymentUrls>()
+                    ?? new PaymentUrls();
+            services.AddSingleton<IPaymentUrls>(paymentUrls);
 
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);

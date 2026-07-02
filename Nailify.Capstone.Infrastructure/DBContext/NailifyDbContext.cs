@@ -57,6 +57,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<UserPromotionUsage> UserPromotionUsages { get; set; }
         public DbSet<BookingWaitlist> BookingWaitlists { get; set; }
         public DbSet<WalkInQueue> WalkInQueues { get; set; }
+        public DbSet<Transaction> Transactions { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -709,6 +710,24 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                     .WithMany()
                     .HasForeignKey(wq => wq.AssignedNailArtistId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+            modelBuilder.Entity<Transaction>(entity =>
+            {
+                entity.HasKey(t => t.TransactionId);
+                entity.Property(t => t.OrderCode).IsRequired().HasMaxLength(50);
+                entity.Property(t => t.Amount).HasPrecision(18, 2);
+                entity.Property(t => t.Reference).HasMaxLength(200);
+                entity.Property(t => t.PaymentLinkId).HasMaxLength(200);
+                entity.Property(t => t.CheckoutUrl).IsRequired();
+                entity.Property(t => t.QrCode).IsRequired();
+                entity.Property(t => t.WebhookPayload).HasDefaultValue(string.Empty);
+                entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(30);
+                entity.HasIndex(t => t.BookingId);
+                entity.HasIndex(t => t.OrderCode).IsUnique();
+                entity.HasOne(t => t.Booking)
+                    .WithMany()
+                    .HasForeignKey(t => t.BookingId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             ConfigureStatusDefaults(modelBuilder);
