@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -15,8 +15,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<Booking>> GetBookingsByArtistAndDateAsync(Guid artistId, DateTime date);
         Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null);
         Task<PagedList<Booking>> GetBookingsBySalonAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
-        Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime);
-        Task<bool> HasBookingConflictExcludingCurrentAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid currentBookingId);
         Task<PagedList<Booking>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
         /// <summary>
         /// Lấy danh sách các đơn đặt lịch có trạng thái Approved nhưng đã quá giờ check-in so với mốc thời gian chỉ định.
@@ -26,6 +24,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// <param name="trackChanges">Có theo dõi thay đổi thực thể hay không</param>
         /// <returns>Danh sách các Booking đã quá hạn check-in</returns>
         Task<IEnumerable<Booking>> GetOverdueApprovedBookingsAsync(DateTime date, TimeSpan thresholdTime, bool trackChanges = false);
+        Task<int> CountServingBookingsAsync(Guid artistId, DateTime date);
+        Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime);
 
     }
 }

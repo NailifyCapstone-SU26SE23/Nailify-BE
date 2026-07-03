@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,6 +45,10 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IUserPromotionUsageRepository UserPromotionUsageRepository { get; }
         IBookingWaitlistRepository BookingWaitlistRepository { get; }
         IWalkInQueueRepository WalkInQueueRepository { get; }
+        // Quản lý Transaction
+        Task BeginTransactionAsync();
+        Task CommitTransactionAsync();
+        Task RollbackTransactionAsync();
         Task<int> SaveChangesAsync();
     }
 }

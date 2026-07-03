@@ -52,6 +52,22 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                     NameClaimType = JwtRegisteredClaimNames.Email,
                     RoleClaimType = "role"
                 };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+
+                        // If the request is for the notifications hub
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notifications"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return System.Threading.Tasks.Task.CompletedTask;
+                    }
+                };
             });
             // Cấu hình DbContext với PostgreSQL
             services.AddDbContext<NailifyDbContext>(options =>

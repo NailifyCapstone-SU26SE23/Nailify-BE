@@ -11,5 +11,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<List<BookingProcedure>> GetProceduresByBookingItemIdAsync(Guid bookingItemId);
         Task<List<BookingProcedure>> GetProceduresByBookingIdAsync(Guid bookingId);
+        Task<bool> HasAnyInProgressProcedureAsync(Guid artistId);
     }
 }

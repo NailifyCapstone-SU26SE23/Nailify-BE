@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs
         public Guid SalonId { get; set; }
         public Guid? CustomerId { get; set; }
         public Guid? OriginalBookingId { get; set; }
+        public Guid? AssignedNailArtistId { get; set; } // Thêm trường chọn thợ móng
         public string? GuestName { get; set; }
         public string? GuestPhone { get; set; }
         public string? RequestNote { get; set; }

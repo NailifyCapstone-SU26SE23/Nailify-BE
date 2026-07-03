@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,5 +21,12 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// <param name="salonId">ID của salon</param>
         /// <returns>Vị trí tiếp theo trong hàng đợi</returns>
         Task<int> GetNextPositionAsync(Guid salonId);
+        /// <summary>
+        /// Lấy danh sách khách hàng đang chờ (Waiting) tại sảnh hôm nay của Salon.
+        /// </summary>
+        Task<IEnumerable<WalkInQueue>> GetActiveWaitingEntriesAsync(Guid salonId, Guid? assignedNailArtistId, bool trackChanges = false);
+        // Lấy số thứ tự tiếp theo của thợ đó tại salon trong ngày hôm nay
+        Task<int> GetNextPositionAsync(Guid salonId, Guid? assignedNailArtistId);
+        Task<int> CountServingWalkInsAsync(Guid artistId, DateTime date);
     }
 }
