@@ -35,41 +35,6 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
         }
 
-        public async Task<PayoutResult> CreateSinglePayoutAsync(int transactionId, BankAccountInfo bankInfo, string? reason = null)
-        {
-            try
-            {
-                var transaction = await _unitOfWork.TransactionRepository.GetDetailByIdAsync(transactionId, trackChanges: true);
-                if (transaction == null)
-                {
-                    return new PayoutResult
-                    {
-                        Success = false,
-                        Message = "Transaction not found"
-                    };
-                }
-
-                if (transaction.Status != TransactionStatus.Paid)
-                {
-                    return new PayoutResult
-                    {
-                        Success = false,
-                        Message = "Only paid transactions can be refunded"
-                    };
-                }
-
-                return await CreateSinglePayoutAsync(transaction, bankInfo, reason);
-            }
-            catch (Exception ex)
-            {
-                return new PayoutResult
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
-        }
-
         public async Task<PayoutResult> CreateSinglePayoutByBookingAsync(Guid bookingId, BankAccountInfo bankInfo, string? reason = null)
         {
             try
@@ -186,32 +151,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                 Success = false,
                 Message = payoutResponse?.Desc ?? "PayOS payout failed",
                 ErrorCode = payoutResponse?.Code ?? string.Empty
-            };
-        }
-
-        public async Task<PayoutInfo> GetPayoutStatusAsync(string payoutId)
-        {
-            var response = await SendPayOSRequestAsync($"/v1/payouts/{payoutId}", null, HttpMethod.Get);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException($"Failed to get payout status: {response.StatusCode}");
-            }
-
-            var content = await response.Content.ReadAsStringAsync();
-            var payoutResponse = JsonSerializer.Deserialize<PayOSPayoutDetailResponse>(content, JsonOptions)
-                ?? throw new InvalidOperationException("Invalid payout response");
-
-            var latestTransaction = payoutResponse.Data.Transactions?.LastOrDefault();
-            var transactionStatus = latestTransaction?.State ?? "PENDING";
-
-            return new PayoutInfo
-            {
-                TransactionId = payoutResponse.Data.Id,
-                Status = transactionStatus,
-                Amount = latestTransaction?.Amount ?? payoutResponse.Data.Transactions?.FirstOrDefault()?.Amount ?? 0,
-                CreatedAt = payoutResponse.Data.CreatedAt,
-                CompletedAt = latestTransaction?.TransactionDatetime
             };
         }
 
