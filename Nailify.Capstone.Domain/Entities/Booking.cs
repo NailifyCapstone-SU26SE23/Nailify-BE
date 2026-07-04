@@ -28,6 +28,9 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
         public bool IsRated { get; set; } = false;
+        public bool IsPaid { get; set; } = false;
+        public bool IsRefunded { get; set; } = false;
+
         // ThanhDT
         public DateTime? ActualCheckInTime { get; set; }
         public DateTime? ActualStartTime { get; set; }

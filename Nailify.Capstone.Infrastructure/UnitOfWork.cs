@@ -48,6 +48,7 @@ namespace Nailify.Capstone.Infrastructure
         private IUserPromotionUsageRepository? _userPromotionUsageRepository;
         private IBookingWaitlistRepository? _bookingWaitlistRepository;
         private IWalkInQueueRepository? _walkInQueueRepository;
+        private ITransactionRepository? _transactionRepository;
 
         public UnitOfWork(NailifyDbContext context)
         {
@@ -104,6 +105,7 @@ namespace Nailify.Capstone.Infrastructure
         public IBookingWaitlistRepository BookingWaitlistRepository => _bookingWaitlistRepository ??= new BookingWaitlistRepository(_context);
 
         public IWalkInQueueRepository WalkInQueueRepository => _walkInQueueRepository ??= new WalkInQueueRepository(_context);
+        public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

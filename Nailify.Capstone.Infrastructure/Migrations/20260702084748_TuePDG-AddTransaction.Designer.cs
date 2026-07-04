@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702084748_TuePDG-AddTransaction")]
+    partial class TuePDGAddTransaction
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -53,17 +56,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<bool>("IsLateArrival")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsPaid")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<bool>("IsRated")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsRefunded")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
@@ -884,9 +877,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("ConcurrentCapacity")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1552,13 +1542,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("PaymentLinkId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Policy")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasDefaultValue("");
 
                     b.Property<string>("QrCode")
                         .IsRequired()

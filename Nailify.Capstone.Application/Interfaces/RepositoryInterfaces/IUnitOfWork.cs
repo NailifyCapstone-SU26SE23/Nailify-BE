@@ -45,6 +45,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IUserPromotionUsageRepository UserPromotionUsageRepository { get; }
         IBookingWaitlistRepository BookingWaitlistRepository { get; }
         IWalkInQueueRepository WalkInQueueRepository { get; }
+        ITransactionRepository TransactionRepository { get; }
         // Quản lý Transaction
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

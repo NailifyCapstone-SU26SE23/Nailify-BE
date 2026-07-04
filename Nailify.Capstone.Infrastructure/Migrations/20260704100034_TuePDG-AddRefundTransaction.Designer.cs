@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260704100034_TuePDG-AddRefundTransaction")]
+    partial class TuePDGAddRefundTransaction
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -884,9 +887,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("ConcurrentCapacity")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1563,6 +1563,10 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("QrCode")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Reference")
                         .HasMaxLength(200)
