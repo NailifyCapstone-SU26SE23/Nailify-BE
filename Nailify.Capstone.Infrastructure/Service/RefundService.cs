@@ -1,5 +1,6 @@
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var transaction = await _unitOfWork.TransactionRepository
                     .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Paid, trackChanges: true)
                     .Include(t => t.Booking)
+                        .ThenInclude(b => b.Customer)
+                        .ThenInclude(c => c.User)
+                    .Include(t => t.Booking)
+                        .ThenInclude(b => b.Salon)
                     .OrderByDescending(t => t.PaidAt ?? t.CreatedAt)
                     .FirstOrDefaultAsync();
 
@@ -124,7 +129,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                     CheckoutUrl = string.Empty,
                     QrCode = string.Empty,
                     Status = TransactionStatus.Refunded,
-                    Reason = reason,
                     Policy = refundPolicy.PolicyText,
                     CreatedAt = DateTime.UtcNow,
                     PaidAt = DateTime.UtcNow,
@@ -133,6 +137,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 };
 
                 paidTransaction.Booking.IsRefunded = true;
+                refundTransaction.Booking = paidTransaction.Booking;
 
                 await _unitOfWork.TransactionRepository.CreateAsync(refundTransaction);
                 _unitOfWork.BookingRepository.Update(paidTransaction.Booking);
@@ -142,7 +147,8 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     Success = true,
                     TransactionId = payoutResponse.Data.Id,
-                    Message = payoutResponse.Desc ?? "Payout initiated successfully"
+                    Message = payoutResponse.Desc ?? "Payout initiated successfully",
+                    Transaction = ToTransactionResponse(refundTransaction)
                 };
             }
 
@@ -205,6 +211,30 @@ namespace Nailify.Capstone.Infrastructure.Service
             };
 
             return bankBins.GetValueOrDefault(bankCode.ToUpperInvariant(), "970436");
+        }
+
+        private static TransactionResponseDto ToTransactionResponse(Transaction transaction)
+        {
+            return new TransactionResponseDto
+            {
+                TransactionId = transaction.TransactionId,
+                BookingId = transaction.BookingId,
+                OrderCode = transaction.OrderCode,
+                Amount = transaction.Amount,
+                Reference = transaction.Reference,
+                PaymentLinkId = transaction.PaymentLinkId,
+                Policy = transaction.Policy,
+                CheckoutUrl = transaction.CheckoutUrl,
+                QrCode = transaction.QrCode,
+                Status = transaction.Status,
+                CreatedAt = transaction.CreatedAt,
+                PaidAt = transaction.PaidAt,
+                ExpiresAt = transaction.ExpiresAt,
+                CustomerId = transaction.Booking.CustomerId,
+                CustomerName = $"{transaction.Booking.Customer.User.FirstName} {transaction.Booking.Customer.User.LastName}".Trim(),
+                SalonId = transaction.Booking.SalonId,
+                SalonName = transaction.Booking.Salon.Name
+            };
         }
 
         private async Task<HttpResponseMessage> SendPayOSRequestAsync(

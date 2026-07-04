@@ -10,7 +10,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
         public decimal Amount { get; set; }
         public string? Reference { get; set; }
         public string? PaymentLinkId { get; set; }
-        public string? Reason { get; set; }
         public string Policy { get; set; } = string.Empty;
         public string CheckoutUrl { get; set; } = string.Empty;
         public string QrCode { get; set; } = string.Empty;

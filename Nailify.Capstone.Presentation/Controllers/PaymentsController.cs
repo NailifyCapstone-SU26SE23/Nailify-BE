@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Infrastructure.Service;
 using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.BankAccountInfo;
@@ -24,20 +25,16 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _paymentService.CreatePaymentLinkAsync(bookingId);
 
             if (!result.Success)
-                return BadRequest(new { result.Message });
+                return BadRequest(new ApiErrorResult<object>(result.Message));
 
-            return Ok(new
-            {
-                result.Message,
-                data = result.Payment
-            });
+            return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
         }
 
         [HttpPost("refund/{bookingId}")]
         public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] CreateRefundLinkRequest request)
         {
-            if (request.BankInfo == null)
-                return BadRequest(new { Message = "Thong tin tai khoan ngan hang la bat buoc." });
+            if (request?.BankInfo == null)
+                return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
@@ -48,17 +45,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 return BadRequest(new
                 {
+                    IsSucceeded = false,
                     result.Message,
+                    Data = (object?)null,
                     result.ErrorCode,
                     result.ErrorDescription
                 });
             }
 
-            return Ok(new
-            {
-                result.Message,
-                data = result
-            });
+            return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
 
         [HttpPost("webhook")]
@@ -67,9 +62,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _paymentService.HandlePaymentWebhookAsync(webhookData);
 
             if (!result.Success)
-                return BadRequest(new { result.Message });
+                return BadRequest(new ApiErrorResult<object>(result.Message));
 
-            return Ok(new { result.Message });
+            return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
 
         [HttpGet("status/{orderCode}")]
@@ -78,13 +73,12 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _paymentService.GetPaymentStatusAsync(orderCode);
 
             if (!result.Success)
-                return BadRequest(new { result.Message });
+                return BadRequest(new ApiErrorResult<object>(result.Message));
 
-            return Ok(new
+            return Ok(new ApiSuccessResult<object>(new
             {
-                result.Message,
-                status = result.Status
-            });
+                Status = result.Status
+            }, result.Message));
         }
 
         [HttpPost("cancel/{orderCode}")]
@@ -93,9 +87,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _paymentService.CancelPaymentLinkAsync(orderCode);
 
             if (!result.Success)
-                return BadRequest(new { result.Message });
+                return BadRequest(new ApiErrorResult<object>(result.Message));
 
-            return Ok(new { result.Message });
+            return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
     }
 

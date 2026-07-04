@@ -723,7 +723,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.Property(t => t.CheckoutUrl).IsRequired();
                 entity.Property(t => t.QrCode).IsRequired();
                 entity.Property(t => t.WebhookPayload).HasDefaultValue(string.Empty);
-                entity.Property(t => t.Reason).HasMaxLength(500);
                 entity.Property(t => t.Policy).HasDefaultValue(string.Empty).HasMaxLength(500);
                 entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(30);
                 entity.HasIndex(t => t.BookingId);
