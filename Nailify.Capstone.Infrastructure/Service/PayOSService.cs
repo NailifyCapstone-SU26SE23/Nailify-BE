@@ -157,6 +157,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                     ? TransactionStatus.Paid
                     : TransactionStatus.Cancelled;
                 transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
+                if (transaction.Status == TransactionStatus.Paid)
+                {
+                    transaction.Booking.IsPaid = true;
+                }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
@@ -303,6 +307,10 @@ namespace Nailify.Capstone.Infrastructure.Service
             if (newStatus == TransactionStatus.Paid && !transaction.PaidAt.HasValue)
             {
                 transaction.PaidAt = DateTime.UtcNow;
+            }
+            if (newStatus == TransactionStatus.Paid)
+            {
+                transaction.Booking.IsPaid = true;
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);

@@ -14,7 +14,10 @@ namespace Nailify.Capstone.Domain.Entities
         Overdue,
 
         [Display(Name = "Đã hủy")]
-        Cancelled
+        Cancelled,
+
+        [Display(Name = "Đã hoàn tiền")]
+        Refunded
     }
 
     public class Transaction
@@ -30,6 +33,8 @@ namespace Nailify.Capstone.Domain.Entities
         public string CheckoutUrl { get; set; } = string.Empty;
         public string QrCode { get; set; } = string.Empty;
         public TransactionStatus Status { get; set; } = TransactionStatus.Pending;
+        public string? Reason { get; set; }
+        public string Policy { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; }
         public DateTime? PaidAt { get; set; }

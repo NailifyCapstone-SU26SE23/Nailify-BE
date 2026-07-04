@@ -102,6 +102,8 @@ namespace Nailify.Capstone.Application.Services
                 Amount = transaction.Amount,
                 Reference = transaction.Reference,
                 PaymentLinkId = transaction.PaymentLinkId,
+                Reason = transaction.Reason,
+                Policy = transaction.Policy,
                 CheckoutUrl = transaction.CheckoutUrl,
                 QrCode = transaction.QrCode,
                 Status = transaction.Status,

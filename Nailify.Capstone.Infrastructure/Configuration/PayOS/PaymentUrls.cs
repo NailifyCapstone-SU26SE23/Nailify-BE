@@ -1,6 +1,6 @@
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 
-namespace Nailify.Capstone.Infrastructure.Configuration
+namespace Nailify.Capstone.Infrastructure.Configuration.PayOS
 {
     public class PaymentUrls : IPaymentUrls
     {

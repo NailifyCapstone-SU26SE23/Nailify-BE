@@ -9,6 +9,7 @@ using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Application.Services;
+using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
@@ -146,6 +147,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddHttpClient();
             services.AddScoped<PayOSHelper>();
             services.AddScoped<PayOSService>();
+            services.AddScoped<RefundService>();
             services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")

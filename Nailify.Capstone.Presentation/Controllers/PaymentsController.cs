@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Infrastructure.Service;
+using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.BankAccountInfo;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -9,10 +10,12 @@ namespace Nailify.Capstone.Presentation.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly PayOSService _paymentService;
+        private readonly RefundService _refundService;
 
-        public PaymentsController(PayOSService paymentService)
+        public PaymentsController(PayOSService paymentService, RefundService refundService)
         {
             _paymentService = paymentService;
+            _refundService = refundService;
         }
 
         [HttpPost("create/{bookingId}")]
@@ -27,6 +30,34 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 result.Message,
                 data = result.Payment
+            });
+        }
+
+        [HttpPost("refund/{bookingId}")]
+        public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] CreateRefundLinkRequest request)
+        {
+            if (request.BankInfo == null)
+                return BadRequest(new { Message = "Thong tin tai khoan ngan hang la bat buoc." });
+
+            var result = await _refundService.CreateSinglePayoutByBookingAsync(
+                bookingId,
+                request.BankInfo,
+                request.Reason);
+
+            if (!result.Success)
+            {
+                return BadRequest(new
+                {
+                    result.Message,
+                    result.ErrorCode,
+                    result.ErrorDescription
+                });
+            }
+
+            return Ok(new
+            {
+                result.Message,
+                data = result
             });
         }
 
@@ -66,5 +97,11 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             return Ok(new { result.Message });
         }
+    }
+
+    public class CreateRefundLinkRequest
+    {
+        public BankAccountInfo BankInfo { get; set; } = new();
+        public string? Reason { get; set; }
     }
 }

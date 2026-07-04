@@ -1,4 +1,4 @@
-namespace Nailify.Capstone.Infrastructure.Configuration
+namespace Nailify.Capstone.Infrastructure.Configuration.PayOS
 {
     public class PaymentResponseDto
     {
