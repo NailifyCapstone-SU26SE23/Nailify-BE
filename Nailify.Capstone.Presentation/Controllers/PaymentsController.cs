@@ -31,16 +31,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         [HttpPost("refund/{bookingId}")]
-        public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] CreateRefundLinkRequest request)
+        public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] BankAccountInfo request)
         {
-            if (request?.BankInfo == null)
+            if (request == null)
                 return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
-                request.BankInfo,
-                request.Reason);
-
+                request);
             if (!result.Success)
             {
                 return BadRequest(new
@@ -91,11 +89,5 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
-    }
-
-    public class CreateRefundLinkRequest
-    {
-        public BankAccountInfo BankInfo { get; set; } = new();
-        public string? Reason { get; set; }
     }
 }
