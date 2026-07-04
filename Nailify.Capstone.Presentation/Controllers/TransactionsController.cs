@@ -58,7 +58,6 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
-        [HttpGet("byBookingId/{bookingId:guid}")]
         [HttpGet("booking/{bookingId:guid}")]
         public async Task<IActionResult> GetByBookingId(Guid bookingId)
         {
