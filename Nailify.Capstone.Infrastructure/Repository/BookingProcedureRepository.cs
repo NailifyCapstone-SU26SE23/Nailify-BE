@@ -31,5 +31,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .OrderBy(bp => bp.StepOrder)
                 .ToListAsync();
         }
+
+        public async Task<bool> HasAnyInProgressProcedureAsync(Guid artistId)
+        {
+            return await FindByCondition(p => p.CompletedById == artistId 
+                                    && p.Status == Nailify.Capstone.Domain.Enums.BookingProcedureStatus.InProgress, false)
+                        .AnyAsync();
+        }
     }
 }

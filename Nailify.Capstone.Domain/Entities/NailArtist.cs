@@ -10,6 +10,7 @@ namespace Nailify.Capstone.Domain.Entities
     {
         public Guid NailArtistId { get; set; }
         public Guid AccountId { get; set; }
+        public int ConcurrentCapacity { get; set; } = 1;
         public string Status { get; set; } = "Active";
         public virtual User Account { get; set; } = null!;
         public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();

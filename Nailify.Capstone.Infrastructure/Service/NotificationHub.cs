@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using System.Threading.Tasks;
 namespace Nailify.Capstone.Infrastructure.Service
@@ -9,6 +9,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             // Tự động phân nhóm kết nối dựa trên UserId nằm trong JWT Token
             var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? Context.User?.FindFirst("sub")?.Value
                          ?? Context.User?.FindFirst("id")?.Value;
 
             if (!string.IsNullOrEmpty(userId))
@@ -21,6 +22,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         public override async Task OnDisconnectedAsync(System.Exception? exception)
         {
             var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                         ?? Context.User?.FindFirst("sub")?.Value
                          ?? Context.User?.FindFirst("id")?.Value;
 
             if (!string.IsNullOrEmpty(userId))

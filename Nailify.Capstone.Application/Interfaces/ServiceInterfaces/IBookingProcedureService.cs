@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -19,6 +19,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             BookingProcedureStatus status);
 
         Task<ApiResult<bool>> DuplicateProceduresForBookingItemAsync(Guid bookingItemId, int nailVariantId);
+        // Thêm mới phương thức Claim công đoạn
+        Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId);
+
     }
 
 }

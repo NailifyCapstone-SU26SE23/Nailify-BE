@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -67,6 +67,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 }
             }
             return suggestedArtists;
+        }
+
+        public async Task<NailArtist?> GetArtistWithLockAsync(Guid artistId)
+        {
+            // Sử dụng Raw SQL SELECT FOR UPDATE của PostgreSQL để thực hiện khóa dòng
+            return await _context.NailArtists
+                .FromSqlRaw("SELECT * FROM \"NailArtists\" WHERE \"NailArtistId\" = {0} FOR UPDATE", artistId)
+                .Include(x => x.Account)
+                .FirstOrDefaultAsync();
         }
     }
 }

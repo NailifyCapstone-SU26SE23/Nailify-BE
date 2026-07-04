@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
@@ -8,6 +9,7 @@ namespace Nailify.Capstone.Infrastructure
 {
     public class UnitOfWork : IUnitOfWork
     {
+        private IDbContextTransaction? _transaction;
         private readonly NailifyDbContext _context;
         private IUserRepository? _userRepository;
         private ICustomerRepository? _customerRepository;
@@ -47,6 +49,7 @@ namespace Nailify.Capstone.Infrastructure
         private IBookingWaitlistRepository? _bookingWaitlistRepository;
         private IWalkInQueueRepository? _walkInQueueRepository;
         private ITransactionRepository? _transactionRepository;
+
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -113,6 +116,29 @@ namespace Nailify.Capstone.Infrastructure
         {
             _context.Dispose();
             GC.SuppressFinalize(this);
+        }
+
+        public async Task BeginTransactionAsync()
+        {
+            _transaction = await _context.Database.BeginTransactionAsync();
+        }
+        public async Task CommitTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.CommitAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
+        }
+        public async Task RollbackTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.RollbackAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
         }
     }
 }

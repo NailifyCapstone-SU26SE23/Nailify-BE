@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -15,7 +16,7 @@ namespace Nailify.Capstone.Presentation.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class BookingProceduresController : ControllerBase
+    public class BookingProceduresController : BaseApiController
     {
         private readonly IBookingProcedureService _bookingProcedureService;
 
@@ -57,6 +58,20 @@ namespace Nailify.Capstone.Presentation.Controllers
                 {
                     return NotFound(result);
                 }
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+        [Authorize(Roles = "NailArtist,Receptionist,Manager")]
+        [HttpPost("procedures/{procedureId}/claim")]
+        public async Task<IActionResult> ClaimProcedure(Guid procedureId)
+        {
+            // Lấy AccountId từ JWT Token của thợ đang đăng nhập
+            var accountId = GetCurrentUserId();
+
+            var result = await _bookingProcedureService.ClaimProcedureStepAsync(procedureId, accountId);
+            if (!result.IsSucceeded)
+            {
                 return BadRequest(result);
             }
             return Ok(result);

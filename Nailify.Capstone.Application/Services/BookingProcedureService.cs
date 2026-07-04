@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
@@ -22,6 +22,58 @@ namespace Nailify.Capstone.Application.Services
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+        }
+
+        public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
+        {
+            var procedure = await _unitOfWork.BookingProcedureRepository.GetByIdAsync(bookingProcedureId);
+            if (procedure == null)
+            {
+                return new ApiErrorResult<BookingProcedureResponseDTO>("Không tìm thấy bước quy trình yêu cầu.");
+            }
+
+            // Tự động tìm thông tin Thợ từ AccountId người dùng đang đăng nhập
+            var artist = await _unitOfWork.NailArtistRepository.GetNailArtistByAccountIdAsync(accountId);
+            if (artist == null)
+            {
+                return new ApiErrorResult<BookingProcedureResponseDTO>("Tài khoản đăng nhập không liên kết với thợ nail nào.");
+            }
+
+            var artistId = artist.NailArtistId;
+            if (artist.ConcurrentCapacity == 1)
+            {
+                // Kiểm tra xem thợ này có đang làm dở công đoạn nào khác (InProgress) hay không
+                var isBusy = await _unitOfWork.BookingProcedureRepository.HasAnyInProgressProcedureAsync(artistId);
+                if (isBusy)
+                {
+                    return new ApiErrorResult<BookingProcedureResponseDTO>(
+                        $"Thợ {artist.Account.FirstName} {artist.Account.LastName} đang bận thực hiện công đoạn khác. " +
+                        "Vui lòng hoàn thành công việc hiện tại trước khi nhận công đoạn mới.");
+                }
+            }
+            // Đảm bảo tính tuần tự (Bước trước phải hoàn thành thì mới được nhận bước sau)
+            if (procedure.StepOrder > 1)
+            {
+                var allProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingItemIdAsync(procedure.BookingItemId);
+                var prevProcedure = allProcedures.FirstOrDefault(p => p.StepOrder == procedure.StepOrder - 1);
+
+                if (prevProcedure != null && prevProcedure.Status != BookingProcedureStatus.Completed)
+                {
+                    return new ApiErrorResult<BookingProcedureResponseDTO>($"Không thể bắt đầu bước này. Bước trước đó '{prevProcedure.ProcedureName}' chưa hoàn thành.");
+                }
+            }
+
+            procedure.Status = BookingProcedureStatus.InProgress;
+            procedure.CompletedById = artistId;
+            procedure.CompletedAt = null;
+
+            _unitOfWork.BookingProcedureRepository.Update(procedure);
+            await _unitOfWork.SaveChangesAsync();
+
+            var updatedProcs = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingItemIdAsync(procedure.BookingItemId);
+            var targetProc = updatedProcs.First(x => x.BookingProcedureId == bookingProcedureId);
+            var response = _mapper.Map<BookingProcedureResponseDTO>(targetProc);
+            return new ApiSuccessResult<BookingProcedureResponseDTO>(response, "Nhận công đoạn thành công. Hãy bắt đầu phục vụ.");
         }
 
         public async Task<ApiResult<bool>> DuplicateProceduresForBookingItemAsync(Guid bookingItemId, int nailVariantId)

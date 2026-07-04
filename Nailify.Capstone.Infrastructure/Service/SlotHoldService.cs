@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
@@ -5,6 +6,9 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,12 +41,37 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             var tokenKey = $"{_config.KeyPrefix}:token:{holdToken}";
             var mappingJson = await _cache.GetStringAsync(tokenKey);
-            if (!string.IsNullOrEmpty(mappingJson))
+            if (string.IsNullOrEmpty(mappingJson)) 
             {
-                var mapping = JsonSerializer.Deserialize<TokenMapping>(mappingJson);
-                if (mapping != null)
-                    await _cache.RemoveAsync(mapping.SlotKey);
+                return;
+            }
+            var mapping = JsonSerializer.Deserialize<TokenMapping>(mappingJson);
+            if(mapping == null)
+            {
+                return;
+            }
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                // Lock
+                await _unitOfWork.NailArtistRepository.GetArtistWithLockAsync(mapping.ArtistId);
+
+                var redisListKey = BuildSlotKey(mapping.ArtistId, mapping.BookingDate);
+                var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+
+                var holdToRemove = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
+                if(holdToRemove != null)
+                {
+                    activeHolds.Remove(holdToRemove);
+                    await SaveHoldToRedisAsync(redisListKey, activeHolds);
+                }
                 await _cache.RemoveAsync(tokenKey);
+                await _unitOfWork.CommitTransactionAsync();
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
         }
 
@@ -63,18 +92,19 @@ namespace Nailify.Capstone.Infrastructure.Service
                 return new ApiSuccessResult<SlotHoldResponseDTO>(x, "Mã giữ chỗ không tồn tại hoặc đã hết hạn");
             }
             var mapping = JsonSerializer.Deserialize<TokenMapping>(mappingJson);
-            var holdJson = await _cache.GetStringAsync(mapping!.SlotKey);
-            if (string.IsNullOrEmpty(holdJson))
+            var redisListKey = BuildSlotKey(mapping!.ArtistId, mapping.BookingDate);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+            var hold = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
+            if(hold == null)
             {
-                var y = new SlotHoldResponseDTO
+                var x = new SlotHoldResponseDTO
                 {
                     HoldToken = holdToken,
                     RemainingSeconds = 0,
                     IsHeld = false
                 };
-                return new ApiSuccessResult<SlotHoldResponseDTO>(y, "Mã giữ chỗ không tồn tại hoặc đã hết hạn.");
+                return new ApiSuccessResult<SlotHoldResponseDTO>(x, "Mã giữ chỗ không tồn tại hoặc đã hết hạn.");
             }
-            var hold = JsonSerializer.Deserialize<SlotHoldData>(holdJson);
             var remaining = (int)(hold.ExpiresAt - DateTime.UtcNow).TotalSeconds;
             var response = new SlotHoldResponseDTO
             {
@@ -85,61 +115,6 @@ namespace Nailify.Capstone.Infrastructure.Service
             };
             return new ApiSuccessResult<SlotHoldResponseDTO>(response, "Lấy thông tin giữ chỗ thành công");
         }
-
-        private async Task<SlotHoldData?> GetConflictingHoldAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid customerId)
-        {
-            var maxDuration = TimeSpan.FromHours(4);
-            var checkStart = startTime - maxDuration;
-            if (checkStart < TimeSpan.Zero)
-            {
-                checkStart = TimeSpan.Zero;
-            }
-
-            var startMinutes = (int)checkStart.TotalMinutes;
-            if (startMinutes % 30 != 0)
-            {
-                startMinutes = (startMinutes / 30) * 30;
-            }
-            checkStart = TimeSpan.FromMinutes(startMinutes);
-
-            var stepTimes = new List<TimeSpan>();
-            var current = checkStart;
-            while (current < endTime)
-            {
-                stepTimes.Add(current);
-                current = current.Add(TimeSpan.FromMinutes(30));
-            }
-            // Gửi yêu cầu tìm kiếm song song lên Redis để tối ưu hiệu năng
-            var fetchTasks = stepTimes.Select(t => _cache.GetStringAsync(BuildSlotKey(artistId, date, t))).ToList();
-            var jsonResults = await Task.WhenAll(fetchTasks);
-
-            foreach (var json in jsonResults)
-            {
-                if (string.IsNullOrEmpty(json))
-                {
-                    continue;
-                }
-
-                var hold = JsonSerializer.Deserialize<SlotHoldData>(json);
-                if (hold == null)
-                {
-                    continue;
-                }
-
-                var holdEndTime = hold.StartTime.Add(TimeSpan.FromMinutes(hold.EstimatedDurationMinutes));
-                if (startTime < holdEndTime && endTime > hold.StartTime)
-                {
-                    // Tìm thấy giữ chỗ bị đè của khách hàng KHÁC
-                    if (hold.CustomerId != customerId)
-                    {
-                        return hold;
-                    }
-                }
-            }
-
-            return null;
-        }
-
         public async Task<ApiResult<SlotHoldResponseDTO>> HoldSlotAsync(Guid customerId, HoldSlotRequestDTO request)
         {
             if (request.BookingItems == null || !request.BookingItems.Any())
@@ -147,179 +122,90 @@ namespace Nailify.Capstone.Infrastructure.Service
                 return new ApiErrorResult<SlotHoldResponseDTO>("Danh sách dịch vụ/mẫu nail giữ chỗ không được trống.");
             }
 
-            var durationMinutes = 0;
-            foreach (var item in request.BookingItems)
-            {
-                var itemDuration = 0;
-                if (item.NailVariantId.HasValue)
-                {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
-                    if (variant != null)
-                    {
-                        itemDuration += (variant.Duration ?? 60);
-                    }
-                }
-
-                if (item.ServiceId.HasValue)
-                {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if (service != null)
-                    {
-                        itemDuration += service.Duration;
-                    }
-                }
-
-                if (item.CustomerNailId.HasValue)
-                {
-                    var customNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(item.CustomerNailId.Value);
-                    if (customNail != null)
-                    {
-                        itemDuration += (customNail.Duration ?? 60);
-                    }
-                }
-
-                durationMinutes += itemDuration * item.Quantity;
-            }
-
-            if (durationMinutes == 0)
-            {
-                durationMinutes = 30; // Mặc định nếu tổng thời gian bằng 0
-            }
+            int durationMinutes = await CalculateTotalDuratonAysnc(request.BookingItems, request.SalonId);
 
             var endTime = request.StartTime.Add(TimeSpan.FromMinutes(durationMinutes));
 
-            // Check DB conflict
-            var conflict = await _unitOfWork.BookingRepository.HasBookingConflictAsync(request.NailArtistId, request.BookingDate, request.StartTime, endTime);
-            if (conflict)
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                return new ApiErrorResult<SlotHoldResponseDTO>("Thợ đã có lịch hẹn trong khung giờ này");
-            }
-
-            // Kiểm tra xem có khách hàng nào khác đang giữ slot đè lên khung giờ này không
-            var conflictingHold = await GetConflictingHoldAsync(request.NailArtistId, request.BookingDate, request.StartTime, endTime, customerId);
-            if (conflictingHold != null)
-            {
-                var remaining = (int)(conflictingHold.ExpiresAt - DateTime.UtcNow).TotalSeconds;
-                return new ApiErrorResult<SlotHoldResponseDTO>($"Slot đang được giữ bởi khách hàng khác. Vui lòng thử lại sau {Math.Max(remaining, 0)} giây.");
-            }
-
-            // Check if the current customer already holds this exact slot to renew/extend it
-            var slotKey = BuildSlotKey(request.NailArtistId, request.BookingDate, request.StartTime);
-            _logger.LogInformation("HoldSlotAsync: Built slotKey = {slotKey} for artistId = {artistId}, date = {date:yyyy-MM-dd}, startTime = {startTime}", slotKey, request.NailArtistId, request.BookingDate, request.StartTime);
-            var existingJson = await _cache.GetStringAsync(slotKey);
-
-            if(!string.IsNullOrEmpty(existingJson))
-            {
-                var existing = JsonSerializer.Deserialize<SlotHoldData>(existingJson);
-                if(existing != null && existing.CustomerId == customerId)
+                var artist = await _unitOfWork.NailArtistRepository.GetArtistWithLockAsync(request.NailArtistId);
+                if(artist == null || artist.Status != "Active")
                 {
-                    // Khách hàng đang giữ chỗ, gia hạn thời gian giữ chỗ
-                    var refreshExpiry = DateTime.UtcNow.AddSeconds(_config.HoldDurationSeconds);
-                    existing.ExpiresAt = refreshExpiry;
-                    existing.EstimatedDurationMinutes = durationMinutes;
-                    await SetCacheAsync(slotKey, existing);
-                    _logger.LogInformation("HoldSlotAsync: Renewed hold for key = {slotKey}, expiresAt = {expiresAt}", slotKey, refreshExpiry);
-
-                    var x = new SlotHoldResponseDTO
-                    {
-                        HoldToken = existing.HoldToken,
-                        ExpiresAt = refreshExpiry,
-                        RemainingSeconds = _config.HoldDurationSeconds,
-                        IsHeld = true
-                    };
-                    return new ApiSuccessResult<SlotHoldResponseDTO>(x, "Đã gia hạn giữ chỗ thành công");
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return new ApiErrorResult<SlotHoldResponseDTO>("Thợ nail không hoạt động hoặc không tồn tại.");
                 }
+                var isConflict = await CheckCapacityConflictInternalAsync(
+                   artist,
+                   request.BookingDate,
+                   request.StartTime,
+                   endTime,
+                   customerId,
+                   excludingHoldToken: null);
+                if (isConflict)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return new ApiErrorResult<SlotHoldResponseDTO>("Thợ đã đầy lịch trong khoảng thời gian này, vui lòng chọn giờ khác.");
+                }
+                // Đọc danh sách Holds hiện tại từ Redis
+                var redisListKey = BuildSlotKey(request.NailArtistId, request.BookingDate);
+                var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+                var existingHold = activeHolds.FirstOrDefault(x => x.CustomerId == customerId && x.StartTime == request.StartTime);
+                string holdToken;
+                var expiresAt = DateTime.UtcNow.AddSeconds(_config.HoldDurationSeconds);
+                if (existingHold != null)
+                {
+                    holdToken = existingHold.HoldToken;
+                    existingHold.ExpiresAt = expiresAt;
+                    existingHold.EstimatedDurationMinutes = durationMinutes;
+                }
+                else
+                {
+                    holdToken = Guid.NewGuid().ToString("N");
+                    var x = new SlotHoldData
+                    {
+                        CustomerId = customerId,
+                        HoldToken = holdToken,
+                        ArtistId = request.NailArtistId,
+                        SalonId = request.SalonId,
+                        BookingDate = request.BookingDate,
+                        StartTime = request.StartTime,
+                        EstimatedDurationMinutes = durationMinutes,
+                        ExpiresAt = expiresAt
+                    };
+                    activeHolds.Add(x);
+                }
+                // Lưu lại Redis
+                await SaveHoldToRedisAsync(redisListKey, activeHolds);
+
+                // Lưu token mapping
+                var tokenKey = $"{_config.KeyPrefix}:token:{holdToken}";
+                var mapping = new TokenMapping { ArtistId = request.NailArtistId, BookingDate = request.BookingDate, SlotKey = holdToken };
+                await SetCacheAsync(tokenKey, mapping, _config.HoldDurationSeconds);
+                await _unitOfWork.CommitTransactionAsync();
+                var response = new SlotHoldResponseDTO
+                {
+                    HoldToken = holdToken,
+                    ExpiresAt = expiresAt,
+                    RemainingSeconds = _config.HoldDurationSeconds,
+                    IsHeld = true
+                };
+                return new ApiSuccessResult<SlotHoldResponseDTO>(response, "Giữ chỗ thành công.");
             }
-            // Nếu không có giữ chỗ nào, tạo giữ chỗ mới
-            var holdToken = Guid.NewGuid().ToString("N");
-            var expiresAt = DateTime.UtcNow.AddSeconds(_config.HoldDurationSeconds);
-            var holdData = new SlotHoldData
+            catch (Exception ex) 
             {
-                CustomerId = customerId,
-                HoldToken = holdToken,
-                ArtistId = request.NailArtistId,
-                SalonId = request.SalonId,
-                BookingDate = request.BookingDate,
-                StartTime = request.StartTime,
-                EstimatedDurationMinutes = durationMinutes,
-                ExpiresAt = expiresAt
-            };
-           
-            await SetCacheAsync(slotKey, holdData);
-            _logger.LogInformation("HoldSlotAsync: Created hold for key = {slotKey}, holdToken = {holdToken}, expiresAt = {expiresAt}", slotKey, holdToken, expiresAt);
-            // Tạo mapping từ holdToken ngược lại slotKey
-            await SetCacheAsync($"{_config.KeyPrefix}:token:{holdToken}", new TokenMapping { SlotKey = slotKey }, _config.HoldDurationSeconds);
-
-            var response = new SlotHoldResponseDTO
-            {
-                HoldToken = holdToken,
-                ExpiresAt = expiresAt,
-                RemainingSeconds = _config.HoldDurationSeconds,
-                IsHeld = true
-            };
-
-            return new ApiSuccessResult<SlotHoldResponseDTO>(response, "Giữ chỗ thành công");
+                await _unitOfWork.RollbackTransactionAsync();
+                _logger.LogError(ex, "Lỗi xảy ra trong quá trình HoldSlotAsync");
+                return new ApiErrorResult<SlotHoldResponseDTO>("Có lỗi hệ thống xảy ra khi giữ chỗ.");
+            }
         }
 
         public async Task<bool> IsSlotHeldAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime)
         {
-            _logger.LogInformation("IsSlotHeldAsync: Checking slot for artistId = {artistId}, date = {date:yyyy-MM-dd}, startTime = {startTime}, endTime = {endTime}", artistId, date, startTime, endTime);
-            var maxDuration = TimeSpan.FromHours(4);
-            var checkStart = startTime - maxDuration;
-            if (checkStart < TimeSpan.Zero)
-            {
-                checkStart = TimeSpan.Zero;
-            }
-
-            var startMinutes = (int)checkStart.TotalMinutes;
-            if (startMinutes % 30 != 0)
-            {
-                startMinutes = (startMinutes / 30) * 30;
-            }
-            checkStart = TimeSpan.FromMinutes(startMinutes);
-
-            var stepTimes = new List<TimeSpan>();
-            var current = checkStart;
-            while (current < endTime)
-            {
-                stepTimes.Add(current);
-                current = current.Add(TimeSpan.FromMinutes(30));
-            }
-
-            var stepKeys = stepTimes.Select(t => BuildSlotKey(artistId, date, t)).ToList();
-            _logger.LogInformation("IsSlotHeldAsync: Generated {count} step keys to check: {keys}", stepKeys.Count, string.Join(", ", stepKeys));
-            
-            var fetchTasks = stepKeys.Select(k => _cache.GetStringAsync(k)).ToList();
-            var jsonResults = await Task.WhenAll(fetchTasks);
-
-            for (int i = 0; i < stepKeys.Count; i++)
-            {
-                var key = stepKeys[i];
-                var json = jsonResults[i];
-
-                if (string.IsNullOrEmpty(json))
-                {
-                    _logger.LogInformation("IsSlotHeldAsync: Key = {key} is empty in cache", key);
-                    continue;
-                }
-
-                _logger.LogInformation("IsSlotHeldAsync: Key = {key} found in cache with value: {json}", key, json);
-                var hold = JsonSerializer.Deserialize<SlotHoldData>(json);
-                if (hold == null)
-                {
-                    continue;
-                }
-
-                var holdEndTime = hold.StartTime.Add(TimeSpan.FromMinutes(hold.EstimatedDurationMinutes));
-                if (startTime < holdEndTime && endTime > hold.StartTime)
-                {
-                    _logger.LogInformation("IsSlotHeldAsync: Slot is HELD! Conflict found with hold starting at {start} (duration {duration} mins) ending at {end}", hold.StartTime, hold.EstimatedDurationMinutes, holdEndTime);
-                    return true;
-                }
-            }
-
-            _logger.LogInformation("IsSlotHeldAsync: Slot is NOT held. No conflict found.");
-            return false;
+            var redisListKey = BuildSlotKey(artistId, date);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+            return activeHolds.Any(x => x.StartTime < endTime
+                                   && x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes)) > startTime);
         }
 
         public async Task<ApiResult<bool>> ReleaseSlotAsync(Guid customerId, string holdToken)
@@ -336,6 +222,35 @@ namespace Nailify.Capstone.Infrastructure.Service
             if(mapping == null)
             {
                 return new ApiErrorResult<bool>("Mã giữ chỗ không hợp lệ");
+            }
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                await _unitOfWork.NailArtistRepository.GetArtistWithLockAsync(mapping.ArtistId);
+
+                var redisListKey = BuildSlotKey(mapping.ArtistId, mapping.BookingDate);
+                var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+
+                var holdToRemove = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
+                if(holdToRemove != null)
+                {
+                    if(holdToRemove.CustomerId != customerId)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new ApiErrorResult<bool>("Bạn không có quyền giải phóng giữ chỗ này.");
+                    }
+                    activeHolds.Remove(holdToRemove);
+                    await SaveHoldToRedisAsync(redisListKey, activeHolds);
+                }
+
+                await _cache.RemoveAsync(tokenKey);
+                await _unitOfWork.CommitTransactionAsync();
+                return new ApiResult<bool>(true, "Đã hủy giữ chỗ thành công.");
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
             var holdJson = await _cache.GetStringAsync(mapping.SlotKey);
             if (!string.IsNullOrEmpty(holdJson))
@@ -364,17 +279,12 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 return false;
             }
+            var redistListKey = BuildSlotKey(mapping.ArtistId, mapping.BookingDate);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redistListKey);
 
-            var holdJson = await _cache.GetStringAsync(mapping.SlotKey);
-            if (string.IsNullOrEmpty(holdJson))
-            {
-                return false;
-            }
-
-            var response = JsonSerializer.Deserialize<SlotHoldData>(holdJson);
+            var response = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
             return response != null 
                 && response.CustomerId == customerId 
-                && response.HoldToken == holdToken
                 && response.ArtistId == artistId
                 && response.BookingDate.Date == date.Date
                 && response.StartTime == startTime;
@@ -383,8 +293,8 @@ namespace Nailify.Capstone.Infrastructure.Service
         /// Tạo chuỗi Key duy nhất để định danh slot trên Redis.
         /// Định dạng: slot_hold:{artistId}:{yyyyMMdd}:{hhmm}
         /// </summary>
-        private string BuildSlotKey(Guid artistId, DateTime date, TimeSpan startTime)
-            => $"{_config.KeyPrefix}:{artistId}:{date:yyyyMMdd}:{startTime:hhmm}";
+        private string BuildSlotKey(Guid artistId, DateTime date)
+            => $"{_config.KeyPrefix}:list:{artistId}:{date:yyyyMMdd}";
         /// <summary>
         /// Chuyển đổi Object sang JSON và lưu vào Redis kèm thời gian hết hạn tự động (TTL).
         /// </summary>
@@ -401,6 +311,129 @@ namespace Nailify.Capstone.Infrastructure.Service
 
             await _cache.SetStringAsync(key, json, options);
         }
+        private async Task<int> CalculateTotalDuratonAysnc(IEnumerable<BookingItemRequestDTO> items, Guid salonId)
+        {
+            var durationMinutes = 0;
+            foreach (var x in items)
+            {
+                var itemDuration = 0;
+                if (x.NailVariantId.HasValue)
+                {
+                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
+                    if (variant != null)
+                    {
+                        itemDuration += (variant.Duration ?? 60);
+                    }
+                }
+
+                if (x.ServiceId.HasValue)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(x.ServiceId.Value);
+                    if (service != null)
+                    {
+                        itemDuration += service.Duration;
+                    }
+                }
+
+                if (x.CustomerNailId.HasValue)
+                {
+                   var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(x.CustomerNailId.Value, salonId);
+                   if(customNailRequest != null && customNailRequest.Duration.HasValue)
+                    {
+                        itemDuration += customNailRequest.Duration.Value;
+                    }
+                    else
+                    {
+                        var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(x.CustomerNailId.Value);
+                        if(customerNail != null)
+                        {
+                            itemDuration += (customerNail.Duration ?? 60);
+                        }
+                    }
+                }
+
+                durationMinutes += itemDuration * x.Quantity;
+            }
+            return durationMinutes == 0 ? 30 : durationMinutes;
+        }
+        private async Task SaveHoldToRedisAsync(string redisListKey, List<SlotHoldData> holds)
+        {
+            var json = JsonSerializer.Serialize(holds);
+            var options = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24) // Hết hạn sau 24h
+            };
+            await _cache.SetStringAsync(redisListKey, json, options);
+        }
+        private async Task<List<SlotHoldData>> GetActiveHoldsFromRedisAsync(string redisListKey)
+        {
+            var json = await _cache.GetStringAsync(redisListKey);
+            if (string.IsNullOrEmpty(json)) return new List<SlotHoldData>();
+            var list = JsonSerializer.Deserialize<List<SlotHoldData>>(json) ?? new List<SlotHoldData>();
+            return list.Where(h => h.ExpiresAt > DateTime.UtcNow).ToList();
+        }
+        private async Task<bool> CheckCapacityConflictInternalAsync(
+            NailArtist artist, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid customerId, string? excludingHoldToken)
+        {
+            int capacity = artist.ConcurrentCapacity;
+            // 1. Lấy tất cả bookings từ DB
+            var dbBookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAndDateAsync(artist.NailArtistId, date);
+            var overlappingBookings = dbBookings
+                .Where(x => x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime)
+                .ToList();
+            // 2. Lấy holds từ Redis
+            var redisListKey = BuildSlotKey(artist.NailArtistId, date);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+            var overlappingHolds = activeHolds
+                                   .Where(h => h.CustomerId != customerId
+                                          && (excludingHoldToken == null || h.HoldToken != excludingHoldToken)
+                                          && h.StartTime < endTime
+                                          && h.StartTime.Add(TimeSpan.FromMinutes(h.EstimatedDurationMinutes)) > startTime)
+                                   .ToList();
+            // 2.5. Lấy danh sách hàng chờ đang ở trạng thái Notified (Đang có 15 phút xác nhận)
+            var activeNotifiedWaitlists = await _unitOfWork.BookingWaitlistRepository.GetActiveNotifiedWaitlistsAsync(artist.NailArtistId, date);
+            var overlappingWaitlists = activeNotifiedWaitlists
+                .Where(x => x.RequestedStartTime < endTime
+                         && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > startTime)
+                .ToList();
+
+            // 3. Quét các điểm mốc (Test Points)
+            var testPoints = new List<TimeSpan> { startTime };
+            foreach (var x in overlappingBookings)
+            {
+                if (x.StartTime > startTime && x.StartTime < endTime)
+                {
+                    testPoints.Add(x.StartTime);
+                }
+            }
+            foreach (var x in overlappingHolds)
+            {
+                if (x.StartTime > startTime && x.StartTime < endTime)
+                {
+                    testPoints.Add(x.StartTime);
+                }
+            }
+            foreach (var w in overlappingWaitlists)
+            {
+                if (w.RequestedStartTime > startTime && w.RequestedStartTime < endTime)
+                {
+                    testPoints.Add(w.RequestedStartTime);
+                }
+            }
+            // 4. Đếm số lượng trùng lặp tại các điểm mốc
+            foreach (var t in testPoints)
+            {
+                int dbCount = overlappingBookings.Count(x => x.StartTime <= t && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > t);
+                int holdCount = overlappingHolds.Count(x => x.StartTime <= t && x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes)) > t);
+                int waitlistCount = overlappingWaitlists.Count(x => x.RequestedStartTime <= t && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > t);
+                if (dbCount + holdCount +waitlistCount >= capacity)
+                {
+                    return true; // Hết chỗ
+                }
+            }
+            return false;
+        }
+
         /// <summary>
         /// Cấu trúc dữ liệu chi tiết của một slot giữ chỗ (dùng để lưu xuống Redis dưới dạng JSON).
         /// </summary>
@@ -421,6 +454,8 @@ namespace Nailify.Capstone.Infrastructure.Service
         /// </summary>
         private class TokenMapping
         {
+            public Guid ArtistId { get; set; }
+            public DateTime BookingDate { get; set; }
             public string SlotKey { get; set; } = string.Empty;
         }
     }
