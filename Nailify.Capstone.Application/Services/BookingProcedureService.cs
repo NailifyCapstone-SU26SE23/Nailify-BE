@@ -55,16 +55,31 @@ namespace Nailify.Capstone.Application.Services
             if (procedure.StepOrder > 1)
             {
                 var allProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingItemIdAsync(procedure.BookingItemId);
-                var prevProcedure = allProcedures.FirstOrDefault(p => p.StepOrder == procedure.StepOrder - 1);
-
-                if (prevProcedure != null && prevProcedure.Status != BookingProcedureStatus.Completed)
+                var blockingProcedures = allProcedures.Where(x => x.StepOrder < procedure.StepOrder && x.IsRequired && !x.CanOverlap)
+                    .ToList();
+                foreach (var x in blockingProcedures)
                 {
-                    return new ApiErrorResult<BookingProcedureResponseDTO>($"Không thể bắt đầu bước này. Bước trước đó '{prevProcedure.ProcedureName}' chưa hoàn thành.");
+                    if (x.Status != BookingProcedureStatus.Completed && x.Status != BookingProcedureStatus.Skipped)
+                    {
+                        if (x.Status == BookingProcedureStatus.InProgress && x.ActualStartTime.HasValue)
+                        {
+                            var activeTime = DateTime.UtcNow - x.ActualStartTime.Value;
+                            if (activeTime.TotalMinutes >= x.ActiveDuration)
+                            {
+                                // Đã làm xong phần active, khách đang ngồi ngâm/chờ gel khô -> không block bước tiếp theo
+                                continue;
+                            }
+                        }
+                        return new ApiErrorResult<BookingProcedureResponseDTO>(
+              $"Không thể bắt đầu bước này. Bước trước đó '{x.ProcedureName}' chưa hoàn thành hoặc chưa kết thúc phần việc thợ cần thao tác.");
+                    }
                 }
             }
 
             procedure.Status = BookingProcedureStatus.InProgress;
-            procedure.CompletedById = artistId;
+            procedure.CompletedById = null;
+            procedure.AssignedArtistId = artistId;
+            procedure.ActualStartTime = DateTime.UtcNow;
             procedure.CompletedAt = null;
 
             _unitOfWork.BookingProcedureRepository.Update(procedure);
@@ -76,29 +91,79 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<BookingProcedureResponseDTO>(response, "Nhận công đoạn thành công. Hãy bắt đầu phục vụ.");
         }
 
-        public async Task<ApiResult<bool>> DuplicateProceduresForBookingItemAsync(Guid bookingItemId, int nailVariantId)
+        public async Task DuplicateProceduresForBookingItemAsync(BookingItem item)
         {
-            var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(nailVariantId);
-            if (!activeNailProcedures.Any())
+            if (item.NailVariantId.HasValue)
             {
-                return new ApiSuccessResult<bool>(false, "Không tìm thấy cấu hình quy trình mẫu cho biến thể nail này.");
-            }
-            foreach (var y in activeNailProcedures)
-            {
-                var x = new BookingProcedure
+                var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
+                foreach (var x in activeNailProcedures.OrderBy(x => x.StepOrder))
                 {
-                    BookingItemId = bookingItemId,
-                    ProcedureId = y.ProcedureId,
-                    ProcedureName = y.Procedure.Name,
-                    Description = y.Procedure.Description,
-                    StepOrder = y.StepOrder,
-                    Status = BookingProcedureStatus.Pending,
-                    IsRequired = y.Procedure.IsRequired
-                };
-                await _unitOfWork.BookingProcedureRepository.CreateAsync(x);
-                await _unitOfWork.SaveChangesAsync();
+                    var bookingProcedure = new BookingProcedure
+                    {
+                        BookingItemId = item.BookingItemId,
+                        ProcedureId = x.ProcedureId,
+                        ProcedureName = x.Procedure.Name,
+                        StepOrder = x.StepOrder,
+                        Duration = x.Procedure.Duration ?? 0,
+                        ActiveDuration = x.Procedure.ActiveDuration,
+                        PassiveDuration = x.Procedure.PassiveDuration,
+                        CanOverlap = x.Procedure.CanOverlap,
+                        IsRequired = x.Procedure.IsRequired,
+                        Status = BookingProcedureStatus.Pending
+                    };
+                    await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
+                }
             }
-            return new ApiSuccessResult<bool>(true, "Sao chép quy trình thành công.");
+
+            else if (item.ServiceId.HasValue)
+            {
+                var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                if (service != null)
+                {
+                    var bookingProcedure = new BookingProcedure
+                    {
+                        BookingItemId = item.BookingItemId,
+                        ProcedureName = service.Name,
+                        StepOrder = 1,
+                        Duration = service.Duration,
+                        ActiveDuration = service.Duration,
+                        PassiveDuration = 0,
+                        CanOverlap = false,
+                        IsRequired = true,
+                        Status = BookingProcedureStatus.Pending
+                    };
+                    await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
+                }
+            }
+
+            else if (item.CustomerNailId.HasValue)
+            {
+                var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                int duration = 60;
+
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetAnyApprovedRequestAsync(item.CustomerNailId.Value);
+                if (customNailRequest != null && customNailRequest.Duration.HasValue)
+                {
+                    duration = customNailRequest.Duration.Value;
+                }
+                else if (customNail != null)
+                {
+                    duration = customNail.Duration ?? 60;
+                }
+                var bookingProcedure = new BookingProcedure
+                {
+                    BookingItemId = item.BookingItemId,
+                    ProcedureName = customNail?.Name ?? "Mẫu móng custom",
+                    StepOrder = 1,
+                    Duration = duration,
+                    ActiveDuration = duration,
+                    PassiveDuration = 0,
+                    CanOverlap = false,
+                    IsRequired = true,
+                    Status = BookingProcedureStatus.Pending
+                };
+                await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
+            }
         }
 
         public async Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingItemIdAsync(Guid bookingItemId)
@@ -125,17 +190,22 @@ namespace Nailify.Capstone.Application.Services
             if (status == BookingProcedureStatus.Completed)
             {
                 existbooking.CompletedAt = DateTime.UtcNow;
+                existbooking.ActualEndTime = DateTime.UtcNow;
                 existbooking.CompletedById = artistId;
             }
             else if (status == BookingProcedureStatus.InProgress)
             {
                 existbooking.CompletedAt = null;
-                existbooking.CompletedById = artistId;
+                existbooking.ActualStartTime = DateTime.UtcNow; // Ghi nhận thời gian thực tế bắt đầu
+                existbooking.AssignedArtistId = artistId;
+                existbooking.CompletedById = null;
             }
             else
             {
                 existbooking.CompletedAt = null;
                 existbooking.CompletedById = null;
+                existbooking.ActualStartTime = null;
+                existbooking.ActualEndTime = null;
             }
             _unitOfWork.BookingProcedureRepository.Update(existbooking);
             await _unitOfWork.SaveChangesAsync();

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -44,10 +44,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpPost("{id}/confirm")]
         [ProducesResponseType(typeof(ApiResult<WaitlistResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Confirm(Guid id)
+        public async Task<IActionResult> Confirm(Guid id, [FromBody] ConfirmWaitlistRequestDTO request)
         {
             var customerId = GetCurrentUserId();
-            var result = await _waitlistService.ConfirmWaitlistAsync(id, customerId);
+            var result = await _waitlistService.ConfirmWaitlistAsync(id, customerId, request);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
 
@@ -63,6 +63,21 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var customerId = GetCurrentUserId();
             var result = await _waitlistService.CancelWaitlistAsync(id, customerId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        /// <summary>
+        /// Lấy tất cả lượt đăng ký hàng chờ đang hoạt động của khách hàng hiện tại.
+        /// </summary>
+        /// <returns>Danh sách hàng chờ đang hoạt động của khách hàng.</returns>
+        [HttpGet("me")]
+        [Authorize(Roles = "Customer")]
+        [ProducesResponseType(typeof(ApiResult<List<WaitlistResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetMyWaitlists()
+        {
+            var customerId = GetCurrentUserId();
+            var result = await _waitlistService.GetMyWaitlistsAsync(customerId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
 

@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +16,17 @@ namespace Nailify.Capstone.Domain.Entities
         public string? Description { get; set; }
         public int StepOrder { get; set; }
         public BookingProcedureStatus Status { get; set; } = BookingProcedureStatus.Pending;
+        // New snapshot fields
+        public int Duration { get; set; }
+        public int ActiveDuration { get; set; }
+        public int PassiveDuration { get; set; }
+        public bool CanOverlap { get; set; }
+        // New scheduling fields
+        public TimeSpan? EstimatedStartTime { get; set; }
+        public TimeSpan? EstimatedEndTime { get; set; }
+        public DateTime? ActualStartTime { get; set; }
+        public DateTime? ActualEndTime { get; set; }
+        public Guid? AssignedArtistId { get; set; }
         public DateTime? CompletedAt { get; set; }
         public Guid? CompletedById { get; set; }
         public bool IsRequired { get; set; } = true;
@@ -23,5 +34,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual BookingItem BookingItem { get; set; } = null!;
         public virtual Procedure? Procedure { get; set; }
         public virtual NailArtist? CompletedBy { get; set; }
+        public virtual NailArtist? AssignedArtist { get; set; }
     }
 }

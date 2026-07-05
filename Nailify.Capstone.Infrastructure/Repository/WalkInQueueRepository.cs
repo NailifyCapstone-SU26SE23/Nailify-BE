@@ -36,14 +36,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return maxPos + 1;
         }
 
-        public async Task<IEnumerable<WalkInQueue>> GetTodayQueueAsync(Guid salonId)
+        public async Task<IEnumerable<WalkInQueue>> GetTodayQueueAsync(Guid salonId, bool trackChanges = false)
         {
             var today = DateTime.UtcNow.Date;
             return await FindByCondition(x => x.SalonId == salonId 
-                                         && x.ArrivalTime.Date == today)
+                                         && x.ArrivalTime.Date == today,
+                                         trackChanges)
                          .Include(x => x.Customer)
                          .Include(x => x.AssignedNailArtist)
-                         .Include(x => x.QueuePosition)
                          .ToListAsync();
         }
         public async Task<IEnumerable<WalkInQueue>> GetActiveWaitingEntriesAsync(Guid salonId, Guid? assignedNailArtistId,bool trackChanges = false)

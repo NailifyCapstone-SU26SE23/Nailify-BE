@@ -14,7 +14,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// </summary>
         /// <param name="salonId">ID của salon</param>
         /// <returns>Danh sách các khách hàng trong hàng đợi hôm nay</returns>
-        Task<IEnumerable<WalkInQueue>> GetTodayQueueAsync(Guid salonId);
+        Task<IEnumerable<WalkInQueue>> GetTodayQueueAsync(Guid salonId, bool trackChanges = false);
         /// <summary>
         /// Lấy vị trí tiếp theo trong hàng đợi cho một salon cụ thể.
         /// </summary>

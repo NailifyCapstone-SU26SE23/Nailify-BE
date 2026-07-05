@@ -49,6 +49,7 @@ namespace Nailify.Capstone.Infrastructure
         private IBookingWaitlistRepository? _bookingWaitlistRepository;
         private IWalkInQueueRepository? _walkInQueueRepository;
         private ITransactionRepository? _transactionRepository;
+        private IChairRepository? _chairRepository;
 
         public UnitOfWork(NailifyDbContext context)
         {
@@ -106,6 +107,7 @@ namespace Nailify.Capstone.Infrastructure
 
         public IWalkInQueueRepository WalkInQueueRepository => _walkInQueueRepository ??= new WalkInQueueRepository(_context);
         public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
+        public IChairRepository ChairRepository => _chairRepository ??= new ChairRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {
@@ -120,6 +122,10 @@ namespace Nailify.Capstone.Infrastructure
 
         public async Task BeginTransactionAsync()
         {
+            if (_context.Database.CurrentTransaction != null)
+            {
+                return;
+            }
             _transaction = await _context.Database.BeginTransactionAsync();
         }
         public async Task CommitTransactionAsync()

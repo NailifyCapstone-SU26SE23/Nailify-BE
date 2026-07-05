@@ -19,6 +19,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string SalonName { get; set; } = string.Empty;
         public Guid? NailArtistId { get; set; }
         public string ArtistName { get; set; } = string.Empty;
+        public Guid? ChairId { get; set; }
+        public string ChairName { get; set; } = string.Empty;
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public decimal? Price { get; set; }
@@ -44,6 +46,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                 .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.User.FirstName + " " + src.Customer.User.LastName))
                 .ForMember(dest => dest.SalonName, opt => opt.MapFrom(src => src.Salon.Name))
                 .ForMember(dest => dest.ArtistName, opt => opt.MapFrom(src => src.NailArtist != null ? src.NailArtist.Account.FirstName + " " + src.NailArtist.Account.LastName : "Chưa chỉ định"))
+                .ForMember(dest => dest.ChairName, opt => opt.MapFrom(src => src.Chair != null ? src.Chair.ChairName : "Chưa chỉ định"))
                 .ForMember(dest => dest.BookingItems, opt => opt.MapFrom(src => src.BookingItems))
                 .ForMember(dest => dest.Discounts, opt => opt.MapFrom(src => src.BookingDiscounts
                     .Select(discount => new SimpleDiscountDto

@@ -17,6 +17,8 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.WaitlistRequestDTOs
         public DateTime RequestedDate { get; set; }
         public TimeSpan RequestedStartTime { get; set; }
         public int EstimatedDuration { get; set; }
+        public List<WaitlistItemRequestDTO> WaitlistItems { get; set; } = new();
+
         public void Mapping(Profile profile)
         {
             profile.CreateMap<JoinWaitlistRequestDTO, BookingWaitlist>()

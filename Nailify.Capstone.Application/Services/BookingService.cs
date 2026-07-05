@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -22,7 +23,9 @@ namespace Nailify.Capstone.Application.Services
         private readonly ISlotHoldService _slotHoldService;
         private readonly IPromotionService _promotionService;
         private readonly ILogger<BookingService> _logger;
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, ILogger<BookingService> logger)
+        private readonly IBookingSchedulingService _bookingSchedulingService;
+        private readonly IWalkInQueueService _queueService;
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, ILogger<BookingService> logger, IBookingSchedulingService bookingSchedulingService, IWalkInQueueService queueService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -33,6 +36,8 @@ namespace Nailify.Capstone.Application.Services
             _slotHoldService = slotHoldService;
             _promotionService = promotionService;
             _logger = logger;
+            _bookingSchedulingService = bookingSchedulingService;
+            _queueService = queueService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -126,8 +131,37 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.BookingRepository.Update(booking);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
+            if (booking.IsLateArrival)
+            {
+                var originalArtistId = booking.NailArtistId;
+                booking.NailArtistId = null;
+
+                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
+                foreach (var proc in procedures)
+                {
+                    proc.AssignedArtistId = null;
+                    _unitOfWork.BookingProcedureRepository.Update(proc);
+                }
+
+                _unitOfWork.BookingRepository.Update(booking);
+                await _unitOfWork.SaveChangesAsync();
+                var addToQueueRequest = new AddToQueueRequestDTO
+                {
+                    SalonId = booking.SalonId,
+                    CustomerId = booking.CustomerId,
+                    OriginalBookingId = booking.BookingId,
+                    GuestName = $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}",
+                    GuestPhone = booking.Customer.User.Phone,
+                    RequestNote = "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ.",
+                    AssignedNailArtistId = originalArtistId
+                };
+
+                await _queueService.AddToQueueAsync(actorId, addToQueueRequest);
+            }
             var response = _mapper.Map<BookingResponseDTO>(booking);
-            return new ApiSuccessResult<BookingResponseDTO>(response, "Khách hàng Check-in thành công.");
+            return new ApiSuccessResult<BookingResponseDTO>(response, booking.IsLateArrival
+                            ? "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ."
+                            : "Khách hàng Check-in thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> CheckOutBookingAsync(CheckOutRequestDTO request, Guid actorId)
@@ -295,13 +329,17 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
                     // 3. Kiểm tra xem có bị xung đột Capacity thực tế không
-                    var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
-                    var isConflict = await CheckCapacityConflictInternalAsync(
-                                           request.NailArtistId.Value,
-                                           artist.ConcurrentCapacity,
-                                           request.BookingDate,
-                                           request.StartTime,
-                                           targetEndTime);
+                    var mockProcedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(
+                        request.BookingItems.ToList(),
+                        request.SalonId);
+                    var timeline = _bookingSchedulingService.BuildProcedureTimeline(
+                        mockProcedures,
+                        request.StartTime);
+                    var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                        request.NailArtistId.Value,
+                        request.BookingDate,
+                        timeline,
+                        artist.ConcurrentCapacity);
                     if (isConflict)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
@@ -334,12 +372,34 @@ namespace Nailify.Capstone.Application.Services
                 // Tạo các quy trình (Procedures) mặc định cho booking
                 foreach (var item in booking.BookingItems)
                 {
-                    if (item.NailVariantId.HasValue)
-                    {
-                        await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item.BookingItemId, item.NailVariantId.Value);
-                    }
+                    /* if (item.NailVariantId.HasValue)
+                    { */
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
+                    //}
                 }
                 await _unitOfWork.SaveChangesAsync();
+
+                // Tính toán timeline và gán ngay lập tức nếu đã chọn thợ
+                if (booking.NailArtistId.HasValue)
+                {
+                    var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
+                    if (procedures.Any())
+                    {
+                        var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                        foreach (var segment in timeline)
+                        {
+                            var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                            procedure.EstimatedStartTime = segment.StartTime;
+                            procedure.EstimatedEndTime = segment.EndTime;
+                            if (procedure.ActiveDuration > 0)
+                            {
+                                procedure.AssignedArtistId = booking.NailArtistId.Value;
+                            }
+                            _unitOfWork.BookingProcedureRepository.Update(procedure);
+                        }
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                }
                 // Commit Transaction thành công giải phóng khóa dòng
                 await _unitOfWork.CommitTransactionAsync();
                 var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
@@ -369,44 +429,140 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<ArtistAvailabilityResponseDTO>("Thợ nail không có lịch làm việc trong ngày này.");
             }
 
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAndDateAsync(request.NailArtistId, request.BookingDate);
-
-            var busySlots = bookings.Select(x => new BusyTimeSlotResponseDto
+            var mockProcedures = new List<BookingProcedure>();
+            int tempStepOrder = 1;
+            if (request.BookingItems != null)
             {
-                StartTime = x.StartTime,
-                EndTime = x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration))
-            })
-            .OrderBy(x => x.StartTime)
-            .ToList();
+                foreach (var item in request.BookingItems)
+                {
+                    if (item.NailVariantId.HasValue)
+                    {
+                        var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
+                        foreach (var x in activeNailProcedures)
+                        {
+                            mockProcedures.Add(new BookingProcedure
+                            {
+                                BookingProcedureId = Guid.NewGuid(),
+                                StepOrder = tempStepOrder++,
+                                Duration = x.Procedure.Duration ?? 0,
+                                ActiveDuration = x.Procedure.ActiveDuration,
+                                PassiveDuration = x.Procedure.PassiveDuration,
+                                CanOverlap = x.Procedure.CanOverlap
+                            });
+                        }
+                    }
+                    // 3.2. Nếu là dịch vụ lẻ
+                    if (item.ServiceId.HasValue)
+                    {
+                        var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                        if (service != null)
+                        {
+                            mockProcedures.Add(new BookingProcedure
+                            {
+                                BookingProcedureId = Guid.NewGuid(),
+                                StepOrder = tempStepOrder++,
+                                Duration = service.Duration,
+                                ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
+                                PassiveDuration = 0,
+                                CanOverlap = false
+                            });
+                        }
+                    }
+                    if (item.CustomerNailId.HasValue)
+                    {
+                        var salonId = artist.Account.SalonId ?? Guid.Empty;
+
+                        // Tìm yêu cầu đã được duyệt báo giá để lấy thời gian thi công thực tế tại chi nhánh
+                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, salonId);
+                        int duration = 60; // Thời gian mặc định
+
+                        if (customNailRequest != null && customNailRequest.Duration.HasValue)
+                        {
+                            duration = customNailRequest.Duration.Value;
+                        }
+                        else
+                        {
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                            if (customNail != null)
+                            {
+                                duration = customNail.Duration ?? 60;
+                            }
+                        }
+                        mockProcedures.Add(new BookingProcedure
+                        {
+                            BookingProcedureId = Guid.NewGuid(),
+                            StepOrder = tempStepOrder++,
+                            Duration = duration,
+                            ActiveDuration = duration, // Mặc định custom nail thợ bận toàn bộ thời gian
+                            PassiveDuration = 0,
+                            CanOverlap = false
+                        });
+                    }
+                }
+            }
+
+            if (!mockProcedures.Any())
+            {
+                // Mặc định giả lập 1 slot 15 phút bận toàn bộ để hiển thị chính xác các slot thợ bận/giữ chỗ
+                mockProcedures.Add(new BookingProcedure
+                {
+                    BookingProcedureId = Guid.NewGuid(),
+                    StepOrder = tempStepOrder++,
+                    Duration = 15,
+                    ActiveDuration = 15,
+                    PassiveDuration = 0,
+                    CanOverlap = false
+                });
+            }
+            var existingBusySegments = await _unitOfWork.BookingProcedureRepository
+                                                        .GetArtistBusySegmentsByDateAsync(request.NailArtistId, request.BookingDate);
 
             var timeSlots = new List<TimeSlotResponseDTO>();
-            var currentStart = schedule.ShiftStart;
-            var slotInterval = TimeSpan.FromMinutes(30);
-            int capacity = artist.ConcurrentCapacity;
-            while (currentStart + slotInterval <= schedule.ShiftEnd)
+            var candidateStart = schedule.ShiftStart;
+            var interval = TimeSpan.FromMinutes(15);
+            int totalDuration = mockProcedures.Sum(x => x.Duration);
+            while (candidateStart.Add(TimeSpan.FromMinutes(totalDuration)) <= schedule.ShiftEnd)
             {
-                var currentEnd = currentStart + slotInterval;
+                // A. Tạo timeline giả lập xuất phát từ candidateStart
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcedures, candidateStart);
 
-                // Đếm số lượng lịch trùng tại slot này
-                int activeBookingsInSlot = busySlots.Count(x => currentStart < x.EndTime && currentEnd > x.StartTime);
-                bool isAvailable = activeBookingsInSlot < capacity;
+                // B. Check conflict trên các khoảng ActiveDuration > 0 của thợ
+                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                    request.NailArtistId,
+                    request.BookingDate,
+                    timeline,
+                    artist.ConcurrentCapacity
+                );
+                bool isAvailable = !isConflict;
                 bool isHeld = false;
+                // C. Nếu không conflict lịch trong DB, kiểm tra tiếp trạng thái giữ chỗ tạm thời (Redis Hold)
                 if (isAvailable)
                 {
-                    // Kiểm tra xem slot có bị ai giữ tạm thời trên Redis không
-                    isHeld = await _slotHoldService.IsSlotHeldAsync(request.NailArtistId, request.BookingDate, currentStart, currentEnd);
+                    isHeld = await _slotHoldService.IsSlotHeldAsync(
+                        request.NailArtistId,
+                        request.BookingDate,
+                        candidateStart,
+                        candidateStart.Add(TimeSpan.FromMinutes(totalDuration))
+                    );
                 }
-
                 timeSlots.Add(new TimeSlotResponseDTO
                 {
-                    StartTime = currentStart,
-                    EndTime = currentEnd,
+                    StartTime = candidateStart,
+                    EndTime = candidateStart.Add(interval),
                     IsAvailable = isAvailable && !isHeld,
                     IsHeld = isHeld
                 });
-
-                currentStart = currentEnd;
+                candidateStart = candidateStart.Add(interval);
             }
+            // 6. Map dữ liệu busySlots thực tế của thợ để hiển thị trên UI
+            var busySlots = existingBusySegments
+                .Select(x => new BusyTimeSlotResponseDto
+                {
+                    StartTime = x.ArtistBusyStart,
+                    EndTime = x.ArtistBusyEnd
+                })
+                .OrderBy(x => x.StartTime)
+                .ToList();
 
             var response = new ArtistAvailabilityResponseDTO
             {
@@ -568,12 +724,10 @@ namespace Nailify.Capstone.Application.Services
 
                 if (request.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd) continue;
 
-                var isConflict = await CheckCapacityConflictInternalAsync(
-                                       artist.NailArtistId,
-                                       artist.ConcurrentCapacity,
-                                       request.BookingDate,
-                                       request.StartTime,
-                                       targetEndTime);
+                var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), request.SalonId);
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
+                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                artist.NailArtistId, request.BookingDate, timeline, artist.ConcurrentCapacity);
                 if (isConflict) continue;
 
                 availableArtists.Add(artist);
@@ -691,16 +845,12 @@ namespace Nailify.Capstone.Application.Services
 
             if (request.NailArtistId.HasValue)
             {
-                var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
                 var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(request.NailArtistId.Value);
                 int capacity = artist?.ConcurrentCapacity ?? 1;
-                var isConflict = await CheckCapacityConflictInternalAsync(
-                                       request.NailArtistId.Value,
-                                       capacity,
-                                       request.BookingDate,
-                                       request.StartTime,
-                                       targetEndTime,
-                                       bookingId);
+                var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), booking.SalonId);
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
+                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                request.NailArtistId.Value, request.BookingDate, timeline, capacity);
                 if (isConflict)
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ đã bận, xin chọn giờ khác.");
@@ -795,9 +945,32 @@ namespace Nailify.Capstone.Application.Services
             }
             booking.Confirm(actorId);
             _unitOfWork.BookingRepository.Update(booking);
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+            if (procedures.Any() && booking.NailArtistId.HasValue)
+            {
+                // 1. Tính toán Timeline thực tế bắt đầu từ StartTime
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                // 2. Cập nhật Estimated time và gán AssignedArtist cho các công đoạn có ActiveDuration > 0
+                foreach (var segment in timeline)
+                {
+                    var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+
+                    procedure.EstimatedStartTime = segment.StartTime;
+                    procedure.EstimatedEndTime = segment.EndTime;
+                    // Nếu công đoạn này thợ cần thao tác (ActiveDuration > 0), gán AssignedArtistId
+                    if (procedure.ActiveDuration > 0)
+                    {
+                        procedure.AssignedArtistId = booking.NailArtistId.Value;
+                    }
+
+                    _unitOfWork.BookingProcedureRepository.Update(procedure);
+                }
+            }
             await _unitOfWork.SaveChangesAsync();
+            /*
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
-            var response = _mapper.Map<BookingResponseDTO>(savedBooking);
+            */
+            var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt đơn đặt lịch thành công.");
         }
 
@@ -808,7 +981,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
-
+            /*
             booking.Status = BookingStatus.CheckedIn;
             booking.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRepository.Update(booking);
@@ -825,6 +998,41 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Checkin lịch hẹn thành công.");
+            */
+            booking.CheckInWithoutImage(actorId);
+            _unitOfWork.BookingRepository.Update(booking);
+            await _unitOfWork.SaveChangesAsync();
+            if (booking.IsLateArrival)
+            {
+                var originalArtistId = booking.NailArtistId;
+                booking.NailArtistId = null;
+
+                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
+                foreach (var proc in procedures)
+                {
+                    proc.AssignedArtistId = null;
+                    _unitOfWork.BookingProcedureRepository.Update(proc);
+                }
+
+                _unitOfWork.BookingRepository.Update(booking);
+                await _unitOfWork.SaveChangesAsync();
+                var addToQueueRequest = new AddToQueueRequestDTO
+                {
+                    SalonId = booking.SalonId,
+                    CustomerId = booking.CustomerId,
+                    OriginalBookingId = booking.BookingId,
+                    GuestName = $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}",
+                    GuestPhone = booking.Customer.User.Phone,
+                    RequestNote = "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ.",
+                    AssignedNailArtistId = originalArtistId 
+                };
+
+                await _queueService.AddToQueueAsync(actorId, addToQueueRequest);
+            }
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, booking.IsLateArrival
+                ? "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ."
+                : "Checkin lịch hẹn thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
@@ -1177,6 +1385,34 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin thợ.");
             }
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+            if (procedures.Any())
+            {
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                    request.StaffArtistId,
+                    booking.BookingDate,
+                    timeline,
+                    artist.ConcurrentCapacity
+                );
+                if (isConflict)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>($"Thợ {artist.Account.FirstName} đã bị trùng hoặc quá tải lịch làm việc trong khung giờ này.");
+                }
+
+                // Cập nhật gán thợ và timeline cho các bước con
+                foreach (var segment in timeline)
+                {
+                    var proc = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                    proc.EstimatedStartTime = segment.StartTime;
+                    proc.EstimatedEndTime = segment.EndTime;
+                    if (proc.ActiveDuration > 0)
+                    {
+                        proc.AssignedArtistId = request.StaffArtistId;
+                    }
+                    _unitOfWork.BookingProcedureRepository.Update(proc);
+                }
+            }
             // Cập nhật thợ nail
             booking.ReceptionistAssignArtist(request.StaffArtistId, $"{artist.Account.FirstName} {artist.Account.LastName}", actorId);
 
@@ -1197,6 +1433,10 @@ namespace Nailify.Capstone.Application.Services
             }
             var bookingItems = booking.BookingItems.ToList();
             var targetEndTime = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
+            var procedures = await _unitOfWork.BookingProcedureRepository
+                                              .GetProceduresByBookingIdAsync(bookingId);
+            var timeline = _bookingSchedulingService.BuildProcedureTimeline(
+                procedures, booking.StartTime);
 
             // Custom: Chỉ cho phép thợ duyệt mẫu custom nhận làm
             var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
@@ -1214,12 +1454,11 @@ namespace Nailify.Capstone.Application.Services
                             var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(approvedArtist.NailArtistId, booking.BookingDate);
                             if (schedule != null && booking.StartTime >= schedule.ShiftStart && targetEndTime <= schedule.ShiftEnd)
                             {
-                              var isConflict = await CheckCapacityConflictInternalAsync(
-                                    approvedArtist.NailArtistId,
-                                    approvedArtist.ConcurrentCapacity,
-                                    booking.BookingDate,
-                                    booking.StartTime,
-                                    targetEndTime);
+                                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                                  approvedArtist.NailArtistId,
+                                  booking.BookingDate,
+                                  timeline,
+                                  approvedArtist.ConcurrentCapacity);
                                 if (!isConflict)
                                 {
                                     var singleArtistDto = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
@@ -1250,69 +1489,75 @@ namespace Nailify.Capstone.Application.Services
                 var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, booking.BookingDate);
                 if (schedule == null) continue;
                 if (booking.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd) continue;
-                var isConflict = await CheckCapacityConflictInternalAsync(
-                                       artist.NailArtistId,
-                                       artist.ConcurrentCapacity,
-                                       booking.BookingDate,
-                                       booking.StartTime,
-                                       targetEndTime);
+                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                                         artist.NailArtistId,
+                                         booking.BookingDate,
+                                         timeline,
+                                         artist.ConcurrentCapacity);
                 if (isConflict) continue;
                 availableArtists.Add(artist);
             }
             var response = _mapper.Map<List<SuggestedArtistResponseDTO>>(availableArtists);
             return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(response, "Lấy danh sách thợ rảnh cho đơn đặt lịch thành công.");
         }
-        private async Task<bool> CheckCapacityConflictInternalAsync(
-                                                         Guid artistId,
-                                                         int capacity,
-                                                         DateTime date,
-                                                         TimeSpan startTime,
-                                                         TimeSpan endTime,
-                                                         Guid? excludingBookingId = null)
+
+        public async Task<ApiResult<BookingResponseDTO>> AssignChairAsync(Guid bookingId, Guid chairId, Guid actorId)
         {
-            // 1. Lấy danh sách Bookings từ Repository
-            var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAndDateAsync(artistId, date);
-            var overlappingBookings = bookings
-                .Where(x => (excludingBookingId == null || x.BookingId != excludingBookingId.Value)
-                         && x.StartTime < endTime
-                         && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime)
-                .ToList();
-
-            // 2. Lấy danh sách BookingWaitlist từ Repository
-            var waitlists = await _unitOfWork.BookingWaitlistRepository.GetActiveNotifiedWaitlistsAsync(artistId, date);
-            var overlappingWaitlists = waitlists
-                .Where(x => x.RequestedStartTime < endTime
-                         && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > startTime)
-                .ToList();
-
-            // 3. Quét các điểm mốc bắt đầu
-            var testPoints = new List<TimeSpan> { startTime };
-            foreach (var b in overlappingBookings)
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
+            if (booking == null)
             {
-                if (b.StartTime > startTime && b.StartTime < endTime) testPoints.Add(b.StartTime);
-            }
-            foreach (var w in overlappingWaitlists)
-            {
-                if (w.RequestedStartTime > startTime && w.RequestedStartTime < endTime) testPoints.Add(w.RequestedStartTime);
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            // 4. Kiểm tra tại mỗi điểm mốc xem tổng số lượng phục vụ thực tế có vượt quá capacity không
-            foreach (var t in testPoints)
+            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Rejected)
             {
-                int activeCount = overlappingBookings.Count(x =>
-                    x.StartTime <= t && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > t);
+                return new ApiErrorResult<BookingResponseDTO>($"Không thể gán ghế cho lịch hẹn đã bị hủy hoặc từ chối.");
+            }
 
-                int waitlistCount = overlappingWaitlists.Count(x =>
-                    x.RequestedStartTime <= t && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > t);
+            var chair = await _unitOfWork.ChairRepository.GetByIdAsync(chairId);
+            if (chair == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin ghế.");
+            }
 
-                if (activeCount + waitlistCount >= capacity)
+            if (chair.SalonId != booking.SalonId)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Ghế được chọn không thuộc chi nhánh của lịch hẹn này.");
+            }
+
+            if (chair.Status != "Active")
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Ghế '{chair.ChairName}' hiện không khả dụng (Trạng thái: {chair.Status}).");
+            }
+
+            // Check if the chair is occupied during this time
+            var requestedStart = booking.StartTime;
+            var requestedEnd = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
+
+            var overlappingBookings = await _unitOfWork.BookingRepository.GetBookingsByChairAndDateAsync(chairId, booking.BookingDate);
+
+            foreach (var ob in overlappingBookings)
+            {
+                if (ob.BookingId == bookingId) continue;
+
+                var obStart = ob.StartTime;
+                var obEnd = ob.StartTime.Add(TimeSpan.FromMinutes(ob.TotalDuration));
+
+                if (obStart < requestedEnd && requestedStart < obEnd)
                 {
-                    return true; // Quá tải sức chứa
+                    return new ApiErrorResult<BookingResponseDTO>($"Ghế '{chair.ChairName}' đã được sử dụng bởi một lịch hẹn khác trong khung giờ {obStart} - {obEnd}.");
                 }
             }
 
-            return false;
-        }
+            // Assign chair
+            booking.AssignChair(chairId, chair.ChairName, actorId);
+            _unitOfWork.BookingRepository.Update(booking);
+            await _unitOfWork.SaveChangesAsync();
 
+            // Refresh booking detail for response
+            var refreshedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            var response = _mapper.Map<BookingResponseDTO>(refreshedBooking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, $"Phân bổ ghế '{chair.ChairName}' cho lịch hẹn thành công.");
+        }
     }
 }

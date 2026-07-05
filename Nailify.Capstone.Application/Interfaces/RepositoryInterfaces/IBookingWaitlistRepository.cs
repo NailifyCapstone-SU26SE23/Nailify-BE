@@ -55,7 +55,9 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// Lấy lượt hàng chờ đang hoạt động (Waiting hoặc Notified) của một khách hàng cụ thể tại Salon.
         /// </summary>
         Task<BookingWaitlist?> GetActiveWaitlistByCustomerAsync(Guid customerId, Guid salonId);
+        Task<IEnumerable<BookingWaitlist>> GetActiveWaitlistsByCustomerAsync(Guid customerId);
         Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date);
+        Task<BookingWaitlist?> GetWaitlistWithItemsAsync(Guid waitlistId);
 
     }
 }
