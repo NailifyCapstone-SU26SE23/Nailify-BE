@@ -615,9 +615,9 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<BookingItem>()
-                        .HasOne(bi => bi.CustomerNail)
+                        .HasOne(bi => bi.CustomerNailRequest)
                         .WithMany()
-                        .HasForeignKey(bi => bi.CustomerNailId)
+                        .HasForeignKey(bi => bi.CustomerNailRequestId)
                         .OnDelete(DeleteBehavior.SetNull);
 
 

@@ -95,7 +95,8 @@ namespace Nailify.Capstone.Application.Services
             {
                 variant.Price = (variant.NailShape?.Price ?? 0m)
                     + (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
+                    + variant.NailComponents.Sum(nailComponent =>
+                        nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
                 variant.Duration = (variant.NailShape?.Duration ?? 0)
                     + (variant.NailSurface?.Duration ?? 0)
                     + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
@@ -108,6 +109,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 await UpdateNailDesignPriceRangeAsync(nailDesignId);
             }
+        }
+
+        private static int GetFingerPriceMultiplier(int fingerIndex)
+        {
+            return fingerIndex == -1 ? 5 : 1;
         }
 
         private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)

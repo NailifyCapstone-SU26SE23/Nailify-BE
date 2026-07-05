@@ -118,10 +118,16 @@ namespace Nailify.Capstone.Application.Services
             if (nailVariantId.HasValue)
             {
                 var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(nailVariantId.Value);
-                componentPrice = variant?.NailComponents.Sum(nailComponent => nailComponent.Component.Price) ?? 0m;
+                componentPrice = variant?.NailComponents.Sum(nailComponent =>
+                    nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex)) ?? 0m;
             }
 
             return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+        }
+
+        private static int GetFingerPriceMultiplier(int fingerIndex)
+        {
+            return fingerIndex == -1 ? 5 : 1;
         }
 
         private async Task<int?> CalculateNailVariantDurationAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)

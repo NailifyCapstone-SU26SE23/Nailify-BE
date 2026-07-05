@@ -112,7 +112,8 @@ namespace Nailify.Capstone.Application.Services
             variant.Price =
                 (variantDetail.NailShape?.Price ?? 0m)
                 + (variantDetail.NailSurface?.Price ?? 0m)
-                + (variantDetail.NailComponents?.Sum(nailComponent => nailComponent.Component?.Price ?? 0m) ?? 0m);
+                + (variantDetail.NailComponents?.Sum(nailComponent =>
+                    (nailComponent.Component?.Price ?? 0m) * GetFingerPriceMultiplier(nailComponent.FingerIndex)) ?? 0m);
 
             variant.Duration = (variantDetail.NailShape.Duration ?? 0)
                 + (variantDetail.NailSurface.Duration ?? 0)
@@ -121,6 +122,11 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
             await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
+        }
+
+        private static int GetFingerPriceMultiplier(int fingerIndex)
+        {
+            return fingerIndex == -1 ? 5 : 1;
         }
 
         private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
