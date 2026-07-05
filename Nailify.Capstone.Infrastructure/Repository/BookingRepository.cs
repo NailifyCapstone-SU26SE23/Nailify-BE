@@ -51,7 +51,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                         x.NailArtistId == artistId
                                         && x.BookingDate >= range.start
                                         && x.BookingDate <= range.end
-                                        && x.Status != BookingStatus.Cancelled 
+                                        && x.Status != BookingStatus.Cancelled
                                         && x.Status != BookingStatus.Rejected)
                                     .ToListAsync();
         }
@@ -76,19 +76,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return await ToPagedListAsync(query, pageNumber, pageSize);
         }
-
-        public async Task<bool> HasBookingConflictAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime)
-        {
-            var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
-            return bookings.Any(x => x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
-        }
-
-        public async Task<bool> HasBookingConflictExcludingCurrentAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid currentBookingId)
-        {
-            var bookings = await GetBookingsByArtistAndDateAsync(artistId, date);
-            return bookings.Any(x => x.BookingId != currentBookingId && x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime);
-        }
-
         public async Task<PagedList<Booking>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null)
         {
             var query = BuildBookingQuery()
@@ -172,6 +159,28 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && (x.BookingDate.Date < date.Date
                                              || (x.BookingDate.Date == date.Date && x.StartTime < thresholdTime)), trackChanges)
                         .ToListAsync();
+        }
+
+        public async Task<int> CountServingBookingsAsync(Guid artistId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x => x.NailArtistId == artistId
+                                           && x.BookingDate >= range.start
+                                           && x.BookingDate <= range.end
+                                           && (x.Status == BookingStatus.CheckedIn || x.Status == BookingStatus.InProgress))
+                        .CountAsync();
+        }
+
+        public async Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x => x.NailArtistId == artistId
+                                           && x.BookingDate >= range.start
+                                           && x.BookingDate <= range.end
+                                           && x.Status == BookingStatus.Approved
+                                           && x.StartTime >= startTime
+                                           && x.StartTime <= thresholdTime)
+                        .CountAsync();
         }
 
     }

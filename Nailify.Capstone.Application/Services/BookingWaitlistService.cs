@@ -42,7 +42,8 @@ namespace Nailify.Capstone.Application.Services
                 wailist.AddDomainEvent(freedEvent);
             }
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<WaitlistResponseDTO>(wailist);
+            var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(waitlistId);
+            var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist ?? wailist);
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Hủy vị trí trong hàng chờ thành công.");
         }
 
@@ -78,22 +79,25 @@ namespace Nailify.Capstone.Application.Services
             wailist.ConvertedBookingId = booking.BookingId;
             _unitOfWork.BookingWaitlistRepository.Update(wailist);
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<WaitlistResponseDTO>(wailist);
+            var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(waitlistId);
+            var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist ?? wailist);
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Xác nhận hàng chờ thành công. Lịch hẹn chính thức đã được tạo!");
         }
 
         public async Task<ApiResult<WaitlistResponseDTO>> GetMyWaitlistAsync(Guid customerId, Guid salonId)
         {
-            var list = await _unitOfWork.BookingWaitlistRepository.GetNextWaitingEntryAsync(salonId, DateTime.UtcNow.Date, TimeSpan.Zero);
+            var list = await _unitOfWork.BookingWaitlistRepository.GetActiveWaitlistByCustomerAsync(customerId, salonId);
+            if (list == null)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>("Bạn không có lượt hàng chờ nào đang hoạt động.");
+            }
             var response = _mapper.Map<WaitlistResponseDTO>(list);
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Lấy thông tin hàng chờ thành công.");
         }
 
         public async Task<ApiResult<PagedList<WaitlistResponseDTO>>> GetSalonWaitlistAsync(Guid salonId, int pageNumber, int pageSize)
         {
-            var paged = await _unitOfWork.BookingWaitlistRepository.GetPagedAsync(
-                pageNumber, pageSize,
-                x => x.SalonId == salonId && x.Status == WaitlistStatus.Waiting);
+            var paged = await _unitOfWork.BookingWaitlistRepository.GetSalonWaitlistWithDetailsAsync(salonId, pageNumber, pageSize);
             var dtos = paged.Items.Select(x => _mapper.Map<WaitlistResponseDTO>(x)).ToList();
             var response = new PagedList<WaitlistResponseDTO>(dtos, paged.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<WaitlistResponseDTO>>(response, "Lấy danh sách hàng chờ salon thành công.");
@@ -102,15 +106,14 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<WaitlistResponseDTO>> JoinWaitlistAsync(Guid customerId, JoinWaitlistRequestDTO request)
         {
             // 1. Check duplicate waiting entry
-            var isDuplicate = await _unitOfWork.BookingWaitlistRepository.IsDuplicateAsync(customerId, request.SalonId, request.RequestedDate, request.RequestedStartTime);
+            var isDuplicate = await _unitOfWork.BookingWaitlistRepository.IsDuplicateAsync(customerId, request.SalonId, request.RequestedDate, request.RequestedStartTime, request.PreferredNailArtistId);
             if (isDuplicate)
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Bạn đã ở trong hàng chờ của khung giờ này rồi.");
             }
-            var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(request.SalonId, request.RequestedDate, request.RequestedStartTime);
+            var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(request.SalonId, request.RequestedDate, request.RequestedStartTime, request.PreferredNailArtistId);
 
             var wailist = _mapper.Map<BookingWaitlist>(request);
-            wailist.WailistId = Guid.NewGuid();
             wailist.CustomerId = customerId;
             wailist.Position = position;
             wailist.Status = WaitlistStatus.Waiting;
@@ -118,7 +121,8 @@ namespace Nailify.Capstone.Application.Services
 
             await _unitOfWork.BookingWaitlistRepository.CreateAsync(wailist);
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<WaitlistResponseDTO>(wailist);
+            var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(wailist.WailistId);
+            var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist ?? wailist);
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Đăng ký vào hàng chờ thành công.");
         }
     }

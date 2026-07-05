@@ -34,7 +34,7 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
         {
             var e = notification.DomainEvent;
 
-            var nextEntry = await _unitOfWork.BookingWaitlistRepository.GetNextWaitingEntryAsync(e.SalonId, e.BookingDate, e.StartTime);
+            var nextEntry = await _unitOfWork.BookingWaitlistRepository.GetNextWaitingEntryAsync(e.SalonId, e.BookingDate, e.StartTime, e.NailArtistId);
             if(nextEntry == null)
             {
                 return;

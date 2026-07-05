@@ -110,5 +110,18 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _queueService.MarkLeftAsync(id, actorId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
+        /// <summary>
+        /// Lễ tân đẩy một lượt chờ lên đầu hàng chờ sảnh của thợ đó để được phục vụ trước.
+        /// </summary>
+        [HttpPost("{id}/prioritize")]
+        [ProducesResponseType(typeof(ApiResult<WalkInQueueResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Prioritize(Guid id)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _queueService.PrioritizeQueueEntryAsync(id, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
     }
 }
