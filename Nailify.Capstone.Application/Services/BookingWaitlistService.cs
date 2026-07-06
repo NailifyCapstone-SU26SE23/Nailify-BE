@@ -87,7 +87,6 @@ namespace Nailify.Capstone.Application.Services
                         Quantity = x.Quantity,
                         ServiceId = x.ServiceId,
                         NailVariant = x.NailVariant,
-                        CustomerNailId = x.CustomerNailId,
                     };
                     decimal itemPrice = 0;
                     int itemDuration = 0;
@@ -97,6 +96,7 @@ namespace Nailify.Capstone.Application.Services
                         var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(x.CustomerNailId.Value, waitlist.SalonId);
                         if (customNailRequest != null)
                         {
+                            item.CustomerNailRequestId = customNailRequest.CustomerNailRequestId;
                             itemPrice += customNailRequest.Price ?? 0;
                             itemDuration += customNailRequest.Duration ?? 60;
                         }

@@ -136,12 +136,14 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
-            else if (item.CustomerNailId.HasValue)
+            else if (item.CustomerNailRequestId.HasValue)
             {
-                var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
+                var customNail = customNailRequest == null
+                    ? null
+                    : await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
                 int duration = 60;
 
-                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetAnyApprovedRequestAsync(item.CustomerNailId.Value);
                 if (customNailRequest != null && customNailRequest.Duration.HasValue)
                 {
                     duration = customNailRequest.Duration.Value;

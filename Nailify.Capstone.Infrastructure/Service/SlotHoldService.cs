@@ -410,7 +410,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     ServiceId = x.ServiceId,
                     NailVariantId = x.NailVariantId,
-                    CustomerNailId = x.CustomerNailId,
                     Quantity = x.Quantity
                 }).ToList();
                 var waitlistProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(waitlistItems, salonId);

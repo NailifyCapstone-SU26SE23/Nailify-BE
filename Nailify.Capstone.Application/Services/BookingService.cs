@@ -473,21 +473,21 @@ namespace Nailify.Capstone.Application.Services
                             });
                         }
                     }
-                    if (item.CustomerNailId.HasValue)
+                    if (item.CustomerNailRequestId.HasValue)
                     {
                         var salonId = artist.Account.SalonId ?? Guid.Empty;
 
                         // Tìm yêu cầu đã được duyệt báo giá để lấy thời gian thi công thực tế tại chi nhánh
-                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, salonId);
+                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
                         int duration = 60; // Thời gian mặc định
 
-                        if (customNailRequest != null && customNailRequest.Duration.HasValue)
+                        if (customNailRequest != null && customNailRequest.SalonId == salonId && customNailRequest.Duration.HasValue)
                         {
                             duration = customNailRequest.Duration.Value;
                         }
-                        else
+                        else if (customNailRequest != null)
                         {
-                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
                             if (customNail != null)
                             {
                                 duration = customNail.Duration ?? 60;

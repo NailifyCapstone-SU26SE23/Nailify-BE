@@ -166,18 +166,18 @@ namespace Nailify.Capstone.Application.Services
                     }
                 }
                 // 3. Nếu là mẫu móng custom (CustomerNail)
-                if (item.CustomerNailId.HasValue)
+                if (item.CustomerNailRequestId.HasValue)
                 {
-                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, salonId);
+                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
                     int duration = 60; // Mặc định
 
-                    if (customNailRequest != null && customNailRequest.Duration.HasValue)
+                    if (customNailRequest != null && customNailRequest.SalonId == salonId && customNailRequest.Duration.HasValue)
                     {
                         duration = customNailRequest.Duration.Value;
                     }
-                    else
+                    else if (customNailRequest != null)
                     {
-                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
                         if (customNail != null)
                         {
                             duration = customNail.Duration ?? 60;
