@@ -42,6 +42,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                            .ThenInclude(x => x.CustomerNail)
                                     .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
+                                    .Include(x => x.Chair)
                                     .FirstOrDefaultAsync();
 
         public async Task<IEnumerable<Booking>> GetBookingsByArtistAndDateAsync(Guid artistId, DateTime date)
@@ -54,6 +55,31 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                         && x.Status != BookingStatus.Cancelled
                                         && x.Status != BookingStatus.Rejected)
                                     .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Booking>> GetBookingsByChairAndDateAsync(Guid chairId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x =>
+                                         x.ChairId == chairId
+                                         && x.BookingDate >= range.start
+                                         && x.BookingDate <= range.end
+                                         && x.Status != BookingStatus.Cancelled
+                                         && x.Status != BookingStatus.Rejected)
+                                     .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Booking>> GetActiveBookingsWithChairsBySalonAndDateAsync(Guid salonId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x =>
+                                         x.SalonId == salonId
+                                         && x.BookingDate >= range.start
+                                         && x.BookingDate <= range.end
+                                         && x.ChairId != null
+                                         && x.Status != BookingStatus.Cancelled
+                                         && x.Status != BookingStatus.Rejected)
+                                     .ToListAsync();
         }
 
         public async Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null)

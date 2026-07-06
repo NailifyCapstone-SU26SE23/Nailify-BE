@@ -16,6 +16,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid CustomerId { get; set; }
         public Guid SalonId { get; set; }
         public Guid? NailArtistId { get; set; }
+        public Guid? ChairId { get; set; }
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public BookingStatus Status { get; set; }
@@ -40,6 +41,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }
         public virtual BookingRating? Rating { get; set; }
+        public virtual Chair? Chair { get; set; }
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
         public virtual ICollection<BookingDiscount> BookingDiscounts { get; set; } = new List<BookingDiscount>();
@@ -71,6 +73,8 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -86,6 +90,8 @@ namespace Nailify.Capstone.Domain.Entities
             Status = BookingStatus.CheckedIn;
             CheckInImageUrl = imageUrl;
             UpdatedAt = DateTime.UtcNow;
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -100,7 +106,8 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
-
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -200,6 +207,7 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.InProgress;
             UpdatedAt = DateTime.UtcNow;
+            ActualStartTime = DateTime.UtcNow;
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -219,6 +227,19 @@ namespace Nailify.Capstone.Domain.Entities
                 Status, // Trạng thái giữ nguyên
                 "ReceptionistAssignedArtist",
                 $"Tiếp tân đã chỉ định thợ {artistName} thực hiện dịch vụ cho đơn hàng.",
+                actorId
+            ));
+        }
+        public void AssignChair(Guid chairId, string chairName, Guid actorId)
+        {
+            ChairId = chairId;
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                Status, // Trạng thái giữ nguyên
+                Status, // Trạng thái giữ nguyên
+                "ChairAssigned",
+                $"Đã phân bổ ghế {chairName} cho khách hàng.",
                 actorId
             ));
         }

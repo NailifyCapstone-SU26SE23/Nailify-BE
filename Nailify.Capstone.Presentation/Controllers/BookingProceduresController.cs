@@ -7,6 +7,7 @@ using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -62,8 +63,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             return Ok(result);
         }
-        [Authorize(Roles = "NailArtist,Receptionist,Manager")]
+        /// <summary>
+        /// Thợ nail tự nhận (claim) thực hiện một bước quy trình làm móng đang chờ của khách hàng.
+        /// </summary>
+        /// <param name="procedureId">Mã định danh (ID) của bước quy trình thực tế (BookingProcedureId).</param>
+        /// <returns>Thông tin bước quy trình sau khi đã được nhận.</returns>
+        [Authorize(Roles = "Staff_Artist,Receptionist,Manager")]
         [HttpPost("procedures/{procedureId}/claim")]
+        [ProducesResponseType(typeof(ApiResult<BookingProcedureResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> ClaimProcedure(Guid procedureId)
         {
             // Lấy AccountId từ JWT Token của thợ đang đăng nhập

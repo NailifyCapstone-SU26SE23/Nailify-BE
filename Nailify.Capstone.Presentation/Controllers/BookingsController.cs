@@ -467,6 +467,28 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
+
+        /// <summary>
+        /// Tiếp tân (hoặc Quản lý) chỉ định ghế cho đơn đặt lịch.
+        /// </summary>
+        [HttpPost("{id}/assign-chair/{chairId}")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> AssignChair(Guid id, Guid chairId)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var response = await _bookingService.AssignChairAsync(id, chairId, currentUserId);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
     }
 
     public class CheckInForm

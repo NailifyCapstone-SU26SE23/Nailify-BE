@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
@@ -19,6 +20,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs
         public string? GuestName { get; set; }
         public string? GuestPhone { get; set; }
         public string? RequestNote { get; set; }
+        public List<BookingItemRequestDTO>? BookingItems { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<AddToQueueRequestDTO, WalkInQueue>()

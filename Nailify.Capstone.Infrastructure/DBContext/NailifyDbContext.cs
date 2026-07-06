@@ -56,8 +56,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<BookingDiscount> BookingDiscounts { get; set; }
         public DbSet<UserPromotionUsage> UserPromotionUsages { get; set; }
         public DbSet<BookingWaitlist> BookingWaitlists { get; set; }
+        public DbSet<WaitlistItem> WaitlistItems { get; set; }
         public DbSet<WalkInQueue> WalkInQueues { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<Chair> Chairs { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -387,6 +389,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                             v => v.ToString(),
                             v => (BookingStatus)Enum.Parse(typeof(BookingStatus), v))
                     .HasMaxLength(20);
+                entity.HasOne(b => b.Chair)
+                      .WithMany(c => c.Bookings)
+                      .HasForeignKey(b => b.ChairId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Services>(entity =>
@@ -523,6 +529,18 @@ namespace Nailify.Capstone.Infrastructure.DBContext
 
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);
+
+            modelBuilder.Entity<Chair>(entity =>
+            {
+                entity.HasKey(c => c.ChairId);
+                entity.Property(c => c.ChairName).HasMaxLength(100);
+                entity.Property(c => c.Status).HasMaxLength(30).HasDefaultValue("Active");
+
+                entity.HasOne(c => c.Salon)
+                      .WithMany(s => s.Chairs)
+                      .HasForeignKey(c => c.SalonId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
 
 
             modelBuilder.Entity<SalonOperatingHour>()
@@ -662,6 +680,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany()
                       .HasForeignKey(bp => bp.CompletedById)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(bp => bp.AssignedArtist)
+                      .WithMany()
+                      .HasForeignKey(bp => bp.AssignedArtistId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<BookingWaitlist>(entity =>
             {
@@ -731,6 +753,27 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                     .WithMany()
                     .HasForeignKey(t => t.BookingId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<WaitlistItem>(entity =>
+            {
+                entity.HasKey(wi => wi.WaitlistItemId);
+
+                entity.HasOne(wi => wi.BookingWaitlist)
+                      .WithMany(bw => bw.WaitlistItems)
+                      .HasForeignKey(wi => wi.WaitlistId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(wi => wi.Service)
+                      .WithMany()
+                      .HasForeignKey(wi => wi.ServiceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(wi => wi.NailVariant)
+                      .WithMany()
+                      .HasForeignKey(wi => wi.NailVariantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(wi => wi.CustomerNail)
+                      .WithMany()
+                      .HasForeignKey(wi => wi.CustomerNailId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             ConfigureStatusDefaults(modelBuilder);

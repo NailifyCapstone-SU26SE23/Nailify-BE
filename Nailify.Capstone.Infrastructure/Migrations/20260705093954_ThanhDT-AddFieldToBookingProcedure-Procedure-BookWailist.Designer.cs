@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705093954_ThanhDT-AddFieldToBookingProcedure-Procedure-BookWailist")]
+    partial class ThanhDTAddFieldToBookingProcedureProcedureBookWailist
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36,9 +39,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<DateTime>("BookingDate")
                         .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid?>("ChairId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("CheckInImageUrl")
                         .HasColumnType("text");
@@ -103,8 +103,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("timestamp without time zone");
 
                     b.HasKey("BookingId");
-
-                    b.HasIndex("ChairId");
 
                     b.HasIndex("CustomerId");
 
@@ -203,8 +201,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CustomerNailRequestId")
-                        .HasColumnType("uuid");
+                    b.Property<int?>("CustomerNailId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -234,7 +232,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasIndex("BookingId");
 
-                    b.HasIndex("CustomerNailRequestId");
+                    b.HasIndex("CustomerNailId");
 
                     b.HasIndex("NailVariantId");
 
@@ -308,8 +306,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("BookingProcedureId");
-
-                    b.HasIndex("AssignedArtistId");
 
                     b.HasIndex("BookingItemId");
 
@@ -494,34 +490,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasKey("CategoryTypeId");
 
                     b.ToTable("CategoryTypes");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
-                {
-                    b.Property<Guid>("ChairId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ChairName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("SalonId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("Active");
-
-                    b.HasKey("ChairId");
-
-                    b.HasIndex("SalonId");
-
-                    b.ToTable("Chairs");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Component", b =>
@@ -1834,11 +1802,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Booking", b =>
                 {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.Chair", "Chair")
-                        .WithMany("Bookings")
-                        .HasForeignKey("ChairId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -1854,8 +1817,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("SalonId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Chair");
 
                     b.Navigation("Customer");
 
@@ -1921,9 +1882,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNailRequest", "CustomerNailRequest")
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
                         .WithMany()
-                        .HasForeignKey("CustomerNailRequestId")
+                        .HasForeignKey("CustomerNailId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
@@ -1938,7 +1899,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Navigation("Booking");
 
-                    b.Navigation("CustomerNailRequest");
+                    b.Navigation("CustomerNail");
 
                     b.Navigation("NailVariant");
 
@@ -1947,11 +1908,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingProcedure", b =>
                 {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.NailArtist", "AssignedArtist")
-                        .WithMany()
-                        .HasForeignKey("AssignedArtistId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Nailify.Capstone.Domain.Entities.BookingItem", "BookingItem")
                         .WithMany("BookingProcedures")
                         .HasForeignKey("BookingItemId")
@@ -1967,8 +1923,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ProcedureId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("AssignedArtist");
 
                     b.Navigation("BookingItem");
 
@@ -2038,17 +1992,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CategoryType");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
-                        .WithMany("Chairs")
-                        .HasForeignKey("SalonId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Salon");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
@@ -2533,11 +2476,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("Promotions");
                 });
 
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
-                {
-                    b.Navigation("Bookings");
-                });
-
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Component", b =>
                 {
                     b.Navigation("NailComponents");
@@ -2618,8 +2556,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
                 {
-                    b.Navigation("Chairs");
-
                     b.Navigation("OperatingHours");
                 });
 

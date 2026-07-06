@@ -50,8 +50,8 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
-                    NameClaimType = JwtRegisteredClaimNames.Email,
-                    RoleClaimType = "role"
+                    NameClaimType = System.Security.Claims.ClaimTypes.Email,
+                    RoleClaimType = System.Security.Claims.ClaimTypes.Role
                 };
 
                 options.Events = new JwtBearerEvents
@@ -91,6 +91,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailDesignRepository, NailDesignRepository>();
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped<ISalonRepository, SalonRepository>();
+            services.AddScoped<IChairRepository, ChairRepository>();
             services.AddScoped<INailArtistRepository, NailArtistRepository>();
             services.AddScoped<IScheduleRepository, ScheduleRepository>();
             services.AddScoped<IComponentRepository, ComponentRepository>();
@@ -128,6 +129,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailDesignService, NailDesignService>();
             services.AddScoped<IPasswordHasher, PasswordHasher>();
             services.AddScoped<ISalonService, SalonService>();
+            services.AddScoped<IChairService, ChairService>();
             services.AddScoped<INailArtistService, NailArtistService>();
             services.AddScoped<IScheduleService, ScheduleService>();
             services.AddScoped<IComponentService, ComponentService>();
@@ -156,6 +158,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IPromotionService, PromotionService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
             services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
+            services.AddScoped<IBookingSchedulingService, BookingSchedulingService>();
             services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();
             services.AddScoped<IWalkInQueueService, WalkInQueueService>();
             services.AddScoped<IEmailService, SmtpEmailService>();

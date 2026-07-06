@@ -13,6 +13,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<Booking?> GetBookingDetailAsync(Guid bookingId, bool trackChanges = false);
         Task<IEnumerable<Booking>> GetBookingsByArtistAndDateAsync(Guid artistId, DateTime date);
+        Task<IEnumerable<Booking>> GetBookingsByChairAndDateAsync(Guid chairId, DateTime date);
+        Task<IEnumerable<Booking>> GetActiveBookingsWithChairsBySalonAndDateAsync(Guid salonId, DateTime date);
         Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null);
         Task<PagedList<Booking>> GetBookingsBySalonAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);
         Task<PagedList<Booking>> GetBookingsByArtistAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null, string? search = null);

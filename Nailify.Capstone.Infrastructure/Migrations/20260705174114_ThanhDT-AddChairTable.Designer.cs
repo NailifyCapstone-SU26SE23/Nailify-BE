@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705174114_ThanhDT-AddChairTable")]
+    partial class ThanhDTAddChairTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -203,8 +206,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CustomerNailRequestId")
-                        .HasColumnType("uuid");
+                    b.Property<int?>("CustomerNailId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -234,7 +237,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasIndex("BookingId");
 
-                    b.HasIndex("CustomerNailRequestId");
+                    b.HasIndex("CustomerNailId");
 
                     b.HasIndex("NailVariantId");
 
@@ -1921,9 +1924,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNailRequest", "CustomerNailRequest")
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
                         .WithMany()
-                        .HasForeignKey("CustomerNailRequestId")
+                        .HasForeignKey("CustomerNailId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
@@ -1938,7 +1941,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Navigation("Booking");
 
-                    b.Navigation("CustomerNailRequest");
+                    b.Navigation("CustomerNail");
 
                     b.Navigation("NailVariant");
 

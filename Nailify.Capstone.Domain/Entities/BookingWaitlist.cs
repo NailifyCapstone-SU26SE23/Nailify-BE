@@ -30,5 +30,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Salon Salon { get; set; }
         public virtual NailArtist? PreferredNailArtist { get; set; }
         public virtual Booking? ConvertedBooking { get; set; }
+        public virtual ICollection<WaitlistItem> WaitlistItems { get; set; } = new List<WaitlistItem>();
     }
 }

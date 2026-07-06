@@ -97,6 +97,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<IEnumerable<BookingWaitlist>> GetActiveWaitlistsByCustomerAsync(Guid customerId)
+        {
+            return await FindByCondition(x => x.CustomerId == customerId
+                                            && (x.Status == WaitlistStatus.Waiting || x.Status == WaitlistStatus.Notified), false)
+                .Include(x => x.Customer).ThenInclude(c => c.User)
+                .Include(x => x.Salon)
+                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.WaitlistItems)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date)
         {
             var dateOnly = date.Date;
@@ -105,7 +116,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.Status == WaitlistStatus.Notified
                                          && x.ExpiresAt.HasValue
                                          && x.ExpiresAt.Value > DateTime.UtcNow, false)
+                         .Include(x => x.WaitlistItems)
                          .ToListAsync();
+        }
+        public async Task<BookingWaitlist?> GetWaitlistWithItemsAsync(Guid waitlistId)
+        {
+            return await FindByCondition(x => x.WailistId == waitlistId, false)
+                .Include(x => x.Customer).ThenInclude(c => c.User)
+                .Include(x => x.Salon)
+                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.WaitlistItems)
+                .FirstOrDefaultAsync();
         }
     }
 }

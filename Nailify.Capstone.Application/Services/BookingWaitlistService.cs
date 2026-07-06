@@ -19,11 +19,18 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-
-        public BookingWaitlistService(IUnitOfWork unitOfWork, IMapper mapper)
+        private readonly ILoyaltyTierService _loyaltyTierService;
+        private readonly IPromotionService _promotionService;
+        private readonly IBookingProcedureService _bookingProcedureService;
+        private readonly IBookingSchedulingService _bookingSchedulingService;
+        public BookingWaitlistService(IUnitOfWork unitOfWork, IMapper mapper, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, IBookingProcedureService bookingProcedureService, IBookingSchedulingService bookingSchedulingService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _loyaltyTierService = loyaltyTierService;
+            _promotionService = promotionService;
+           _bookingProcedureService = bookingProcedureService;
+            _bookingSchedulingService = bookingSchedulingService;
         }
 
         public async Task<ApiResult<WaitlistResponseDTO>> CancelWaitlistAsync(Guid waitlistId, Guid customerId)
@@ -47,42 +54,175 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Hủy vị trí trong hàng chờ thành công.");
         }
 
-        public async Task<ApiResult<WaitlistResponseDTO>> ConfirmWaitlistAsync(Guid waitlistId, Guid customerId)
+        public async Task<ApiResult<WaitlistResponseDTO>> ConfirmWaitlistAsync(Guid waitlistId, Guid customerId, ConfirmWaitlistRequestDTO request)
         {
-            var wailist = await _unitOfWork.BookingWaitlistRepository.GetByIdAsync(waitlistId);
-            if (wailist == null || wailist.CustomerId != customerId)
+            //var wailist = await _unitOfWork.BookingWaitlistRepository.GetByIdAsync(waitlistId);
+            var waitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithItemsAsync(waitlistId);
+            if (waitlist == null || waitlist.CustomerId != customerId)
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Không tìm thấy thông tin hàng chờ hợp lệ.");
             }
-            if (wailist.Status != WaitlistStatus.Notified)
+            if (waitlist.Status != WaitlistStatus.Notified)
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Lịch hẹn của bạn chưa được mở hoặc đã hết hiệu lực xác nhận.");
             }
-            if (wailist.ExpiresAt.HasValue && wailist.ExpiresAt < DateTime.UtcNow)
+            if (waitlist.ExpiresAt.HasValue && waitlist.ExpiresAt < DateTime.UtcNow)
             {
-                wailist.Status = WaitlistStatus.Expired;
-                _unitOfWork.BookingWaitlistRepository.Update(wailist);
+                waitlist.Status = WaitlistStatus.Expired;
+                _unitOfWork.BookingWaitlistRepository.Update(waitlist);
                 await _unitOfWork.SaveChangesAsync();
                 return new ApiErrorResult<WaitlistResponseDTO>("Thời gian xác nhận giữ chỗ (15 phút) đã hết hạn.");
             }
-            var booking = new Booking
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                CustomerId = customerId,
-                SalonId = wailist.SalonId,
-                BookingDate = wailist.RequestedDate,
-                StartTime = wailist.RequestedStartTime,
-                NailArtistId = wailist.PreferredNailArtistId ?? Guid.Empty,
-                Status = BookingStatus.Approved,
-            };
-            await _unitOfWork.BookingRepository.CreateAsync(booking);
-            wailist.Status = WaitlistStatus.Confirmed;
-            wailist.ConvertedBookingId = booking.BookingId;
-            _unitOfWork.BookingWaitlistRepository.Update(wailist);
-            await _unitOfWork.SaveChangesAsync();
-            var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(waitlistId);
-            var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist ?? wailist);
-            return new ApiSuccessResult<WaitlistResponseDTO>(response, "Xác nhận hàng chờ thành công. Lịch hẹn chính thức đã được tạo!");
+                var bookingItems = new List<BookingItem>();
+                decimal basePrice = 0;
+                int totalDuration = 0;
+
+                foreach (var x in waitlist.WaitlistItems)
+                {
+                    var item = new BookingItem
+                    {
+                        Quantity = x.Quantity,
+                        ServiceId = x.ServiceId,
+                        NailVariant = x.NailVariant,
+                        CustomerNailId = x.CustomerNailId,
+                    };
+                    decimal itemPrice = 0;
+                    int itemDuration = 0;
+                    if (x.CustomerNailId.HasValue)
+                    {
+
+                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(x.CustomerNailId.Value, waitlist.SalonId);
+                        if (customNailRequest != null)
+                        {
+                            itemPrice += customNailRequest.Price ?? 0;
+                            itemDuration += customNailRequest.Duration ?? 60;
+                        }
+                        else
+                        {
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(x.CustomerNailId.Value);
+                            if (customNail != null)
+                            {
+                                itemDuration += customNail.Duration ?? 60;
+                            }
+                        }
+                    }
+                    if (x.NailVariantId.HasValue)
+                    {
+                        var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
+                        if (variant != null)
+                        {
+                            itemPrice += variant.Price;
+                            itemDuration += (variant.Duration ?? 60);
+                        }
+                    }
+                    if (x.ServiceId.HasValue)
+                    {
+                        var service = await _unitOfWork.ServicesRepository.GetByIdAsync(x.ServiceId.Value);
+                        if (service != null)
+                        {
+                            itemPrice += service.Price;
+                            itemDuration += service.Duration;
+                        }
+                    }
+                    item.Price = itemPrice;
+                    item.DiscountAmount = 0;
+                    item.FinalPrice = itemPrice * Math.Max(x.Quantity, 1);
+                    item.Duration = itemDuration;
+                    basePrice += item.FinalPrice;
+                    totalDuration += item.Duration;
+                    bookingItems.Add(item);
+                }
+               
+                var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId);
+                if (!loyaltyResult.IsSucceeded)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return new ApiErrorResult<WaitlistResponseDTO>(loyaltyResult.Message);
+                }
+                var dummyBooking = new Booking
+                {
+                    CustomerId = customerId,
+                    BookingItems = bookingItems
+                };
+                var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(customerId, bookingItems, new List<int>());
+                var (promotionDiscountAmount, appliedPromotionDiscounts) = await _promotionService.CalculateDiscountsAsync(dummyBooking, applicablePromotions);
+                var loyaltyDiscountAmount = decimal.Round(
+                    basePrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    0,
+                    MidpointRounding.AwayFromZero
+                );
+                if (loyaltyDiscountAmount > 0)
+                {
+                    appliedPromotionDiscounts.Add(new BookingDiscount
+                    {
+                        Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                        DiscountAmount = loyaltyDiscountAmount,
+                        IsAutoApplied = true,
+                        AppliedDate = DateTime.UtcNow,
+                        LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                    });
+                }
+                decimal totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
+                decimal finalPrice = Math.Max(0, basePrice - totalDiscountAmount);
+                // 3. Khởi tạo Booking mới
+                var booking = new Booking
+                {
+                    CustomerId = customerId,
+                    SalonId = waitlist.SalonId,
+                    BookingDate = waitlist.RequestedDate,
+                    StartTime = waitlist.RequestedStartTime,
+                    NailArtistId = waitlist.PreferredNailArtistId,
+                    Price = basePrice,
+                    Discount = -totalDiscountAmount,
+                    TotalPrice = finalPrice,
+                    TotalDuration = totalDuration,
+                    Status = BookingStatus.Approved,
+                    BookingItems = bookingItems,
+                    BookingDiscounts = appliedPromotionDiscounts
+                };
+                await _unitOfWork.BookingRepository.CreateAsync(booking);
+                await _unitOfWork.SaveChangesAsync();
+                foreach (var item in booking.BookingItems)
+                {
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
+                }
+                // 5. Cập nhật và tính toán Timeline công đoạn ban đầu cho booking này
+                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
+                if (procedures.Any() && booking.NailArtistId.HasValue)
+                {
+                    var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                    foreach (var segment in timeline)
+                    {
+                        var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                        procedure.EstimatedStartTime = segment.StartTime;
+                        procedure.EstimatedEndTime = segment.EndTime;
+                        if (procedure.ActiveDuration > 0)
+                        {
+                            procedure.AssignedArtistId = booking.NailArtistId.Value;
+                        }
+                        _unitOfWork.BookingProcedureRepository.Update(procedure);
+                    }
+                }
+                // 6. Cập nhật trạng thái hàng chờ Waitlist
+                waitlist.Status = WaitlistStatus.Confirmed;
+                waitlist.ConvertedBookingId = booking.BookingId;
+                _unitOfWork.BookingWaitlistRepository.Update(waitlist);
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+                var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(waitlistId);
+                var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist ?? waitlist);
+                return new ApiSuccessResult<WaitlistResponseDTO>(response, "Xác nhận hàng chờ thành công. Lịch hẹn và quy trình chi tiết đã được lập!");
+            }
+            catch (Exception ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return new ApiErrorResult<WaitlistResponseDTO>($"Lỗi hệ thống khi chuyển đổi lịch: {ex.Message}");
+            }
         }
+            
 
         public async Task<ApiResult<WaitlistResponseDTO>> GetMyWaitlistAsync(Guid customerId, Guid salonId)
         {
@@ -93,6 +233,13 @@ namespace Nailify.Capstone.Application.Services
             }
             var response = _mapper.Map<WaitlistResponseDTO>(list);
             return new ApiSuccessResult<WaitlistResponseDTO>(response, "Lấy thông tin hàng chờ thành công.");
+        }
+
+        public async Task<ApiResult<List<WaitlistResponseDTO>>> GetMyWaitlistsAsync(Guid customerId)
+        {
+            var lists = await _unitOfWork.BookingWaitlistRepository.GetActiveWaitlistsByCustomerAsync(customerId);
+            var response = _mapper.Map<List<WaitlistResponseDTO>>(lists);
+            return new ApiSuccessResult<List<WaitlistResponseDTO>>(response, "Lấy danh sách hàng chờ thành công.");
         }
 
         public async Task<ApiResult<PagedList<WaitlistResponseDTO>>> GetSalonWaitlistAsync(Guid salonId, int pageNumber, int pageSize)
@@ -106,12 +253,21 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<WaitlistResponseDTO>> JoinWaitlistAsync(Guid customerId, JoinWaitlistRequestDTO request)
         {
             // 1. Check duplicate waiting entry
-            var isDuplicate = await _unitOfWork.BookingWaitlistRepository.IsDuplicateAsync(customerId, request.SalonId, request.RequestedDate, request.RequestedStartTime, request.PreferredNailArtistId);
+            var isDuplicate = await _unitOfWork.BookingWaitlistRepository.IsDuplicateAsync(
+                customerId, 
+                request.SalonId, 
+                request.RequestedDate, 
+                request.RequestedStartTime, 
+                request.PreferredNailArtistId);
             if (isDuplicate)
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Bạn đã ở trong hàng chờ của khung giờ này rồi.");
             }
-            var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(request.SalonId, request.RequestedDate, request.RequestedStartTime, request.PreferredNailArtistId);
+            var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(
+                request.SalonId, 
+                request.RequestedDate, 
+                request.RequestedStartTime, 
+                request.PreferredNailArtistId);
 
             var wailist = _mapper.Map<BookingWaitlist>(request);
             wailist.CustomerId = customerId;

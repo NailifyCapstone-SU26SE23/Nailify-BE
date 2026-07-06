@@ -1,4 +1,5 @@
 ﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalkInQueueResponseDTOs;
 using System;
@@ -18,5 +19,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<WalkInQueueResponseDTO>> CompleteQueueEntryAsync(Guid queueId, Guid actorId);
         Task<ApiResult<WalkInQueueResponseDTO>> MarkLeftAsync(Guid queueId, Guid actorId);
         Task<ApiResult<WalkInQueueResponseDTO>> PrioritizeQueueEntryAsync(Guid queueId, Guid actorId);
+        Task<int> CalculateEstimatedWaitTimeAsync(Guid salonId, List<BookingItemRequestDTO> requestedItems);
     }
 }

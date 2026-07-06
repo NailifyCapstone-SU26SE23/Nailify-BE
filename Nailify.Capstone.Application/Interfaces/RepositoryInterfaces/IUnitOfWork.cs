@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -46,6 +46,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IBookingWaitlistRepository BookingWaitlistRepository { get; }
         IWalkInQueueRepository WalkInQueueRepository { get; }
         ITransactionRepository TransactionRepository { get; }
+        IChairRepository ChairRepository { get; }
         // Quản lý Transaction
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

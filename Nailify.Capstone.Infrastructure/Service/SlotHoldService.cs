@@ -6,6 +6,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 using Org.BouncyCastle.Asn1.Ocsp;
@@ -24,17 +25,20 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly IUnitOfWork _unitOfWork;
         private readonly ISlotHoldConfiguration _config;
         private readonly ILogger<SlotHoldService> _logger;
+        private readonly IBookingSchedulingService _bookingSchedulingService;
 
         public SlotHoldService(
                IDistributedCache cache,
                IUnitOfWork unitOfWork,
                ISlotHoldConfiguration config,
-               ILogger<SlotHoldService> logger)
+               ILogger<SlotHoldService> logger,
+               IBookingSchedulingService bookingSchedulingService)
         {
             _cache = cache;
             _unitOfWork = unitOfWork;
             _config = config;
             _logger = logger;
+            _bookingSchedulingService = bookingSchedulingService;
         }
 
         public async Task ConsumeHoldAsync(string holdToken)
@@ -139,7 +143,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                    artist,
                    request.BookingDate,
                    request.StartTime,
-                   endTime,
+                   request.BookingItems.ToList(),
                    customerId,
                    excludingHoldToken: null);
                 if (isConflict)
@@ -158,6 +162,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     holdToken = existingHold.HoldToken;
                     existingHold.ExpiresAt = expiresAt;
                     existingHold.EstimatedDurationMinutes = durationMinutes;
+                    existingHold.BookingItems = request.BookingItems.ToList();
                 }
                 else
                 {
@@ -171,7 +176,8 @@ namespace Nailify.Capstone.Infrastructure.Service
                         BookingDate = request.BookingDate,
                         StartTime = request.StartTime,
                         EstimatedDurationMinutes = durationMinutes,
-                        ExpiresAt = expiresAt
+                        ExpiresAt = expiresAt,
+                        BookingItems = request.BookingItems.ToList()
                     };
                     activeHolds.Add(x);
                 }
@@ -368,66 +374,58 @@ namespace Nailify.Capstone.Infrastructure.Service
             var list = JsonSerializer.Deserialize<List<SlotHoldData>>(json) ?? new List<SlotHoldData>();
             return list.Where(h => h.ExpiresAt > DateTime.UtcNow).ToList();
         }
+
         private async Task<bool> CheckCapacityConflictInternalAsync(
-            NailArtist artist, DateTime date, TimeSpan startTime, TimeSpan endTime, Guid customerId, string? excludingHoldToken)
+            NailArtist artist, DateTime date, TimeSpan startTime, List<BookingItemRequestDTO> requestItems, Guid customerId, string? excludingHoldToken)
         {
             int capacity = artist.ConcurrentCapacity;
-            // 1. Lấy tất cả bookings từ DB
-            var dbBookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAndDateAsync(artist.NailArtistId, date);
-            var overlappingBookings = dbBookings
-                .Where(x => x.StartTime < endTime && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > startTime)
-                .ToList();
-            // 2. Lấy holds từ Redis
+
+            var salonId = artist.Account?.SalonId ?? Guid.Empty;
+
+            // 1. Tạo mock procedures và build timeline cho lượt giữ chỗ hiện tại
+            var currentProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(requestItems, salonId);
+            var newSegments = _bookingSchedulingService.BuildProcedureTimeline(currentProcs, startTime);
+
+            // 2. Thu thập và giả lập timeline cho các lượt giữ chỗ đang hoạt động khác trên Redis
+            var simulatedSegments = new List<ProcedureScheduleSegment>();
             var redisListKey = BuildSlotKey(artist.NailArtistId, date);
             var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
             var overlappingHolds = activeHolds
                                    .Where(h => h.CustomerId != customerId
-                                          && (excludingHoldToken == null || h.HoldToken != excludingHoldToken)
-                                          && h.StartTime < endTime
-                                          && h.StartTime.Add(TimeSpan.FromMinutes(h.EstimatedDurationMinutes)) > startTime)
+                                          && (excludingHoldToken == null || h.HoldToken != excludingHoldToken))
                                    .ToList();
-            // 2.5. Lấy danh sách hàng chờ đang ở trạng thái Notified (Đang có 15 phút xác nhận)
-            var activeNotifiedWaitlists = await _unitOfWork.BookingWaitlistRepository.GetActiveNotifiedWaitlistsAsync(artist.NailArtistId, date);
-            var overlappingWaitlists = activeNotifiedWaitlists
-                .Where(x => x.RequestedStartTime < endTime
-                         && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > startTime)
-                .ToList();
 
-            // 3. Quét các điểm mốc (Test Points)
-            var testPoints = new List<TimeSpan> { startTime };
-            foreach (var x in overlappingBookings)
+            foreach (var hold in overlappingHolds)
             {
-                if (x.StartTime > startTime && x.StartTime < endTime)
-                {
-                    testPoints.Add(x.StartTime);
-                }
+                var holdProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(hold.BookingItems, salonId);
+                var holdTimeline = _bookingSchedulingService.BuildProcedureTimeline(holdProcs, hold.StartTime);
+                simulatedSegments.AddRange(holdTimeline);
             }
-            foreach (var x in overlappingHolds)
+
+            // 3. Thu thập và giả lập timeline cho các lượt waitlist đang ở trạng thái Notified
+            var activeNotifiedWaitlists = await _unitOfWork.BookingWaitlistRepository.GetActiveNotifiedWaitlistsAsync(artist.NailArtistId, date);
+            foreach (var w in activeNotifiedWaitlists)
             {
-                if (x.StartTime > startTime && x.StartTime < endTime)
+                var waitlistItems = w.WaitlistItems.Select(x => new BookingItemRequestDTO
                 {
-                    testPoints.Add(x.StartTime);
-                }
+                    ServiceId = x.ServiceId,
+                    NailVariantId = x.NailVariantId,
+                    CustomerNailId = x.CustomerNailId,
+                    Quantity = x.Quantity
+                }).ToList();
+                var waitlistProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(waitlistItems, salonId);
+                var waitlistTimeline = _bookingSchedulingService.BuildProcedureTimeline(waitlistProcs, w.RequestedStartTime);
+                simulatedSegments.AddRange(waitlistTimeline);
             }
-            foreach (var w in overlappingWaitlists)
-            {
-                if (w.RequestedStartTime > startTime && w.RequestedStartTime < endTime)
-                {
-                    testPoints.Add(w.RequestedStartTime);
-                }
-            }
-            // 4. Đếm số lượng trùng lặp tại các điểm mốc
-            foreach (var t in testPoints)
-            {
-                int dbCount = overlappingBookings.Count(x => x.StartTime <= t && x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)) > t);
-                int holdCount = overlappingHolds.Count(x => x.StartTime <= t && x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes)) > t);
-                int waitlistCount = overlappingWaitlists.Count(x => x.RequestedStartTime <= t && x.RequestedStartTime.Add(TimeSpan.FromMinutes(x.EstimatedDuration)) > t);
-                if (dbCount + holdCount +waitlistCount >= capacity)
-                {
-                    return true; // Hết chỗ
-                }
-            }
-            return false;
+
+            // 4. Thực hiện kiểm tra chồng chéo sử dụng HasSimulationConflictAsync chung
+            return await _bookingSchedulingService.HasSimulationConflictAsync(
+                artist.NailArtistId,
+                date,
+                newSegments,
+                simulatedSegments,
+                capacity
+            );
         }
 
         /// <summary>
@@ -443,6 +441,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             public TimeSpan StartTime { get; set; }
             public int EstimatedDurationMinutes { get; set; }
             public DateTime ExpiresAt { get; set; }
+            public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
         }
         /// <summary>
         /// Bản đồ ánh xạ (Mapping) từ holdToken ngược lại SlotKey.
