@@ -209,6 +209,12 @@ namespace Nailify.Capstone.Application.Services
                 // 6. Cập nhật trạng thái hàng chờ Waitlist
                 waitlist.Status = WaitlistStatus.Confirmed;
                 waitlist.ConvertedBookingId = booking.BookingId;
+                
+                // Tránh tranh chấp tracking Entity Framework khi Update đối tượng NoTracking
+                waitlist.Customer = null!;
+                waitlist.PreferredNailArtist = null;
+                waitlist.Salon = null!;
+                
                 _unitOfWork.BookingWaitlistRepository.Update(waitlist);
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransactionAsync();

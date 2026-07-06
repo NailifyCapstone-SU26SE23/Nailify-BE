@@ -18,5 +18,6 @@ namespace Nailify.Capstone.Application.Common.Models.Scheduling
         public TimeSpan ArtistBusyEnd { get; set; }
 
         public bool CanOverlap { get; set; }
+        public bool IsMainStep { get; set; } = true;
     }
 }

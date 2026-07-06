@@ -32,6 +32,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public int ActiveDuration { get; set; }
         public int PassiveDuration { get; set; }
         public bool CanOverlap { get; set; }
+        public bool IsMainStep { get; set; }
 
         public void Mapping(Profile profile)
         {

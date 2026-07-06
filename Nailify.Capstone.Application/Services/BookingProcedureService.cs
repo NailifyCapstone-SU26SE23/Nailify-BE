@@ -109,6 +109,7 @@ namespace Nailify.Capstone.Application.Services
                         PassiveDuration = x.Procedure.PassiveDuration,
                         CanOverlap = x.Procedure.CanOverlap,
                         IsRequired = x.Procedure.IsRequired,
+                        IsMainStep = x.Procedure.IsMainStep,
                         Status = BookingProcedureStatus.Pending
                     };
                     await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -130,6 +131,7 @@ namespace Nailify.Capstone.Application.Services
                         PassiveDuration = 0,
                         CanOverlap = false,
                         IsRequired = true,
+                        IsMainStep = true,
                         Status = BookingProcedureStatus.Pending
                     };
                     await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -160,6 +162,7 @@ namespace Nailify.Capstone.Application.Services
                     PassiveDuration = 0,
                     CanOverlap = false,
                     IsRequired = true,
+                    IsMainStep = true,
                     Status = BookingProcedureStatus.Pending
                 };
                 await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -213,6 +216,59 @@ namespace Nailify.Capstone.Application.Services
             var mapper = updatedProc.First(x => x.BookingProcedureId == bookingProcedureId);
             var response = _mapper.Map<BookingProcedureResponseDTO>(mapper);
             return new ApiSuccessResult<BookingProcedureResponseDTO>(response, "Cập nhật trạng thái bước quy trình thành công.");
+        }
+
+        public async Task<ApiResult<List<IdleArtistResponseDTO>>> GetAvailableArtistsForProcedureAsync(Guid bookingProcedureId)
+        {
+            var procedure = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId);
+
+            if (procedure == null)
+            {
+                return new ApiErrorResult<List<IdleArtistResponseDTO>>("Không tìm thấy bước quy trình.");
+            }
+
+            var salonId = procedure.BookingItem.Booking.SalonId;
+
+            // 1. Lấy danh sách kỹ năng yêu cầu cho mẫu nail (nếu có) từ repository chuyên biệt
+            var requiredSkills = new List<NailRequiredSkill>();
+            if (procedure.BookingItem.NailVariantId.HasValue)
+            {
+                requiredSkills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(procedure.BookingItem.NailVariantId.Value);
+            }
+
+            // 2. Lấy tất cả thợ hoạt động tại salon kèm theo danh sách kỹ năng của họ từ repository
+            var artists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(salonId);
+
+            var responseList = new List<IdleArtistResponseDTO>();
+
+            foreach (var artist in artists)
+            {
+                // A. Kiểm tra bận (IsFree): thợ ko có bất kỳ BookingProcedure nào ở trạng thái InProgress
+                var isBusy = await _unitOfWork.BookingProcedureRepository.HasAnyInProgressProcedureAsync(artist.NailArtistId);
+                var isFree = !isBusy;
+
+                // B. Kiểm tra trình độ (IsQualified)
+                bool isQualified = true;
+                foreach (var reqSkill in requiredSkills)
+                {
+                    var artistSkill = artist.NailArtistSkills.FirstOrDefault(x => x.SkillTypeId == reqSkill.SkillTypeId);
+                    if (artistSkill == null || artistSkill.Level < reqSkill.RequiredLevel)
+                    {
+                        isQualified = false;
+                        break;
+                    }
+                }
+
+                responseList.Add(new IdleArtistResponseDTO
+                {
+                    NailArtistId = artist.NailArtistId,
+                    Name = artist.Account != null ? $"{artist.Account.FirstName} {artist.Account.LastName}" : "Thợ nail",
+                    IsFree = isFree,
+                    IsQualified = isQualified
+                });
+            }
+
+            return new ApiSuccessResult<List<IdleArtistResponseDTO>>(responseList, "Lấy danh sách thợ rảnh thành công.");
         }
     }
 }

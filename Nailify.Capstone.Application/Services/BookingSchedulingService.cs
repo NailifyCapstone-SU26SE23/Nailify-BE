@@ -25,31 +25,34 @@ namespace Nailify.Capstone.Application.Services
             TimeSpan bookingStartTime)
         {
             var result = new List<ProcedureScheduleSegment>();
-            var groupedProcedures = procedures.GroupBy(x => x.BookingItemId);
+            
+            // Sắp xếp tuần tự tất cả các bước của các dịch vụ khác nhau trong cùng đơn đặt lịch
+            var orderedProcedures = procedures
+                .OrderBy(x => x.BookingItemId)
+                .ThenBy(x => x.StepOrder)
+                .ToList();
 
-            foreach (var group in groupedProcedures)
+            var cursor = bookingStartTime;
+            foreach (var procedure in orderedProcedures)
             {
-                var cursor = bookingStartTime;
-                foreach (var procedure in group.OrderBy(x => x.StepOrder))
+                var start = cursor;
+                var end = start.Add(TimeSpan.FromMinutes(procedure.Duration));
+
+                result.Add(new ProcedureScheduleSegment
                 {
-                    var start = cursor;
-                    var end = start.Add(TimeSpan.FromMinutes(procedure.Duration));
+                    BookingProcedureId = procedure.BookingProcedureId,
+                    BookingItemId = procedure.BookingItemId,
+                    BookingId = procedure.BookingItem?.BookingId,
+                    AssignedArtistId = procedure.AssignedArtistId,
+                    IsMainStep = procedure.IsMainStep,
+                    StartTime = start,
+                    EndTime = end,
+                    ArtistBusyStart = start,
+                    ArtistBusyEnd = start.Add(TimeSpan.FromMinutes(procedure.ActiveDuration)),
+                    CanOverlap = procedure.CanOverlap
+                });
 
-                    result.Add(new ProcedureScheduleSegment
-                    {
-                        BookingProcedureId = procedure.BookingProcedureId,
-                        BookingItemId = procedure.BookingItemId,
-                        BookingId = procedure.BookingItem?.BookingId,
-                        AssignedArtistId = procedure.AssignedArtistId,
-                        StartTime = start,
-                        EndTime = end,
-                        ArtistBusyStart = start,
-                        ArtistBusyEnd = start.Add(TimeSpan.FromMinutes(procedure.ActiveDuration)),
-                        CanOverlap = procedure.CanOverlap
-                    });
-
-                    cursor = end;
-                }
+                cursor = end;
             }
 
             return result;
@@ -84,8 +87,12 @@ namespace Nailify.Capstone.Application.Services
 
             var allExisting = dbSegments.Concat(simulatedSegments).ToList();
 
-            // 1. Kiểm tra Active Capacity (Tối đa 1 công việc chủ động đồng thời)
-            foreach (var newSegment in newSegments.Where(x => x.ArtistBusyEnd > x.ArtistBusyStart))
+            // 1. Kiểm tra Active Capacity (Tối đa 1 công việc chủ động đồng thời cho thợ đang xét)
+            var relevantNewSegments = newSegments.Where(x => 
+                (x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep)) && 
+                x.ArtistBusyEnd > x.ArtistBusyStart);
+
+            foreach (var newSegment in relevantNewSegments)
             {
                 var activeOverlapCount = allExisting.Count(existing =>
                     existing.ArtistBusyEnd > existing.ArtistBusyStart &&
@@ -97,8 +104,11 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
-            // 2. Kiểm tra Total Capacity (Giới hạn ConcurrentCapacity của thợ)
-            foreach (var newSegment in newSegments)
+            // 2. Kiểm tra Total Capacity (Giới hạn ConcurrentCapacity của thợ đang xét)
+            var relevantTotalSegments = newSegments.Where(x => 
+                x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep));
+
+            foreach (var newSegment in relevantTotalSegments)
             {
                 var conflictingTotals = allExisting.Where(existing =>
                     existing.StartTime < newSegment.EndTime &&

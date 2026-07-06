@@ -84,5 +84,21 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             return Ok(result);
         }
+
+        /// <summary>
+        /// Lấy danh sách thợ nail tại salon để chỉ định, kèm theo trạng thái rảnh (IsFree) và đủ điều kiện kỹ năng (IsQualified).
+        /// </summary>
+        [HttpGet("{bookingProcedureId}/available-artists")]
+        [ProducesResponseType(typeof(ApiResult<List<IdleArtistResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetAvailableArtists(Guid bookingProcedureId)
+        {
+            var result = await _bookingProcedureService.GetAvailableArtistsForProcedureAsync(bookingProcedureId);
+            if (!result.IsSucceeded)
+            {
+                return NotFound(result);
+            }
+            return Ok(result);
+        }
     }
 }
