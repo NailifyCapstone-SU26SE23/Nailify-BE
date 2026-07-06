@@ -87,19 +87,17 @@ namespace Nailify.Capstone.Application.Services
 
             foreach (var variant in affectedVariants)
             {
-                variant.Price = (variant.NailShape?.Price ?? 0m)
-                    + (variant.NailSurface?.Price ?? 0m)
+                variant.Price = (variant.NailSurface?.Price ?? 0m)
                     + variant.NailComponents.Sum(nailComponent =>
                         nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
-                variant.Duration = (variant.NailShape?.Duration ?? 0)
-                    + (variant.NailSurface?.Duration ?? 0)
+                variant.Duration = (variant.NailSurface?.Duration ?? 0)
                     + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
 
                 _unitOfWork.NailVariantRepository.Update(variant);
             }
 
             await _unitOfWork.SaveChangesAsync();
-            foreach (var nailDesignId in affectedVariants.Select(variant => variant.NailDesignId).Distinct())
+            foreach (var nailDesignId in affectedVariants.Select(variant => variant.NailDesignId).Where(id => id.HasValue).Select(id => id!.Value).Distinct())
             {
                 await UpdateNailDesignPriceRangeAsync(nailDesignId);
             }

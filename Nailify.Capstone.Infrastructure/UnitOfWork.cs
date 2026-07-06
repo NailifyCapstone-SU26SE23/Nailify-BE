@@ -22,6 +22,7 @@ namespace Nailify.Capstone.Infrastructure
         private IScheduleRepository? _scheduleRepository;
         private IComponentRepository? _componentRepository;
         private INailShapeRepository? _nailShapeRepository;
+        private IShapeMethodConfigRepository? _shapeMethodConfigRepository;
         private INailSurfaceRepository? _nailSurfaceRepository;
         private INailVariantRepository? _nailVariantRepository;
         private INailComponentRepository? _nailComponentRepository;
@@ -70,6 +71,7 @@ namespace Nailify.Capstone.Infrastructure
         public IScheduleRepository ScheduleRepository => _scheduleRepository ??= new ScheduleRepository(_context);
         public IComponentRepository ComponentRepository => _componentRepository ??= new ComponentRepository(_context);
         public INailShapeRepository NailShapeRepository => _nailShapeRepository ??= new NailShapeRepository(_context);
+        public IShapeMethodConfigRepository ShapeMethodConfigRepository => _shapeMethodConfigRepository ??= new ShapeMethodConfigRepository(_context);
         public INailSurfaceRepository NailSurfaceRepository => _nailSurfaceRepository ??= new NailSurfaceRepository(_context);
         public INailVariantRepository NailVariantRepository => _nailVariantRepository ??= new NailVariantRepository(_context);
         public INailComponentRepository NailComponentRepository => _nailComponentRepository ??= new NailComponentRepository(_context);

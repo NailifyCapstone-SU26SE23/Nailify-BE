@@ -107,9 +107,6 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<decimal> CalculateNailVariantPriceAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)
         {
-            var nailShape = nailShapeId.HasValue
-                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
-                : null;
             var nailSurface = nailSurfaceId.HasValue
                 ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
                 : null;
@@ -122,7 +119,7 @@ namespace Nailify.Capstone.Application.Services
                     nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex)) ?? 0m;
             }
 
-            return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+            return (nailSurface?.Price ?? 0m) + componentPrice;
         }
 
         private static int GetFingerPriceMultiplier(int fingerIndex)
@@ -132,9 +129,6 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<int?> CalculateNailVariantDurationAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)
         {
-            var nailShape = nailShapeId.HasValue
-                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
-                : null;
             var nailSurface = nailSurfaceId.HasValue
                 ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
                 : null;
@@ -146,18 +140,23 @@ namespace Nailify.Capstone.Application.Services
                 componentDuration = variant?.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0) ?? 0;
             }
 
-            return (nailShape?.Duration ?? 0) + (nailSurface?.Duration ?? 0) + componentDuration;
+            return (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
-        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        private async Task UpdateNailDesignPriceRangeAsync(int? nailDesignId)
         {
-            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
+            if (!nailDesignId.HasValue)
+            {
+                return;
+            }
+
+            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId.Value);
             if (nailDesign == null)
             {
                 return;
             }
 
-            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
+            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId.Value);
             nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
             nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
 
@@ -165,10 +164,12 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private async Task<string?> ValidateReferencesAsync(int nailDesignId, int? nailShapeId, int? nailSurfaceId)
+        private async Task<string?> ValidateReferencesAsync(int? nailDesignId, int? nailShapeId, int? nailSurfaceId)
         {
-            var design = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
-            if (design == null || design.Status == "InActive")
+            var design = nailDesignId.HasValue
+                ? await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId.Value)
+                : null;
+            if (nailDesignId.HasValue && (design == null || design.Status == "InActive"))
             {
                 return "Không tìm thấy mẫu nail.";
             }

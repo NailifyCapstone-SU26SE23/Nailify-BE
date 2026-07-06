@@ -1180,6 +1180,7 @@ namespace Nailify.Capstone.Application.Services
                 Price = calculation.Price,
                 Discount = -totalDiscountAmount,
                 TotalPrice = finalPrice,
+                TotalDuration = calculation.Duration,
                 DiscountBreakdown = new List<DiscountBreakdownDTO>()
             };
 
@@ -1293,6 +1294,43 @@ namespace Nailify.Capstone.Application.Services
 
                     unitPrice += variant.Data.Price;
                     unitDuration += variant.Data.Duration ?? 60;
+                }
+
+                if (item.ShapeMethodConfigId.HasValue)
+                {
+                    var shapeMethodConfig = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(item.ShapeMethodConfigId.Value);
+                    if (shapeMethodConfig == null)
+                    {
+                        return BookingItemsCalculation.Failure(
+                            $"Khong tim thay cau hinh cach lam dang mong ID {item.ShapeMethodConfigId.Value}");
+                    }
+
+                    if (item.NailVariantId.HasValue)
+                    {
+                        var variantEntity = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
+                        if (variantEntity?.NailShapeId != shapeMethodConfig.NailShapeId)
+                        {
+                            return BookingItemsCalculation.Failure(
+                                "Cau hinh cach lam khong thuoc dang mong cua mau nail da chon.");
+                        }
+                    }
+
+                    if (item.CustomerNailRequestId.HasValue)
+                    {
+                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
+                        var customNail = customNailRequest == null
+                            ? null
+                            : await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailRequest.CustomerNailId);
+
+                        if (customNail?.NailShapeId != shapeMethodConfig.NailShapeId)
+                        {
+                            return BookingItemsCalculation.Failure(
+                                "Cau hinh cach lam khong thuoc dang mong cua mau custom da chon.");
+                        }
+                    }
+
+                    unitPrice += shapeMethodConfig.Price;
+                    unitDuration += shapeMethodConfig.Duration;
                 }
 
                 if (item.ServiceId.HasValue)

@@ -96,6 +96,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IScheduleRepository, ScheduleRepository>();
             services.AddScoped<IComponentRepository, ComponentRepository>();
             services.AddScoped<INailShapeRepository, NailShapeRepository>();
+            services.AddScoped<IShapeMethodConfigRepository, ShapeMethodConfigRepository>();
             services.AddScoped<INailSurfaceRepository, NailSurfaceRepository>();
             services.AddScoped<INailVariantRepository, NailVariantRepository>();
             services.AddScoped<INailComponentRepository, NailComponentRepository>();
@@ -134,6 +135,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IScheduleService, ScheduleService>();
             services.AddScoped<IComponentService, ComponentService>();
             services.AddScoped<INailShapeService, NailShapeService>();
+            services.AddScoped<IShapeMethodConfigService, ShapeMethodConfigService>();
             services.AddScoped<INailSurfaceService, NailSurfaceService>();
             services.AddScoped<INailVariantService, NailVariantService>();
             services.AddScoped<INailComponentService, NailComponentService>();

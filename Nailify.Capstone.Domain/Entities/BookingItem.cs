@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Nailify.Capstone.Domain.Entities
+﻿namespace Nailify.Capstone.Domain.Entities
 {
     public class BookingItem
     {
@@ -12,6 +6,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid BookingId { get; set; }
         public Guid? ServiceId { get; set; }
         public int? NailVariantId { get; set; }
+        public int? ShapeMethodConfigId { get; set; } 
         public Guid? CustomerNailRequestId { get; set; }
 
         public int Quantity { get; set; }
@@ -23,6 +18,7 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Services? Service { get; set; }
         public virtual NailVariant? NailVariant { get; set; }
         public virtual CustomerNailRequest? CustomerNailRequest { get; set; }
+        public virtual ShapeMethodConfig? ShapeMethodConfig { get; set; } 
         public virtual ICollection<BookingProcedure> BookingProcedures { get; set; } = new List<BookingProcedure>();
     }
 }

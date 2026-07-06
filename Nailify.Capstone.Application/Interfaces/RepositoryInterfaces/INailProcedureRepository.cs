@@ -10,6 +10,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface INailProcedureRepository : IGenericRepository<NailProcedure>
     {
         Task<List<NailProcedure>> GetActiveProceduresByVariantIdAsync(int nailVariantId);
+        Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdAsync(int customerNailId);
+        Task<NailProcedure?> GetNailProcedureWithProcedureAsync(Guid nailProcedureId);
     }
 
 }

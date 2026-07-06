@@ -21,5 +21,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual NailSurface NailSurface { get; set; } = null!;
         public virtual ICollection<CustomerNailComponent> CustomerNailComponents { get; set; } = new List<CustomerNailComponent>();
         public virtual ICollection<CustomerNailRequest> CustomerNailRequests { get; set; } = new List<CustomerNailRequest>();
+        public virtual ICollection<NailProcedure> NailProcedures { get; set; } = new List<NailProcedure>();
     }
 }

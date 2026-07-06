@@ -19,6 +19,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IScheduleRepository ScheduleRepository { get; }
         IComponentRepository ComponentRepository { get; }
         INailShapeRepository NailShapeRepository { get; }
+        IShapeMethodConfigRepository ShapeMethodConfigRepository { get; }
         INailSurfaceRepository NailSurfaceRepository { get; }
         INailVariantRepository NailVariantRepository { get; }
         INailComponentRepository NailComponentRepository { get; }
