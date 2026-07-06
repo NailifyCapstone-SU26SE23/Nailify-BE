@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Nailify.Capstone.Application.Common.Models;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -83,13 +83,16 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                 var booking = await _unitOfWork.BookingRepository.GetByIdAsync(domainEvent.BookingId);
                 if (booking != null)
                 {
-                    var appointmentTime = booking.BookingDate.Date.Add(booking.StartTime);
+                    var localBookingDate = (booking.BookingDate.Kind == DateTimeKind.Utc 
+                        ? booking.BookingDate.AddHours(7) 
+                        : booking.BookingDate).Date;
+                    var appointmentTime = localBookingDate.Add(booking.StartTime);
 
                     // Thời điểm gửi mail = Lịch hẹn - 15 phút
                     var reminderTime = appointmentTime.AddMinutes(-15);
 
-                    // Độ trễ từ thời điểm hiện tại (sử dụng UtcNow đồng bộ với database)
-                    var delay = reminderTime - DateTime.UtcNow;
+                    var currentLocalTime = DateTime.UtcNow.AddHours(7);
+                    var delay = reminderTime - currentLocalTime;
                     if (delay > TimeSpan.Zero)
                     {
                         // Trường hợp > 15 phút: Hẹn giờ đúng thời điểm (Schedule)
