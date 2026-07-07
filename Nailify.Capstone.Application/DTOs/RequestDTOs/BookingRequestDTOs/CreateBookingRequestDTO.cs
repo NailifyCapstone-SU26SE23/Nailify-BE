@@ -15,7 +15,9 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public Guid? NailArtistId { get; set; }
+        public string? HoldToken { get; set; }
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
+        public List<int>? SelectedPromotionIds { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CreateBookingRequestDTO, Booking>()
@@ -23,6 +25,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
                 .ForMember(dest => dest.CustomerId, opt => opt.Ignore())
                 .ForMember(dest => dest.TotalPrice, opt => opt.Ignore())
                 .ForMember(dest => dest.Price, opt => opt.Ignore())
+                .ForMember(dest => dest.Discount, opt => opt.Ignore())
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "Pending"))
                 .ForMember(dest => dest.TotalDuration, opt => opt.Ignore())
                 .ForMember(dest => dest.CheckInImageUrl, opt => opt.Ignore())

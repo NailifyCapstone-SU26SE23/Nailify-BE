@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Common.Events;
+using Nailify.Capstone.Domain.Common.Events;
 using Nailify.Capstone.Domain.Common.Events.BookingEvents;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -16,22 +16,35 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid CustomerId { get; set; }
         public Guid SalonId { get; set; }
         public Guid? NailArtistId { get; set; }
+        public Guid? ChairId { get; set; }
         public DateTime BookingDate { get; set; }
         public TimeSpan StartTime { get; set; }
-        public decimal TotalPrice { get; set; }
-        //public string Status { get; set; }
         public BookingStatus Status { get; set; }
-        public string Price { get; set; }
+        public decimal? Price { get; set; } 
+        public decimal? Discount { get; set; }
+        public decimal? TotalPrice { get; set; }
         public int TotalDuration { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public string? CheckInImageUrl { get; set; }
         public string? CheckOutImagesUrl { get; set; }
         public string? QRCode { get; set; }
+        public bool IsRated { get; set; } = false;
+        public bool IsPaid { get; set; } = false;
+        public bool IsRefunded { get; set; } = false;
+
+        // ThanhDT
+        public DateTime? ActualCheckInTime { get; set; }
+        public DateTime? ActualStartTime { get; set; }
+        public bool IsLateArrival { get; set; }
+        // ThanhDT
         public virtual Customer Customer { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? NailArtist { get; set; }
+        public virtual BookingRating? Rating { get; set; }
+        public virtual Chair? Chair { get; set; }
         public virtual ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
+        public virtual ICollection<BookingDiscount> BookingDiscounts { get; set; } = new List<BookingDiscount>();
 
         public void Created(Guid customerId)
         {
@@ -55,48 +68,56 @@ namespace Nailify.Capstone.Domain.Entities
                 customerId
             ));
         }
-        public void CheckInFromQr()
+        public void CheckInFromQr(Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.CheckedIn,
                 "CheckedIn",
-                "Xác thực mã QR thành công. Trạng thái đơn hàng chuyển sang CheckedIn."
+                "Xác thực mã QR thành công. Trạng thái đơn hàng chuyển sang CheckedIn.",
+                actorId
             ));
         }
-        public void CheckIn(string imageUrl)
+        public void CheckIn(string imageUrl, Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             CheckInImageUrl = imageUrl;
             UpdatedAt = DateTime.UtcNow;
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.CheckedIn,
                 "CheckedIn",
-                $"Check-in thành công. Đã chụp trạng thái tay trước khi làm: {imageUrl}"
+                $"Check-in thành công. Đã chụp trạng thái tay trước khi làm: {imageUrl}",
+                actorId
             ));
         }
-        public void CheckInWithoutImage()
+        public void CheckInWithoutImage(Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
-
+            ActualCheckInTime = DateTime.UtcNow;
+            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.CheckedIn,
                 "CheckIn",
-                "Khách hàng đã check-in."
+                "Khách hàng đã check-in.",
+                actorId
             ));
         }
-        public void CompleteService(string finalUrls)
+        public void CompleteService(string finalUrls, Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.ServiceCompleted;
@@ -107,11 +128,12 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.ServiceCompleted,
                 "ServiceCompleted",
-                $"Thợ nail đã hoàn thành các dịch vụ. Ảnh trạng thái tay sau khi làm: {finalUrls}"
+                $"Thợ nail đã hoàn thành các dịch vụ. Ảnh trạng thái tay sau khi làm: {finalUrls}",
+                actorId
             ));
         }
 
-        public void CheckOut()
+        public void CheckOut(Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.Completed;
@@ -121,74 +143,19 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.Completed,
                 "Completed",
-                "Khách hàng đã thanh toán hóa đơn và hoàn thành thủ tục check-out."
+                "Khách hàng đã thanh toán hóa đơn và hoàn thành thủ tục check-out.",
+                actorId
             ));
         }
-        public void Updated(decimal oldPrice, int oldDuration)
+        public void Updated(decimal oldPrice, int oldDuration, Guid actorId)
         {
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 Status,
                 Status,
                 "BookingUpdated",
-                $"Đơn đặt lịch được cập nhật. Tổng tiền mới: {Price}. Tổng thời gian: {TotalDuration} phút."
-            ));
-        }
-        public void AssignArtist(Guid artistId, string artistName)
-        {
-            var oldStatus = Status;
-            NailArtistId = artistId;
-            Status = BookingStatus.Assigned;
-            UpdatedAt = DateTime.UtcNow;
-            AddDomainEvent(new BookingStatusChangedEvent(
-                BookingId,
-                oldStatus,
-                BookingStatus.Assigned,
-                "Assigned",
-                $"Quản lý đã chỉ định thợ {artistName} thẩm định và báo giá."
-            ));
-        }
-        public void ArtistQuote(decimal quotedPrice, int quotedDuration)
-        {
-            var oldStatus = Status;
-            TotalPrice = quotedPrice;
-            Price = quotedPrice.ToString("N0") + " VND";
-            TotalDuration = quotedDuration;
-            Status = BookingStatus.Reviewed;
-            UpdatedAt = DateTime.UtcNow;
-            var item = BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
-            if (item != null)
-            {
-                item.Price = quotedPrice;
-                item.Duration = quotedDuration;
-            }
-            AddDomainEvent(new BookingStatusChangedEvent(
-                BookingId,
-                oldStatus,
-                BookingStatus.Reviewed,
-                "Reviewed",
-                $"Thợ nail đề xuất giá: {Price}, thời gian: {quotedDuration} phút."
-            ));
-        }
-        public void ManagerApproveQuote(decimal finalPrice, int finalDuration)
-        {
-            TotalPrice = finalPrice;
-            Price = finalPrice.ToString("N0") + " VND";
-            TotalDuration = finalDuration;
-            Status = BookingStatus.Pending; // Trở lại pending để chờ làm/duyệt phục vụ
-            UpdatedAt = DateTime.UtcNow;
-            var item = BookingItems.FirstOrDefault(bi => bi.CustomerNailId.HasValue);
-            if (item != null)
-            {
-                item.Price = finalPrice;
-                item.Duration = finalDuration;
-            }
-            AddDomainEvent(new BookingStatusChangedEvent(
-                BookingId,
-                BookingStatus.Reviewed,
-                BookingStatus.Pending,
-                "ManagerApprovedQuote",
-                $"Quản lý đã duyệt báo giá cuối cùng: {Price}, thời gian: {finalDuration} phút. Đơn đặt lịch sẵn sàng phục vụ."
+                $"Đơn đặt lịch được cập nhật. Tổng tiền mới: {Price}. Tổng thời gian: {TotalDuration} phút.",
+                actorId
             ));
         }
         public void Cancel(Guid customerId, string reason)
@@ -204,8 +171,9 @@ namespace Nailify.Capstone.Domain.Entities
                 $"Hủy đơn từ trạng thái '{oldStatus}' sang 'Cancelled'. Lý do: {reason}",
                 customerId
             ));
+            AddDomainEvent(new SlotFreedEvent(SalonId, NailArtistId, BookingDate, StartTime, TotalDuration));
         }
-        public void Confirm()
+        public void Confirm(Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.Approved;
@@ -215,10 +183,11 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.Approved,
                 "BookingConfirmed",
-                "Quản lý Salon xác nhận duyệt đơn đặt lịch."
+                "Quản lý Salon xác nhận duyệt đơn đặt lịch.",
+                actorId
             ));
         }
-        public void Reject()
+        public void Reject(Guid actorId, string reason)
         {
             var oldStatus = Status;
             Status = BookingStatus.Rejected;
@@ -228,20 +197,50 @@ namespace Nailify.Capstone.Domain.Entities
                 oldStatus,
                 BookingStatus.Rejected,
                 "BookingRejected",
-                "Quản lý Salon từ chối đơn đặt lịch."
+               $"Quản lý Salon từ chối đơn đặt lịch. Lý do: {reason}",
+                actorId
             ));
+            AddDomainEvent(new SlotFreedEvent(SalonId, NailArtistId, BookingDate, StartTime, TotalDuration));
         }
-        public void StartService()
+        public void StartService(Guid actorId)
         {
             var oldStatus = Status;
             Status = BookingStatus.InProgress;
             UpdatedAt = DateTime.UtcNow;
+            ActualStartTime = DateTime.UtcNow;
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
                 BookingStatus.InProgress,
                 "ServiceStarted",
-                "Thợ làm móng bắt đầu thực hiện các dịch vụ trong đơn."
+                "Thợ làm móng bắt đầu thực hiện các dịch vụ trong đơn.",
+                actorId
+            ));
+        }
+        public void ReceptionistAssignArtist(Guid artistId, string artistName, Guid actorId)
+        {
+            NailArtistId = artistId;
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                Status, // Trạng thái giữ nguyên
+                Status, // Trạng thái giữ nguyên
+                "ReceptionistAssignedArtist",
+                $"Tiếp tân đã chỉ định thợ {artistName} thực hiện dịch vụ cho đơn hàng.",
+                actorId
+            ));
+        }
+        public void AssignChair(Guid chairId, string chairName, Guid actorId)
+        {
+            ChairId = chairId;
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                Status, // Trạng thái giữ nguyên
+                Status, // Trạng thái giữ nguyên
+                "ChairAssigned",
+                $"Đã phân bổ ghế {chairName} cho khách hàng.",
+                actorId
             ));
         }
     }

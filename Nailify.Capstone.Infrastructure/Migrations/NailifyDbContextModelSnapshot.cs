@@ -28,8 +28,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ActualCheckInTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("ActualStartTime")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime>("BookingDate")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("ChairId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CheckInImageUrl")
                         .HasColumnType("text");
@@ -40,12 +49,34 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("Discount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsLateArrival")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPaid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsRated")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsRefunded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid?>("NailArtistId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Price")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("QRCode")
                         .HasColumnType("text");
@@ -64,7 +95,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<int>("TotalDuration")
                         .HasColumnType("integer");
 
-                    b.Property<decimal>("TotalPrice")
+                    b.Property<decimal?>("TotalPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -73,6 +104,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasKey("BookingId");
 
+                    b.HasIndex("ChairId");
+
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("NailArtistId");
@@ -80,6 +113,54 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasIndex("SalonId");
 
                     b.ToTable("Bookings");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingDiscount", b =>
+                {
+                    b.Property<int>("BookingDiscountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("BookingDiscountId"));
+
+                    b.Property<DateTime>("AppliedDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsAutoApplied")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LoyaltyTierId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LoyaltyTransactionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("PromotionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("BookingDiscountId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("LoyaltyTierId");
+
+                    b.HasIndex("LoyaltyTransactionId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.ToTable("BookingDiscounts");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingHistory", b =>
@@ -125,8 +206,16 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<int?>("CustomerNailId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int>("Duration")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("FinalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int?>("NailVariantId")
                         .HasColumnType("integer");
@@ -160,8 +249,23 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("ActiveDuration")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ActualEndTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("ActualStartTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("AssignedArtistId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("BookingItemId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("CanOverlap")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp without time zone");
@@ -171,6 +275,24 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeSpan?>("EstimatedEndTime")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan?>("EstimatedStartTime")
+                        .HasColumnType("interval");
+
+                    b.Property<bool>("IsMainStep")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("PassiveDuration")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("ProcedureId")
                         .HasColumnType("uuid");
@@ -190,6 +312,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasKey("BookingProcedureId");
 
+                    b.HasIndex("AssignedArtistId");
+
                     b.HasIndex("BookingItemId");
 
                     b.HasIndex("CompletedById");
@@ -197,6 +321,131 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasIndex("ProcedureId");
 
                     b.ToTable("BookingProcedures");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingRating", b =>
+                {
+                    b.Property<Guid>("BookingRatingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Cleanliness")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsUpdated")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("OverallScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Punctuality")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ServiceQuality")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("BookingRatingId");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("BookingRatings", t =>
+                        {
+                            t.HasCheckConstraint("CK_BookingRating_Scores", "\"OverallScore\" BETWEEN 1 AND 5 AND (\"ServiceQuality\" IS NULL OR \"ServiceQuality\" BETWEEN 1 AND 5) AND (\"Punctuality\" IS NULL OR \"Punctuality\" BETWEEN 1 AND 5) AND (\"Cleanliness\" IS NULL OR \"Cleanliness\" BETWEEN 1 AND 5)");
+                        });
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingWaitlist", b =>
+                {
+                    b.Property<Guid>("WailistId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConvertedBookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EstimatedDuration")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("NotifiedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("PreferredNailArtistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RequestedDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("RequesetedDate");
+
+                    b.Property<TimeSpan>("RequestedStartTime")
+                        .HasColumnType("interval");
+
+                    b.Property<Guid>("SalonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("WailistId");
+
+                    b.HasIndex("ConvertedBookingId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("PreferredNailArtistId");
+
+                    b.HasIndex("SalonId");
+
+                    b.ToTable("BookingWaitlists");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Category", b =>
@@ -250,6 +499,34 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.ToTable("CategoryTypes");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
+                {
+                    b.Property<Guid>("ChairId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChairName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("SalonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Active");
+
+                    b.HasKey("ChairId");
+
+                    b.HasIndex("SalonId");
+
+                    b.ToTable("Chairs");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Component", b =>
                 {
                     b.Property<int>("ComponentId")
@@ -292,10 +569,16 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("LifetimePoints")
+                        .HasColumnType("integer");
+
                     b.Property<int>("LoyaltyPoint")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
+
+                    b.Property<int?>("LoyaltyTierId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("NailCondition")
                         .ValueGeneratedOnAdd()
@@ -322,6 +605,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasDefaultValue("");
 
                     b.HasKey("UserId");
+
+                    b.HasIndex("LoyaltyTierId");
 
                     b.ToTable("Customers");
                 });
@@ -392,9 +677,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool>("IsFavorite")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
@@ -408,14 +690,15 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal>("Price")
+                    b.Property<decimal?>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasDefaultValue("Active");
 
                     b.Property<Guid>("UserId")
@@ -479,6 +762,184 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerNailRequest", b =>
+                {
+                    b.Property<Guid>("CustomerNailRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid?>("ApprovedArtistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("CustomerNailId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Duration")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SalonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("CustomerNailRequestId");
+
+                    b.HasIndex("ApprovedArtistId");
+
+                    b.HasIndex("CustomerNailId");
+
+                    b.HasIndex("SalonId");
+
+                    b.ToTable("CustomerNailRequests");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.FavoriteNail", b =>
+                {
+                    b.Property<int>("FavoriteNailId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("FavoriteNailId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("NailDesignId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NailVariantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("FavoriteNailId");
+
+                    b.HasIndex("NailDesignId");
+
+                    b.HasIndex("NailVariantId");
+
+                    b.HasIndex("UserId", "NailDesignId", "NailVariantId")
+                        .IsUnique();
+
+                    b.ToTable("FavoriteNails", t =>
+                        {
+                            t.HasCheckConstraint("CK_FavoriteNail_DesignOrVariant", "\"NailDesignId\" IS NOT NULL OR \"NailVariantId\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTier", b =>
+                {
+                    b.Property<int>("LoyaltyTierId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("LoyaltyTierId"));
+
+                    b.Property<string>("BackgroundColor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ColorJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("DiscountRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("MaxLifetimePoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinLifetimePoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("TextColor")
+                        .HasColumnType("text");
+
+                    b.HasKey("LoyaltyTierId");
+
+                    b.HasIndex("MinLifetimePoints")
+                        .IsUnique();
+
+                    b.ToTable("LoyaltyTiers");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTransaction", b =>
+                {
+                    b.Property<int>("LoyaltyTransactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("LoyaltyTransactionId"));
+
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("LoyaltyTierIdAtTime")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Earned");
+
+                    b.HasKey("LoyaltyTransactionId");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("LoyaltyTierIdAtTime");
+
+                    b.ToTable("LoyaltyTransactions");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
                 {
                     b.Property<Guid>("NailArtistId")
@@ -487,6 +948,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("ConcurrentCapacity")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -747,6 +1211,16 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<int?>("Duration")
                         .HasColumnType("integer");
 
+                    b.Property<string>("FinishType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<float>("HueOffset")
+                        .HasColumnType("real");
+
+                    b.Property<float>("LightnessOffset")
+                        .HasColumnType("real");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -754,6 +1228,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<float>("SaturationOffset")
+                        .HasColumnType("real");
 
                     b.Property<string>("ShaderParam")
                         .IsRequired()
@@ -829,6 +1306,12 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("ActiveDuration")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("CanOverlap")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("CreateAt")
                         .HasColumnType("timestamp without time zone");
 
@@ -838,10 +1321,19 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<int?>("Duration")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsMainStep")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("PassiveDuration")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -852,6 +1344,97 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasKey("ProcedureId");
 
                     b.ToTable("Procedures");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Promotion", b =>
+                {
+                    b.Property<int>("PromotionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PromotionId"));
+
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CategoryTypeId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CurrentUsageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsSelectable")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("NailDesignId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("UsageLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UserLimit")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PromotionId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("CategoryTypeId");
+
+                    b.HasIndex("NailDesignId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("StartDate", "EndDate");
+
+                    b.ToTable("Promotions");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
@@ -1010,6 +1593,79 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.ToTable("SkillTypes");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Transaction", b =>
+                {
+                    b.Property<int>("TransactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("TransactionId"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CheckoutUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("OrderCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("PaymentLinkId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Policy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("QrCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("WebhookPayload")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
+
+                    b.HasKey("TransactionId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("OrderCode")
+                        .IsUnique();
+
+                    b.ToTable("Transactions");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1058,8 +1714,137 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.UserPromotionUsage", b =>
+                {
+                    b.Property<int>("UserPromotionUsageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("UserPromotionUsageId"));
+
+                    b.Property<DateTime>("LastUsedDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("PromotionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserPromotionUsageId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("UserId", "PromotionId")
+                        .IsUnique();
+
+                    b.ToTable("UserPromotionUsages");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WaitlistItem", b =>
+                {
+                    b.Property<Guid>("WaitlistItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CustomerNailId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NailVariantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ServiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WaitlistId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WaitlistItemId");
+
+                    b.HasIndex("CustomerNailId");
+
+                    b.HasIndex("NailVariantId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("WaitlistId");
+
+                    b.ToTable("WaitlistItems");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WalkInQueue", b =>
+                {
+                    b.Property<Guid>("QueueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ArrivalTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("AssignedNailArtistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CalledTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("EstimatedWait")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GuestName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GuestPhone")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OriginalBookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QueuePosition")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequestNote")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SalonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ServiceStartTime")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("QueueId");
+
+                    b.HasIndex("AssignedNailArtistId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OriginalBookingId");
+
+                    b.HasIndex("SalonId");
+
+                    b.ToTable("WalkInQueues");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Booking", b =>
                 {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Chair", "Chair")
+                        .WithMany("Bookings")
+                        .HasForeignKey("ChairId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -1076,11 +1861,45 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Chair");
+
                     b.Navigation("Customer");
 
                     b.Navigation("NailArtist");
 
                     b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingDiscount", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "Booking")
+                        .WithMany("BookingDiscounts")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTier", "LoyaltyTier")
+                        .WithMany()
+                        .HasForeignKey("LoyaltyTierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTransaction", "LoyaltyTransaction")
+                        .WithMany()
+                        .HasForeignKey("LoyaltyTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("BookingDiscounts")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("LoyaltyTier");
+
+                    b.Navigation("LoyaltyTransaction");
+
+                    b.Navigation("Promotion");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingHistory", b =>
@@ -1134,6 +1953,11 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingProcedure", b =>
                 {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailArtist", "AssignedArtist")
+                        .WithMany()
+                        .HasForeignKey("AssignedArtistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nailify.Capstone.Domain.Entities.BookingItem", "BookingItem")
                         .WithMany("BookingProcedures")
                         .HasForeignKey("BookingItemId")
@@ -1150,11 +1974,65 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("ProcedureId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.Navigation("AssignedArtist");
+
                     b.Navigation("BookingItem");
 
                     b.Navigation("CompletedBy");
 
                     b.Navigation("Procedure");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingRating", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "Booking")
+                        .WithOne("Rating")
+                        .HasForeignKey("Nailify.Capstone.Domain.Entities.BookingRating", "BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
+                        .WithMany("BookingRatings")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingWaitlist", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "ConvertedBooking")
+                        .WithMany()
+                        .HasForeignKey("ConvertedBookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailArtist", "PreferredNailArtist")
+                        .WithMany()
+                        .HasForeignKey("PreferredNailArtistId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
+                        .WithMany()
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ConvertedBooking");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("PreferredNailArtist");
+
+                    b.Navigation("Salon");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Category", b =>
@@ -1168,13 +2046,31 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("CategoryType");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
+                        .WithMany("Chairs")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
                 {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTier", "LoyaltyTier")
+                        .WithMany("Customers")
+                        .HasForeignKey("LoyaltyTierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
                         .WithOne()
                         .HasForeignKey("Nailify.Capstone.Domain.Entities.Customer", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("LoyaltyTier");
 
                     b.Navigation("User");
                 });
@@ -1238,6 +2134,82 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("CustomerComponent");
 
                     b.Navigation("CustomerNail");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerNailRequest", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailArtist", "ApprovedArtist")
+                        .WithMany()
+                        .HasForeignKey("ApprovedArtistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
+                        .WithMany("CustomerNailRequests")
+                        .HasForeignKey("CustomerNailId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
+                        .WithMany()
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ApprovedArtist");
+
+                    b.Navigation("CustomerNail");
+
+                    b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.FavoriteNail", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
+                        .WithMany()
+                        .HasForeignKey("NailDesignId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
+                        .WithMany()
+                        .HasForeignKey("NailVariantId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NailDesign");
+
+                    b.Navigation("NailVariant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTransaction", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
+                        .WithMany("LoyaltyTransactions")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTier", "LoyaltyTier")
+                        .WithMany()
+                        .HasForeignKey("LoyaltyTierIdAtTime")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("LoyaltyTier");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
@@ -1382,6 +2354,30 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailSurface");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Promotion", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Category", "Category")
+                        .WithMany("Promotions")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CategoryType", "CategoryType")
+                        .WithMany("Promotions")
+                        .HasForeignKey("CategoryTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
+                        .WithMany("Promotions")
+                        .HasForeignKey("NailDesignId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("CategoryType");
+
+                    b.Navigation("NailDesign");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.SalonOperatingHour", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
@@ -1404,6 +2400,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailArtist");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Transaction", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.User", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
@@ -1414,11 +2421,98 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("Salon");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.UserPromotionUsage", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("UserPromotionUsages")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Promotion");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WaitlistItem", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
+                        .WithMany()
+                        .HasForeignKey("CustomerNailId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
+                        .WithMany()
+                        .HasForeignKey("NailVariantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Services", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.BookingWaitlist", "BookingWaitlist")
+                        .WithMany("WaitlistItems")
+                        .HasForeignKey("WaitlistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BookingWaitlist");
+
+                    b.Navigation("CustomerNail");
+
+                    b.Navigation("NailVariant");
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WalkInQueue", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailArtist", "AssignedNailArtist")
+                        .WithMany()
+                        .HasForeignKey("AssignedNailArtistId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "OriginalBooking")
+                        .WithMany()
+                        .HasForeignKey("OriginalBookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Salon", "Salon")
+                        .WithMany()
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AssignedNailArtist");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("OriginalBooking");
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Booking", b =>
                 {
+                    b.Navigation("BookingDiscounts");
+
                     b.Navigation("BookingHistories");
 
                     b.Navigation("BookingItems");
+
+                    b.Navigation("Rating");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingItem", b =>
@@ -1426,19 +2520,40 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("BookingProcedures");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingWaitlist", b =>
+                {
+                    b.Navigation("WaitlistItems");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Category", b =>
                 {
                     b.Navigation("NailCategories");
+
+                    b.Navigation("Promotions");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CategoryType", b =>
                 {
                     b.Navigation("Categories");
+
+                    b.Navigation("Promotions");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Chair", b =>
+                {
+                    b.Navigation("Bookings");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Component", b =>
                 {
                     b.Navigation("NailComponents");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Customer", b =>
+                {
+                    b.Navigation("BookingRatings");
+
+                    b.Navigation("LoyaltyTransactions");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerComponent", b =>
@@ -1449,6 +2564,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerNail", b =>
                 {
                     b.Navigation("CustomerNailComponents");
+
+                    b.Navigation("CustomerNailRequests");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTier", b =>
+                {
+                    b.Navigation("Customers");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>
@@ -1465,6 +2587,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailDesignImages");
 
                     b.Navigation("NailVariants");
+
+                    b.Navigation("Promotions");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailShape", b =>
@@ -1491,8 +2615,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailProcedures");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Promotion", b =>
+                {
+                    b.Navigation("BookingDiscounts");
+
+                    b.Navigation("UserPromotionUsages");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Salon", b =>
                 {
+                    b.Navigation("Chairs");
+
                     b.Navigation("OperatingHours");
                 });
 

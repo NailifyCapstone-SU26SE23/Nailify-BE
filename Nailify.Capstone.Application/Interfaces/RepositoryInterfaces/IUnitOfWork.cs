@@ -35,6 +35,22 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IProcedureRepository ProcedureRepository { get; }
         INailProcedureRepository NailProcedureRepository { get; }
         IBookingProcedureRepository BookingProcedureRepository { get; }
+        IFavoriteNailRepository FavoriteNailRepository { get; }
+        ILoyaltyTierRepository LoyaltyTierRepository { get; }
+        ILoyaltyTransactionRepository LoyaltyTransactionRepository { get; }
+        ICustomerNailRequestRepository CustomerNailRequestRepository { get; }
+        IBookingRatingRepository BookingRatingRepository { get; }
+        IPromotionRepository PromotionRepository { get; }
+        IBookingDiscountRepository BookingDiscountRepository { get; }
+        IUserPromotionUsageRepository UserPromotionUsageRepository { get; }
+        IBookingWaitlistRepository BookingWaitlistRepository { get; }
+        IWalkInQueueRepository WalkInQueueRepository { get; }
+        ITransactionRepository TransactionRepository { get; }
+        IChairRepository ChairRepository { get; }
+        // Quản lý Transaction
+        Task BeginTransactionAsync();
+        Task CommitTransactionAsync();
+        Task RollbackTransactionAsync();
         Task<int> SaveChangesAsync();
     }
 }

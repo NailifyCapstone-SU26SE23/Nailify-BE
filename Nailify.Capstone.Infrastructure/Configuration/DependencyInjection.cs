@@ -9,6 +9,7 @@ using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Application.Services;
+using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
@@ -49,8 +50,24 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
-                    NameClaimType = JwtRegisteredClaimNames.Email,
-                    RoleClaimType = "role"
+                    NameClaimType = System.Security.Claims.ClaimTypes.Email,
+                    RoleClaimType = System.Security.Claims.ClaimTypes.Role
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+
+                        // If the request is for the notifications hub
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notifications"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return System.Threading.Tasks.Task.CompletedTask;
+                    }
                 };
             });
             // Cấu hình DbContext với PostgreSQL
@@ -74,6 +91,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailDesignRepository, NailDesignRepository>();
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped<ISalonRepository, SalonRepository>();
+            services.AddScoped<IChairRepository, ChairRepository>();
             services.AddScoped<INailArtistRepository, NailArtistRepository>();
             services.AddScoped<IScheduleRepository, ScheduleRepository>();
             services.AddScoped<IComponentRepository, ComponentRepository>();
@@ -94,6 +112,16 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IProcedureRepository, ProcedureRepository>();
             services.AddScoped<INailProcedureRepository, NailProcedureRepository>();
             services.AddScoped<IBookingProcedureRepository, BookingProcedureRepository>();
+            services.AddScoped<IFavoriteNailRepository, FavoriteNailRepository>();
+            services.AddScoped<ILoyaltyTierRepository, LoyaltyTierRepository>();
+            services.AddScoped<ILoyaltyTransactionRepository, LoyaltyTransactionRepository>();
+            services.AddScoped<IBookingRatingRepository, BookingRatingRepository>();
+            services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<IBookingDiscountRepository, BookingDiscountRepository>();
+            services.AddScoped<IUserPromotionUsageRepository, UserPromotionUsageRepository>();
+            services.AddScoped<IBookingWaitlistRepository, BookingWaitlistRepository>();
+            services.AddScoped<IWalkInQueueRepository, WalkInQueueRepository>();
+            services.AddScoped<ITransactionRepository, TransactionRepository>();
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -101,6 +129,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailDesignService, NailDesignService>();
             services.AddScoped<IPasswordHasher, PasswordHasher>();
             services.AddScoped<ISalonService, SalonService>();
+            services.AddScoped<IChairService, ChairService>();
             services.AddScoped<INailArtistService, NailArtistService>();
             services.AddScoped<IScheduleService, ScheduleService>();
             services.AddScoped<IComponentService, ComponentService>();
@@ -110,6 +139,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailComponentService, NailComponentService>();
             services.AddScoped<ICustomerComponentService, CustomerComponentService>();
             services.AddScoped<ICustomerNailService, CustomerNailService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             services.AddScoped<ICustomerNailComponentService, CustomerNailComponentService>();
             services.AddScoped<ISkillTypeService, SkillTypeService>();
             services.AddScoped<INailArtistSkillService, NailArtistSkillService>();
@@ -121,6 +151,23 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IServicesService, ServicesService>();
             services.AddScoped<IBookingProcedureService, BookingProcedureService>();
             services.AddScoped<IProcedureService, ProcedureService>();
+            services.AddScoped<IFavoriteNailService, FavoriteNailService>();
+            services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
+            services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
+            services.AddScoped<IBookingRatingService, BookingRatingService>();
+            services.AddScoped<IPromotionService, PromotionService>();
+            services.AddScoped<ISlotHoldService, SlotHoldService>();
+            services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
+            services.AddScoped<IBookingSchedulingService, BookingSchedulingService>();
+            services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();
+            services.AddScoped<IWalkInQueueService, WalkInQueueService>();
+            services.AddScoped<IEmailService, SmtpEmailService>();
+            services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+            services.AddHttpClient();
+            services.AddScoped<PayOSHelper>();
+            services.AddScoped<PayOSService>();
+            services.AddScoped<RefundService>();
+            services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
                                                   .Get<CloudinaryConfiguration>();
@@ -128,6 +175,44 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             {
                 services.AddSingleton<ICloudinaryConfiguration>(cloudinarySettings);
             }
+
+            var slotHoldSettings = configuration.GetSection("SlotHoldSettings")
+                                                  .Get<SlotHoldConfiguration>()
+                                   ?? new SlotHoldConfiguration();
+            services.AddSingleton<ISlotHoldConfiguration>(slotHoldSettings);
+
+            var redisSettings = configuration.GetSection("Redis")
+                                             .Get<RedisConfiguration>()
+                                ?? new RedisConfiguration { UseMemoryCache = true };
+            services.AddSingleton<IRedisConfiguration>(redisSettings);
+
+            if (redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                   options.Configuration = redisSettings?.ConnectionString;
+                   options.InstanceName = redisSettings?.InstanceName;
+                });
+            }
+
+            var emailSettings = configuration.GetSection("SMTPEmailSettings")
+                                  .Get<SmtpEmailConfiguration>()
+                    ?? new SmtpEmailConfiguration();
+            services.AddSingleton<IEmailConfiguration>(emailSettings);
+
+            var paymentSettings = configuration.GetSection("PayOSSettings")
+                                  .Get<PayOSSettings>()
+                    ?? new PayOSSettings();
+            services.AddSingleton<IPayOSSettings>(paymentSettings);
+
+            var paymentUrls = configuration.GetSection("PaymentUrls")
+                                  .Get<PaymentUrls>()
+                    ?? new PaymentUrls();
+            services.AddSingleton<IPaymentUrls>(paymentUrls);
 
             // Đăng ký FluentValidation từ tầng Application
             services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);

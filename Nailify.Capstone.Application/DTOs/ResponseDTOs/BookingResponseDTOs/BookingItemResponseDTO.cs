@@ -22,6 +22,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string CustomerNailImageUrl { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public decimal Price { get; set; }
+        public decimal FinalPrice { get; set; }
+        public decimal DiscountAmount { get; set; }
         public int Duration { get; set; }
         public void Mapping(Profile profile)
         {

@@ -9,7 +9,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public List<int> CategoryIds { get; set; } = new List<int>();
-        public List<int> NailVariantIds { get; set; } = new List<int>();
         public List<string> ExistingImageUrls { get; set; } = new List<string>();
 
         public void Mapping(Profile profile)

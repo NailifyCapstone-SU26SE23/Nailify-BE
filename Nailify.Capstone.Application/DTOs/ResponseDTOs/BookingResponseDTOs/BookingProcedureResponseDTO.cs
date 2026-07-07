@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -22,6 +22,18 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public Guid? CompletedById { get; set; }
         public string? CompletedByName { get; set; }
         public bool IsRequired { get; set; }
+        
+        // Các trường mới bổ sung
+        public Guid? AssignedArtistId { get; set; }
+        public string? AssignedArtistName { get; set; }
+        public TimeSpan? EstimatedStartTime { get; set; }
+        public TimeSpan? EstimatedEndTime { get; set; }
+        public int Duration { get; set; }
+        public int ActiveDuration { get; set; }
+        public int PassiveDuration { get; set; }
+        public bool CanOverlap { get; set; }
+        public bool IsMainStep { get; set; }
+
         public void Mapping(Profile profile)
         {
             profile.CreateMap<BookingProcedure, BookingProcedureResponseDTO>()
@@ -29,6 +41,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                 .ForMember(dest => dest.CompletedByName, opt => opt.MapFrom(x =>
                     x.CompletedBy != null && x.CompletedBy.Account != null
                     ? $"{x.CompletedBy.Account.FirstName} {x.CompletedBy.Account.LastName}"
+                    : null))
+                .ForMember(dest => dest.AssignedArtistName, opt => opt.MapFrom(x =>
+                    x.AssignedArtist != null && x.AssignedArtist.Account != null
+                    ? $"{x.AssignedArtist.Account.FirstName} {x.AssignedArtist.Account.LastName}"
                     : null));
         }
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,9 +12,14 @@ namespace Nailify.Capstone.Domain.Entities
         public string Name { get; set; }
         public string? Description { get; set; }
         public int? Duration { get; set; }
+        // New
+        public int ActiveDuration { get; set; }
+        public int PassiveDuration { get; set; }
+        public bool CanOverlap { get; set; }
         public string Status { get; set; } = "Active";
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
         public bool IsRequired { get; set; } = true;
+        public bool IsMainStep { get; set; } = true;
         public virtual ICollection<NailProcedure> NailProcedures { get; set; } = new List<NailProcedure>();
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 
 namespace Nailify.Capstone.Infrastructure.Repository
@@ -12,7 +13,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
         }
 
-        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null, bool? isFavorite = null)
+        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
         {
             var query = BuildCustomerNailQuery();
 
@@ -30,11 +31,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
             if (isPublic.HasValue)
             {
                 query = query.Where(nail => nail.IsPublic == isPublic.Value);
-            }
-
-            if (isFavorite.HasValue)
-            {
-                query = query.Where(nail => nail.IsFavorite == isFavorite.Value);
             }
 
             var count = await query.CountAsync();
@@ -55,7 +51,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         private IQueryable<CustomerNail> BuildCustomerNailQuery()
         {
             return _dbSet
-                .Where(nail => nail.Status == "Active")
+                //.Where(nail => nail.Status == "Active")
                 .Include(nail => nail.NailShape)
                 .Include(nail => nail.NailSurface)
                 .Include(nail => nail.CustomerNailComponents)

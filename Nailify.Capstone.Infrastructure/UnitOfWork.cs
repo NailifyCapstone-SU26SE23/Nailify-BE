@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
@@ -8,6 +9,7 @@ namespace Nailify.Capstone.Infrastructure
 {
     public class UnitOfWork : IUnitOfWork
     {
+        private IDbContextTransaction? _transaction;
         private readonly NailifyDbContext _context;
         private IUserRepository? _userRepository;
         private ICustomerRepository? _customerRepository;
@@ -36,6 +38,18 @@ namespace Nailify.Capstone.Infrastructure
         private IProcedureRepository? _procedureRepository;
         private INailProcedureRepository? _nailProcedureRepository;
         private IBookingProcedureRepository? _bookingProcedureRepository;
+        private IFavoriteNailRepository? _favoriteNailRepository;
+        private ILoyaltyTierRepository? _loyaltyTierRepository;
+        private ILoyaltyTransactionRepository? _loyaltyTransactionRepository;
+        private ICustomerNailRequestRepository? _customerNailRequestRepository;
+        private IBookingRatingRepository? _bookingRatingRepository;
+        private IPromotionRepository? _promotionRepository;
+        private IBookingDiscountRepository? _bookingDiscountRepository;
+        private IUserPromotionUsageRepository? _userPromotionUsageRepository;
+        private IBookingWaitlistRepository? _bookingWaitlistRepository;
+        private IWalkInQueueRepository? _walkInQueueRepository;
+        private ITransactionRepository? _transactionRepository;
+        private IChairRepository? _chairRepository;
 
         public UnitOfWork(NailifyDbContext context)
         {
@@ -79,6 +93,22 @@ namespace Nailify.Capstone.Infrastructure
         public IProcedureRepository ProcedureRepository => _procedureRepository ??= new ProcedureRepository(_context);
         public INailProcedureRepository NailProcedureRepository => _nailProcedureRepository ??= new NailProcedureRepository(_context);
         public IBookingProcedureRepository BookingProcedureRepository => _bookingProcedureRepository ??= new BookingProcedureRepository(_context);
+        public IFavoriteNailRepository FavoriteNailRepository => _favoriteNailRepository ??= new FavoriteNailRepository(_context);
+        public ILoyaltyTierRepository LoyaltyTierRepository => _loyaltyTierRepository ??= new LoyaltyTierRepository(_context);
+        public ILoyaltyTransactionRepository LoyaltyTransactionRepository => _loyaltyTransactionRepository ??= new LoyaltyTransactionRepository(_context);
+
+        public ICustomerNailRequestRepository CustomerNailRequestRepository => _customerNailRequestRepository ??= new CustomerNailRequestRepository(_context);
+        public IBookingRatingRepository BookingRatingRepository => _bookingRatingRepository ??= new BookingRatingRepository(_context);
+        public IPromotionRepository PromotionRepository => _promotionRepository ??= new PromotionRepository(_context);
+        public IBookingDiscountRepository BookingDiscountRepository => _bookingDiscountRepository ??= new BookingDiscountRepository(_context);
+        public IUserPromotionUsageRepository UserPromotionUsageRepository => _userPromotionUsageRepository ??= new UserPromotionUsageRepository(_context);
+
+        public IBookingWaitlistRepository BookingWaitlistRepository => _bookingWaitlistRepository ??= new BookingWaitlistRepository(_context);
+
+        public IWalkInQueueRepository WalkInQueueRepository => _walkInQueueRepository ??= new WalkInQueueRepository(_context);
+        public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
+        public IChairRepository ChairRepository => _chairRepository ??= new ChairRepository(_context);
+
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
@@ -88,6 +118,33 @@ namespace Nailify.Capstone.Infrastructure
         {
             _context.Dispose();
             GC.SuppressFinalize(this);
+        }
+
+        public async Task BeginTransactionAsync()
+        {
+            if (_context.Database.CurrentTransaction != null)
+            {
+                return;
+            }
+            _transaction = await _context.Database.BeginTransactionAsync();
+        }
+        public async Task CommitTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.CommitAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
+        }
+        public async Task RollbackTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.RollbackAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Domain.Common.Events.BookingEvents
             NewStatus = newStatus;
             EventType = eventType;
             Payload = payload;
-            ActorId = actorId;
+            ActorId = actorId == Guid.Empty ? null : actorId;
         }
     }
 }

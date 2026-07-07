@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 {
@@ -16,17 +17,20 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string CustomColor { get; set; } = string.Empty;
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsFavorite { get; set; }
         public bool IsPublic { get; set; }
         public int? BasedOnNailVariantId { get; set; }
+
         public NailShapeDto? NailShape { get; set; }
         public NailSurfaceDto? NailSurface { get; set; }
         public NailVariantDto? BasedOnNailVariant { get; set; }
         public List<CustomerNailComponentDto> CustomerNailComponents { get; set; } = new List<CustomerNailComponentDto>();
 
+        public string Status { get; set; } = string.Empty;
+
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<CustomerNail, CustomerNailDto>();
+            profile.CreateMap<CustomerNail, CustomerNailDto>()
+                   .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
         }
     }
 }

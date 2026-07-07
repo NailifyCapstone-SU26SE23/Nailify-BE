@@ -9,5 +9,6 @@ namespace Nailify.Capstone.Domain.Entities
 
         public virtual CategoryType CategoryType { get; set; } = null!;
         public virtual ICollection<NailCategory> NailCategories { get; set; } = new List<NailCategory>();
+        public virtual ICollection<Promotion> Promotions { get; set; } = new List<Promotion>();
     }
 }

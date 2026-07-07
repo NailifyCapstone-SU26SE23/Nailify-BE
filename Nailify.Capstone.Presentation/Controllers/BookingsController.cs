@@ -22,11 +22,12 @@ namespace Nailify.Capstone.Presentation.Controllers
     {
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
-
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary)
+        private readonly ISlotHoldService _slotHoldService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
+            _slotHoldService = slotHoldService;
         }
 
         /// <summary>
@@ -90,6 +91,20 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        [HttpPost("price")]
+        [ProducesResponseType(typeof(ApiResult<BookingPriceResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> CalculatePrice([FromBody] BookingPriceRequestDTO request)
+        {
+            var response = await _bookingService.CalculateBookingPriceAsync(
+                GetCurrentUserId(),
+                request.BookingItems,
+                request.SelectedPromotionIds); 
+
+            return response.IsSucceeded ? Ok(response) : BadRequest(response);
+        }
+
         /// <summary>
         /// Thực hiện chụp hình bàn tay khách cho đơn đặt lịch (Chụp hình trước khi làm).
         /// </summary>
@@ -102,6 +117,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             string checkInImageUrl = string.Empty;
             try
             {
+                var currentUserId = GetCurrentUserId();
                 if (request.Image != null && request.Image.Length > 0)
                 {
                     checkInImageUrl = await _cloudinaryService.UploadImageAsync(request.Image);
@@ -113,7 +129,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                     CheckInImageUrl = checkInImageUrl
                 };
 
-                var response = await _bookingService.CheckInBookingAsync(appRequest);
+                var response = await _bookingService.CheckInBookingAsync(appRequest, currentUserId);
                 if (!response.IsSucceeded && !string.IsNullOrEmpty(checkInImageUrl))
                 {
                     await _cloudinaryService.DeleteImageAsync(checkInImageUrl);
@@ -141,7 +157,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CheckOut([FromForm] CheckOutRequestDTO request)
         {
-            var response = await _bookingService.CheckOutBookingAsync(request);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.CheckOutBookingAsync(request, currentUserId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -154,68 +171,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBookingRequestDTO request)
         {
-            var response = await _bookingService.UpdateBookingAsync(id, request);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
-
-        /// <summary>
-        /// Tạo mới một đơn đặt lịch tùy chỉnh (Booking Custom) của khách hàng.
-        /// </summary>
-        [HttpPost("custom")]
-        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> CreateCustom([FromBody] CreateCustomBookingRequestDTO request)
-        {
-            try
-            {
-                var customerId = GetCurrentUserId();
-                var response = await _bookingService.CreateCustomBookingAsync(customerId, request);
-                if (!response.IsSucceeded) return BadRequest(response);
-                return Ok(response);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return UnauthorizedResponse();
-            }
-        }
-
-        /// <summary>
-        /// Salon Manager phân bổ thợ nail cho đơn đặt lịch tùy chỉnh.
-        /// </summary>
-        [HttpPost("{id}/assign-artist")]
-        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> AssignArtist(Guid id, [FromBody] AssignArtistRequestDTO request)
-        {
-            var response = await _bookingService.AssignArtistAsync(id, request);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
-
-        /// <summary>
-        /// Thợ nail đề xuất giá và thời gian cho đơn đặt lịch tùy chỉnh.
-        /// </summary>
-        [HttpPost("{id}/artist-quote")]
-        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> ArtistQuote(Guid id, [FromBody] ArtistQuoteRequestDTO request)
-        {
-            var response = await _bookingService.ArtistQuoteAsync(id, request);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
-
-        /// <summary>
-        /// Salon Manager chốt/duyệt báo giá cuối cùng cho đơn đặt lịch tùy chỉnh.
-        /// </summary>
-        [HttpPost("{id}/manager-approve-quote")]
-        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> ManagerApproveQuote(Guid id, [FromBody] ManagerApproveQuoteRequestDTO request)
-        {
-            var response = await _bookingService.ManagerApproveQuoteAsync(id, request);
+            var customerId = GetCurrentUserId();
+            var response = await _bookingService.UpdateBookingAsync(id, request, customerId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -244,7 +201,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Confirm(Guid id)
         {
-            var response = await _bookingService.ConfirmBookingAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.ConfirmBookingAsync(id, currentUserId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -258,7 +216,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> ManualCheckIn(Guid id)
         {
-            var response = await _bookingService.ManualCheckInBookingAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.ManualCheckInBookingAsync(id, currentUserId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -270,9 +229,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> Reject(Guid id)
+        public async Task<IActionResult> Reject(Guid id, [FromBody] RejectRequestDTO request)
         {
-            var response = await _bookingService.RejectBookingAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.RejectBookingAsync(id, currentUserId, request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -286,7 +246,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Start(Guid id)
         {
-            var response = await _bookingService.StartServiceAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.StartServiceAsync(id, currentUserId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -373,7 +334,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> VerifyQr([FromQuery] string qrToken)
         {
-            var response = await _bookingService.VerifyQrCodeAsync(qrToken);
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.VerifyQrCodeAsync(qrToken, currentUserId);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -394,13 +356,14 @@ namespace Nailify.Capstone.Presentation.Controllers
             var uploadedUrls = new List<string>();
             try
             {
+                var currentUserId = GetCurrentUserId();
                 uploadedUrls = await _cloudinaryService.UploadMultipleImagesAsync(request.Images);
                 var appRequest = new CompleteServiceRequestDTO
                 {
                     BookingId = id,
                     CompleteImagesUrl = uploadedUrls
                 };
-                var response = await _bookingService.CompleteServiceAsync(appRequest);
+                var response = await _bookingService.CompleteServiceAsync(appRequest, currentUserId);
                 if (!response.IsSucceeded)
                 {
                     await _cloudinaryService.DeleteMultipleImagesAsync(uploadedUrls);
@@ -417,7 +380,115 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiResult<object>(false, $"Hoàn thành dịch vụ thất bại khi tải ảnh: {ex.Message}"));
             }
         }
+        /// <summary>
+        /// Giữ chỗ slot 5 phút để khách hàng có thời gian chọn dịch vụ.
+        /// </summary>
+        [HttpPost("hold-slot")]
+        [ProducesResponseType(typeof(ApiResult<SlotHoldResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> HoldSlot([FromBody] HoldSlotRequestDTO request)
+        {
+            try
+            {
+                var customerId = GetCurrentUserId();
+                var response = await _slotHoldService.HoldSlotAsync(customerId, request);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Hủy giữ chỗ slot thủ công (khi khách đổi ý).
+        /// </summary>
+        [HttpDelete("hold-slot/{holdToken}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ReleaseHold(string holdToken)
+        {
+            try
+            {
+                var customerId = GetCurrentUserId();
+                var response = await _slotHoldService.ReleaseSlotAsync(customerId, holdToken);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Kiểm tra trạng thái giữ chỗ (còn hiệu lực không, còn bao nhiêu giây).
+        /// </summary>
+        [HttpGet("hold-slot/{holdToken}/status")]
+        [ProducesResponseType(typeof(ApiResult<SlotHoldResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetHoldStatus(string holdToken)
+        {
+            var response = await _slotHoldService.GetHoldStatusAsync(holdToken);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Tiếp tân (hoặc Quản lý) chỉ định thợ nail cho đơn đặt lịch khi khách đến.
+        /// </summary>
+        [HttpPost("{id}/receptionist-assign-artist")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ReceptionistAssignArtist(Guid id, [FromBody] AssignArtistRequestDTO request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var response = await _bookingService.ReceptionistAssignArtistAsync(id, request, currentUserId);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Lấy danh sách thợ làm móng đang rảnh và đủ điều kiện làm cho đơn đặt lịch (dùng cho lễ tân phân thợ khi khách đến).
+        /// </summary>
+        [HttpGet("{id}/available-artists-for-receptionist")]
+        [ProducesResponseType(typeof(ApiResult<List<SuggestedArtistResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetAvailableArtistsForBooking(Guid id)
+        {
+            var response = await _bookingService.GetAvailableArtistsForBookingAsync(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
 
+        /// <summary>
+        /// Tiếp tân (hoặc Quản lý) chỉ định ghế cho đơn đặt lịch.
+        /// </summary>
+        [HttpPost("{id}/assign-chair/{chairId}")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> AssignChair(Guid id, Guid chairId)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var response = await _bookingService.AssignChairAsync(id, chairId, currentUserId);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
     }
 
     public class CheckInForm

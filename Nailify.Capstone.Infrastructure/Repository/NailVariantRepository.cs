@@ -71,6 +71,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Where(nv => nv.Status == "Active")
                 .Include(nv => nv.NailShape)
                 .Include(nv => nv.NailSurface)
+                .Include(nv => nv.NailDesign)
+                    .ThenInclude(nd => nd.NailCategories)
+                    .ThenInclude(nc => nc.Category)
                 .Include(nv => nv.NailComponents)
                 .ThenInclude(nc => nc.Component);
         }
