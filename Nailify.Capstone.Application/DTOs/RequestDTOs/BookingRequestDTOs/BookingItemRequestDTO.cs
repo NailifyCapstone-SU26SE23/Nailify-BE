@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public int? NailVariantId { get; set; }
         public Guid? ServiceId { get; set; }
         public int? ShapeMethodConfigId { get; set; }
+        public int? CustomerNailId { get; set; }
         public Guid? CustomerNailRequestId { get; set; }
         public int Quantity { get; set; }
 
