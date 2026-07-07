@@ -73,10 +73,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        // policy.WithOrigins(
-        //           "http://localhost:5173",
-        //           "http://localhost:5174")
-          policy.SetIsOriginAllowed(origin => true) 
+        //policy.WithOrigins(
+        //          "http://localhost:5173",
+        //          "http://localhost:5174");
+        policy.SetIsOriginAllowed(origin => true) 
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -88,8 +88,8 @@ var app = builder.Build();
 app.ApplyMigrations();
 
 app.UseCors("AllowReactApp");
-
 app.UseAuthentication();
+app.UseAuthorization(); 
 app.UseMiddleware<RoleAuthorizationMiddleware>();
 
 app.UseInfrastructure();
