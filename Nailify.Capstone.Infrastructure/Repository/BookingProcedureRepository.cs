@@ -75,9 +75,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<bool> HasAnyInProgressProcedureAsync(Guid artistId)
         {
-            return await FindByCondition(p => p.CompletedById == artistId 
+            return await FindByCondition(p => p.AssignedArtistId == artistId 
                                     && p.Status == Nailify.Capstone.Domain.Enums.BookingProcedureStatus.InProgress, false)
                         .AnyAsync();
+        }
+
+        public async Task<BookingProcedure?> GetProcedureWithBookingItemAsync(Guid bookingProcedureId)
+        {
+            return await FindByCondition(x => x.BookingProcedureId == bookingProcedureId, false)
+                .Include(x => x.BookingItem)
+                    .ThenInclude(x => x.Booking)
+                .FirstOrDefaultAsync();
         }
     }
 }

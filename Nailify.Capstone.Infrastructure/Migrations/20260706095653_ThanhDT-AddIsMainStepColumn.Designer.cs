@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706095653_ThanhDT-AddIsMainStepColumn")]
+    partial class ThanhDTAddIsMainStepColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -203,8 +206,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CustomerNailRequestId")
-                        .HasColumnType("uuid");
+                    b.Property<int?>("CustomerNailId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -230,20 +233,15 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid?>("ServiceId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("ShapeMethodConfigId")
-                        .HasColumnType("integer");
-
                     b.HasKey("BookingItemId");
 
                     b.HasIndex("BookingId");
 
-                    b.HasIndex("CustomerNailRequestId");
+                    b.HasIndex("CustomerNailId");
 
                     b.HasIndex("NailVariantId");
 
                     b.HasIndex("ServiceId");
-
-                    b.HasIndex("ShapeMethodConfigId");
 
                     b.ToTable("BookingItems");
                 });
@@ -1122,10 +1120,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("CustomerNailId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("NailVariantId")
+                    b.Property<int>("NailVariantId")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("ProcedureId")
@@ -1141,8 +1136,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("NailProcedureId");
-
-                    b.HasIndex("CustomerNailId");
 
                     b.HasIndex("NailVariantId");
 
@@ -1184,6 +1177,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NailShapeId"));
 
+                    b.Property<int?>("Duration")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1191,6 +1187,10 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1269,7 +1269,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("NailDesignId")
+                    b.Property<int>("NailDesignId")
                         .HasColumnType("integer");
 
                     b.Property<int?>("NailShapeId")
@@ -1569,41 +1569,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasKey("ServiceId");
 
                     b.ToTable("Services");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.ShapeMethodConfig", b =>
-                {
-                    b.Property<int>("ShapeMethodConfigId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ShapeMethodConfigId"));
-
-                    b.Property<int>("Duration")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("NailShapeId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("Active");
-
-                    b.HasKey("ShapeMethodConfigId");
-
-                    b.HasIndex("NailShapeId");
-
-                    b.ToTable("ShapeMethodConfigs");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.SkillType", b =>
@@ -1965,9 +1930,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNailRequest", "CustomerNailRequest")
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
                         .WithMany()
-                        .HasForeignKey("CustomerNailRequestId")
+                        .HasForeignKey("CustomerNailId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
@@ -1980,20 +1945,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nailify.Capstone.Domain.Entities.ShapeMethodConfig", "ShapeMethodConfig")
-                        .WithMany()
-                        .HasForeignKey("ShapeMethodConfigId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Booking");
 
-                    b.Navigation("CustomerNailRequest");
+                    b.Navigation("CustomerNail");
 
                     b.Navigation("NailVariant");
 
                     b.Navigation("Service");
-
-                    b.Navigation("ShapeMethodConfig");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.BookingProcedure", b =>
@@ -2338,23 +2296,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailProcedure", b =>
                 {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
-                        .WithMany("NailProcedures")
-                        .HasForeignKey("CustomerNailId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
                         .WithMany("NailProcedures")
                         .HasForeignKey("NailVariantId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.Procedure", "Procedure")
                         .WithMany("NailProcedures")
                         .HasForeignKey("ProcedureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("CustomerNail");
 
                     b.Navigation("NailVariant");
 
@@ -2385,7 +2337,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
                         .WithMany("NailVariants")
                         .HasForeignKey("NailDesignId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailShape", "NailShape")
                         .WithMany("NailVariants")
@@ -2448,17 +2401,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("NailArtist");
-                });
-
-            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.ShapeMethodConfig", b =>
-                {
-                    b.HasOne("Nailify.Capstone.Domain.Entities.NailShape", "NailShape")
-                        .WithMany("ShapeMethodConfigs")
-                        .HasForeignKey("NailShapeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("NailShape");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Transaction", b =>
@@ -2627,8 +2569,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("CustomerNailComponents");
 
                     b.Navigation("CustomerNailRequests");
-
-                    b.Navigation("NailProcedures");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTier", b =>
@@ -2657,8 +2597,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailShape", b =>
                 {
                     b.Navigation("NailVariants");
-
-                    b.Navigation("ShapeMethodConfigs");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailSurface", b =>

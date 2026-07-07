@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -76,6 +76,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FromSqlRaw("SELECT * FROM \"NailArtists\" WHERE \"NailArtistId\" = {0} FOR UPDATE", artistId)
                 .Include(x => x.Account)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<NailArtist>> GetArtistsWithSkillsBySalonIdAsync(Guid salonId)
+        {
+            return await FindByCondition(x => x.Account.SalonId == salonId && x.Status == "Active", false)
+                .Include(x => x.Account)
+                .Include(x => x.NailArtistSkills)
+                .ToListAsync();
         }
     }
 }

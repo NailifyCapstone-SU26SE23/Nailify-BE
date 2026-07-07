@@ -14,6 +14,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<NailArtist>> GetSuggestedArtistsAsync(Guid salonId, List<int> nailVariantIds);
         Task<NailArtist?> GetNailArtistByAccountIdAsync(Guid accountId);
         Task<NailArtist?> GetArtistWithLockAsync(Guid artistId);
-
+        Task<List<NailArtist>> GetArtistsWithSkillsBySalonIdAsync(Guid salonId);
     }
 }

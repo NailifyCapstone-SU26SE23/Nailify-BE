@@ -30,6 +30,7 @@ namespace Nailify.Capstone.Domain.Entities
         public DateTime? CompletedAt { get; set; }
         public Guid? CompletedById { get; set; }
         public bool IsRequired { get; set; } = true;
+        public bool IsMainStep { get; set; } = true;
 
         public virtual BookingItem BookingItem { get; set; } = null!;
         public virtual Procedure? Procedure { get; set; }

@@ -44,9 +44,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpPost("{id}/confirm")]
         [ProducesResponseType(typeof(ApiResult<WaitlistResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Confirm(Guid id, [FromBody] ConfirmWaitlistRequestDTO request)
+        public async Task<IActionResult> Confirm(Guid id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] ConfirmWaitlistRequestDTO? request = null)
         {
             var customerId = GetCurrentUserId();
+            request ??= new ConfirmWaitlistRequestDTO();
             var result = await _waitlistService.ConfirmWaitlistAsync(id, customerId, request);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }

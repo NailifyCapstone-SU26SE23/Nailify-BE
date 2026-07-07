@@ -396,7 +396,7 @@ namespace Nailify.Capstone.Application.Services
                             var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
                             procedure.EstimatedStartTime = segment.StartTime;
                             procedure.EstimatedEndTime = segment.EndTime;
-                            if (procedure.ActiveDuration > 0)
+                            if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
                             {
                                 procedure.AssignedArtistId = booking.NailArtistId.Value;
                             }
@@ -992,7 +992,7 @@ namespace Nailify.Capstone.Application.Services
                     procedure.EstimatedStartTime = segment.StartTime;
                     procedure.EstimatedEndTime = segment.EndTime;
                     // Nếu công đoạn này thợ cần thao tác (ActiveDuration > 0), gán AssignedArtistId
-                    if (procedure.ActiveDuration > 0)
+                    if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
                     {
                         procedure.AssignedArtistId = booking.NailArtistId.Value;
                     }
@@ -1482,7 +1482,7 @@ namespace Nailify.Capstone.Application.Services
                     var proc = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
                     proc.EstimatedStartTime = segment.StartTime;
                     proc.EstimatedEndTime = segment.EndTime;
-                    if (proc.ActiveDuration > 0)
+                    if (proc.ActiveDuration > 0 && proc.IsMainStep)
                     {
                         proc.AssignedArtistId = request.StaffArtistId;
                     }
