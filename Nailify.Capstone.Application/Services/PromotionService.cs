@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -44,7 +44,7 @@ namespace Nailify.Capstone.Application.Services
                 pageNumber,
                 pageSize);
 
-            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai thanh cong.");
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PagedList<PromotionDto>>> GetTodayPagedAsync(
@@ -96,15 +96,15 @@ namespace Nailify.Capstone.Application.Services
                 pageNumber,
                 pageSize);
 
-            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai hom nay thanh cong.");
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PromotionDto>> GetByIdAsync(int id)
         {
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             return promotion == null
-                ? new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.")
-                : new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Lay khuyen mai thanh cong.");
+                ? new ApiErrorResult<PromotionDto>("Không tìm thấy khuyến mãi.")
+                : new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Lấy khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByCategoryIdAsync(int categoryId)
@@ -112,7 +112,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByCategoryIdAsync(categoryId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo danh muc thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByCategoryTypeIdAsync(int categoryTypeId)
@@ -120,7 +120,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByCategoryTypeIdAsync(categoryTypeId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo loai danh muc thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByNailDesignIdAsync(int nailDesignId)
@@ -128,7 +128,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByNailDesignIdAsync(nailDesignId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo mau nail thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null)
@@ -154,7 +154,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.PromotionRepository.CreateAsync(promotion);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Tao khuyen mai thanh cong.");
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Tạo khuyến mãi thành công");
         }
 
         public async Task<ApiResult<PromotionDto>> UpdateAsync(int id, PromotionRequest request, string? imageUrl = null)
@@ -162,7 +162,7 @@ namespace Nailify.Capstone.Application.Services
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             if (promotion == null)
             {
-                return new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.");
+                return new ApiErrorResult<PromotionDto>("Không tìm thấy khuyến mãi.");
             }
 
             var validationError = await ValidateAsync(request, id);
@@ -190,7 +190,7 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.PromotionRepository.Update(promotion);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Cap nhat khuyen mai thanh cong.");
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Cập nhật khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteAsync(int id)
@@ -198,12 +198,12 @@ namespace Nailify.Capstone.Application.Services
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             if (promotion == null)
             {
-                return new ApiErrorResult<bool>("Khong tim thay khuyen mai.");
+                return new ApiErrorResult<bool>("Không tìm thấy khuyến mãi.");
             }
 
             _unitOfWork.PromotionRepository.Delete(promotion);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiSuccessResult<bool>(true, "Xoa khuyen mai thanh cong.");
+            return new ApiSuccessResult<bool>(true, "Xóa khuyến mãi thành công.");
         }
 
         public async Task<List<Promotion>> GetApplicablePromotionsAsync(
@@ -340,20 +340,20 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<string?> ValidateAsync(PromotionRequest request, int? excludedId = null)
         {
-            if (string.IsNullOrWhiteSpace(request.Name)) return "Ten khuyen mai khong duoc de trong.";
-            if (request.DiscountValue <= 0) return "Gia tri giam gia phai lon hon 0.";
-            if (request.DiscountType == DiscountType.Percentage && request.DiscountValue > 100) return "Phan tram giam gia khong duoc lon hon 100.";
-            if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate) return "Ngay ket thuc khong duoc truoc ngay bat dau.";
-            if (request.UsageLimit < 0 || request.UserLimit < 0) return "Gioi han su dung khong duoc am.";
+            if (string.IsNullOrWhiteSpace(request.Name)) return "Tên khuyến mãi không được để trống.";
+            if (request.DiscountValue <= 0) return "Giá trị giảm giá phải lớn hơn 0";
+            if (request.DiscountType == DiscountType.Percentage && request.DiscountValue > 100) return "Phầm trăm giảm giá không được lớn hơn 100.";
+            if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate) return "Ngày kết thúc không được trước ngày bắt đầu.";
+            if (request.UsageLimit < 0 || request.UserLimit < 0) return "Giới hạn sử dụng không được lớn hơn 0";
 
             var promotion = _mapper.Map<Promotion>(request);
-            if (!promotion.IsValid()) return "Pham vi khuyen mai khong khop voi doi tuong ap dung.";
+            if (!promotion.IsValid()) return "Phạm vi khuyến mãi không khớp với đối tượng áp dụng.";
 
             var duplicate = await _unitOfWork.PromotionRepository.ExistsAsync(promotionEntity =>
                 promotionEntity.PromotionId != excludedId &&
                 promotionEntity.Name.ToLower() == request.Name.Trim().ToLower());
 
-            return duplicate ? "Ten khuyen mai da ton tai." : null;
+            return duplicate ? "Tên khuyến mãi đã tồn tại." : null;
         }
 
         private static void NormalizePromotionLimits(Promotion promotion)

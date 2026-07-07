@@ -1311,7 +1311,7 @@ namespace Nailify.Capstone.Application.Services
                         if (variantEntity?.NailShapeId != shapeMethodConfig.NailShapeId)
                         {
                             return BookingItemsCalculation.Failure(
-                                "Cau hinh cach lam khong thuoc dang mong cua mau nail da chon.");
+                                "Cấu hình cách làm không thuộc dáng móng đã chọn.");
                         }
                     }
 
@@ -1325,7 +1325,7 @@ namespace Nailify.Capstone.Application.Services
                         if (customNail?.NailShapeId != shapeMethodConfig.NailShapeId)
                         {
                             return BookingItemsCalculation.Failure(
-                                "Cau hinh cach lam khong thuoc dang mong cua mau custom da chon.");
+                                "Cấu hình cách làm không thuộc dáng móng đã chọn.");
                         }
                     }
 

@@ -21,32 +21,32 @@ namespace Nailify.Capstone.Application.Services
         }
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetAllAsync(BookingRatingRequestParameters parameters)
-            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetPagedAsync(parameters), parameters, "Lay danh sach danh gia thanh cong.");
+            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetPagedAsync(parameters), parameters, "Lấy danh sách đánh giá thành công.");
 
         public async Task<ApiResult<BookingRatingResponseDTO>> GetByIdAsync(Guid id)
         {
             var rating = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(id);
             return rating == null
-                ? new ApiErrorResult<BookingRatingResponseDTO>("Khong tim thay danh gia.")
-                : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lay danh gia thanh cong.");
+                ? new ApiErrorResult<BookingRatingResponseDTO>("Không tìm thấy đánh giá.")
+                : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lấy thông tin đánh giá thành công.");
         }
 
         public async Task<ApiResult<BookingRatingResponseDTO>> GetByBookingIdAsync(Guid bookingId)
         {
             var rating = await _unitOfWork.BookingRatingRepository.GetByBookingIdAsync(bookingId);
             return rating == null
-                ? new ApiErrorResult<BookingRatingResponseDTO>("Khong tim thay danh gia cua booking.")
-                : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lay danh gia theo booking thanh cong.");
+                ? new ApiErrorResult<BookingRatingResponseDTO>("Không tìm thấy đánh giá.")
+                : new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(rating), "Lấy thông tin đánh giá thành công.");
         }
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetBySalonIdAsync(Guid salonId, BookingRatingRequestParameters parameters)
-            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetBySalonIdAsync(salonId, parameters), parameters, "Lay danh gia theo salon thanh cong.");
+            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetBySalonIdAsync(salonId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters)
-            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByNailArtistIdAsync(nailArtistId, parameters), parameters, "Lay danh gia theo tho nail thanh cong.");
+            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByNailArtistIdAsync(nailArtistId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters)
-            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByCustomerIdAsync(customerId, parameters), parameters, "Lay danh gia theo khach hang thanh cong.");
+            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByCustomerIdAsync(customerId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
 
         public async Task<ApiResult<BookingRatingResponseDTO>> CreateAsync(Guid customerId, BookingRatingCreateRequest request, string? imageUrl)
         {
@@ -54,13 +54,13 @@ namespace Nailify.Capstone.Application.Services
             if (validationError != null) return new ApiErrorResult<BookingRatingResponseDTO>(validationError);
 
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
-            if (booking == null) return new ApiErrorResult<BookingRatingResponseDTO>("Khong tim thay booking.");
-            if (booking.CustomerId != customerId) return new ApiErrorResult<BookingRatingResponseDTO>("Ban chi duoc danh gia booking cua minh.");
-            if (booking.Status != BookingStatus.Completed) return new ApiErrorResult<BookingRatingResponseDTO>("Chi booking da hoan thanh moi duoc danh gia.");
+            if (booking == null) return new ApiErrorResult<BookingRatingResponseDTO>("Không tìm thấy lịch hẹn.");
+            if (booking.CustomerId != customerId) return new ApiErrorResult<BookingRatingResponseDTO>("Bạn chỉ được đánh giá cho lịch hẹn của mình.");
+            if (booking.Status != BookingStatus.Completed) return new ApiErrorResult<BookingRatingResponseDTO>("Chỉ lịch hẹn hoàn thành mới được đánh giá.");
 
             var existingRating = await _unitOfWork.BookingRatingRepository.GetByBookingIdAsync(request.BookingId, includeDeleted: true);
-            if (existingRating?.DeletedAt != null) return new ApiErrorResult<BookingRatingResponseDTO>("Booking nay da xoa danh gia, khong the danh gia lai.");
-            if (existingRating != null) return new ApiErrorResult<BookingRatingResponseDTO>("Booking nay da duoc danh gia.");
+            if (existingRating?.DeletedAt != null) return new ApiErrorResult<BookingRatingResponseDTO>("Lịch hẹn này đã xóa đánh giá.");
+            if (existingRating != null) return new ApiErrorResult<BookingRatingResponseDTO>("Lịch hẹn này đã được đánh giá.");
 
             var rating = new BookingRating
             {
@@ -83,7 +83,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             var created = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(rating.BookingRatingId);
-            return new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(created), "Tao danh gia thanh cong.");
+            return new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(created), "Tạo đánh giá thành công.");
         }
 
         public async Task<ApiResult<BookingRatingResponseDTO>> UpdateAsync(Guid customerId, Guid id, BookingRatingUpdateRequest request, string? imageUrl)
@@ -137,7 +137,7 @@ namespace Nailify.Capstone.Application.Services
 
             if (!hasChanges)
             {
-                return new ApiErrorResult<BookingRatingResponseDTO>("Khong co thong tin nao de cap nhat.");
+                return new ApiErrorResult<BookingRatingResponseDTO>("Không có thông tin nào để cập nhật.");
             }
 
             rating.IsUpdated = true;
@@ -176,7 +176,7 @@ namespace Nailify.Capstone.Application.Services
         private static string? ValidateScores(params int?[] scores)
         {
             return scores.Any(score => score.HasValue && (score < 1 || score > 5))
-                ? "Diem danh gia phai nam trong khoang 1 den 5."
+                ? "Điểm đánh giá phải nằm trong thang điểm từ 1 đến 5."
                 : null;
         }
     }

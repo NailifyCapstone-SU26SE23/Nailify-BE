@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ShapeMethodConfigRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -28,7 +28,7 @@ namespace Nailify.Capstone.Application.Services
                 pageNumber,
                 pageSize);
 
-            return new ApiSuccessResult<PagedList<ShapeMethodConfigDto>>(response, "Lay danh sach cau hinh cach lam dang mong thanh cong.");
+            return new ApiSuccessResult<PagedList<ShapeMethodConfigDto>>(response, "Lấy danh sách cấu hình thành công.");
         }
 
         public async Task<ApiResult<ShapeMethodConfigDto>> GetShapeMethodConfigByIdAsync(int id)
@@ -36,21 +36,21 @@ namespace Nailify.Capstone.Application.Services
             var config = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(id);
             if (config == null)
             {
-                return new ApiErrorResult<ShapeMethodConfigDto>("Khong tim thay cau hinh cach lam dang mong.");
+                return new ApiErrorResult<ShapeMethodConfigDto>("Không tìm thấy cấu hình.");
             }
 
-            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Lay thong tin cau hinh cach lam dang mong thanh cong.");
+            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Lấy cấu hình thành công.");
         }
 
         public async Task<ApiResult<List<ShapeMethodConfigDto>>> GetShapeMethodConfigsByNailShapeIdAsync(int nailShapeId)
         {
             if (!await _unitOfWork.NailShapeRepository.ExistsAsync(shape => shape.NailShapeId == nailShapeId && shape.Status == "Active"))
             {
-                return new ApiErrorResult<List<ShapeMethodConfigDto>>("Khong tim thay dang mong.");
+                return new ApiErrorResult<List<ShapeMethodConfigDto>>("Không tìm thấy dáng móng.");
             }
 
             var configs = await _unitOfWork.ShapeMethodConfigRepository.GetActiveByNailShapeIdAsync(nailShapeId);
-            return new ApiSuccessResult<List<ShapeMethodConfigDto>>(_mapper.Map<List<ShapeMethodConfigDto>>(configs), "Lay danh sach cau hinh theo dang mong thanh cong.");
+            return new ApiSuccessResult<List<ShapeMethodConfigDto>>(_mapper.Map<List<ShapeMethodConfigDto>>(configs), "Lấy cấu hình thành công.");
         }
 
         public async Task<ApiResult<ShapeMethodConfigDto>> CreateShapeMethodConfigAsync(ShapeMethodConfigCreateRequest request)
@@ -66,7 +66,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.ShapeMethodConfigRepository.CreateAsync(config);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Tao cau hinh cach lam dang mong thanh cong.");
+            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Tạo cấu hình thành công.");
         }
 
         public async Task<ApiResult<ShapeMethodConfigDto>> UpdateShapeMethodConfigAsync(int id, ShapeMethodConfigUpdateRequest request)
@@ -74,7 +74,7 @@ namespace Nailify.Capstone.Application.Services
             var config = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(id);
             if (config == null)
             {
-                return new ApiErrorResult<ShapeMethodConfigDto>("Khong tim thay cau hinh cach lam dang mong.");
+                return new ApiErrorResult<ShapeMethodConfigDto>("Không tìm thấy cấu hình.");
             }
 
             var validationError = await ValidateRequestAsync(request.NailShapeId, request.Price, request.Duration);
@@ -87,7 +87,7 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.ShapeMethodConfigRepository.Update(config);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Cap nhat cau hinh cach lam dang mong thanh cong.");
+            return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Cập nhật cấu hình thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteShapeMethodConfigAsync(int id)
@@ -95,30 +95,30 @@ namespace Nailify.Capstone.Application.Services
             var config = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(id);
             if (config == null)
             {
-                return new ApiErrorResult<bool>("Khong tim thay cau hinh cach lam dang mong.");
+                return new ApiErrorResult<bool>("Không tìm thấy cấu hình.");
             }
 
             _unitOfWork.ShapeMethodConfigRepository.Delete(config);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<bool>(true, "Xoa cau hinh cach lam dang mong thanh cong.");
+            return new ApiSuccessResult<bool>(true, "Xóa cấu hình thành công.");
         }
 
         private async Task<string?> ValidateRequestAsync(int nailShapeId, decimal price, int duration)
         {
             if (!await _unitOfWork.NailShapeRepository.ExistsAsync(shape => shape.NailShapeId == nailShapeId && shape.Status == "Active"))
             {
-                return "Khong tim thay dang mong.";
+                return "Không tìm thấy dáng móng.";
             }
 
             if (price < 0)
             {
-                return "Gia cau hinh cach lam khong duoc am.";
+                return "Giá cấu hình phải lớn hơn 0.";
             }
 
             if (duration < 0)
             {
-                return "Thoi luong cau hinh cach lam khong duoc am.";
+                return "Thời lượng phải lớn hơn 0.";
             }
 
             return null;
