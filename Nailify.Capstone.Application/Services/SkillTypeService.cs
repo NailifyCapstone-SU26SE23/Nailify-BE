@@ -5,11 +5,6 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs.SkillTypeResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -22,28 +17,33 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork = unitOfWork;
             _mapper = mapper;
         }
+
         public async Task<ApiResult<SkillTypeResponseDTO>> CreateSkillTypeAsync(SkillTypeCreateRequest request)
         {
-            var existing = await _unitOfWork.SkillTypeRepository   
-                                            .ExistsAsync(
-                                            x => x.Name.ToLower() == request.Name.ToLower() 
-                                            && x.Status == "Active"
-                                            );
-            if (existing) 
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return new ApiErrorResult<SkillTypeResponseDTO>("Tên loại kỹ năng không được để trống.");
+            }
+
+            var existing = await _unitOfWork.SkillTypeRepository
+                .ExistsAsync(x => x.Name.ToLower() == request.Name.ToLower() && x.Status == "Active");
+            if (existing)
             {
                 return new ApiErrorResult<SkillTypeResponseDTO>("Tên loại kỹ năng này đã tồn tại.");
             }
+
             var skillType = _mapper.Map<SkillType>(request);
+            skillType.Status = "Active";
             await _unitOfWork.SkillTypeRepository.CreateAsync(skillType);
             await _unitOfWork.SaveChangesAsync();
-            var response = _mapper.Map<SkillTypeResponseDTO>(skillType);
-            return new ApiSuccessResult<SkillTypeResponseDTO>(response, "Tên loại kỹ năng này đã được tạo thành công.");
+            var newResponse = _mapper.Map<SkillTypeResponseDTO>(skillType);
+            return new ApiSuccessResult<SkillTypeResponseDTO>(newResponse, "Loại kỹ năng đã được tạo thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteSkillTYpeAsync(Guid skillTypeId)
         {
             var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
-            if(skillType == null || skillType.Status != "Active")
+            if (skillType == null || skillType.Status != "Active")
             {
                 return new ApiErrorResult<bool>("Loại kỹ năng không tồn tại.");
             }
@@ -59,7 +59,7 @@ namespace Nailify.Capstone.Application.Services
                                                .GetPagedAsync(
                                                             pageNumber,
                                                             pageSize,
-                                                            x => x.Status == "Active" 
+                                                            x => x.Status == "Active"
                                                             && (string.IsNullOrEmpty(name) || x.Name.ToLower().Contains(name.ToLower())
                                                             ));
 
@@ -77,7 +77,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<SkillTypeResponseDTO>> GetSkillTypeByIdAsync(Guid skillTypeId)
         {
             var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
-            if(skillType == null || skillType.Status != "InActive")
+            if (skillType == null || skillType.Status != "Active")
             {
                 return new ApiErrorResult<SkillTypeResponseDTO>("Loại kỹ năng không tồn tại.");
             }
@@ -88,7 +88,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<SkillTypeResponseDTO>> UpdateSkillTypeAsync(Guid skillTypeId, SkillTypeUpdateRequest request)
         {
             var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
-            if(skillType == null || skillType.Status != "Active")
+            if (skillType == null || skillType.Status != "Active")
             {
                 return new ApiErrorResult<SkillTypeResponseDTO>("Loại kỹ năng không tồn tại.");
             }
@@ -104,6 +104,20 @@ namespace Nailify.Capstone.Application.Services
 
             var response = _mapper.Map<SkillTypeResponseDTO>(skillType);
             return new ApiSuccessResult<SkillTypeResponseDTO>(response, "Cập nhật loại kỹ năng thành công.");
+        }
+
+        public async Task<ApiResult<bool>> DeleteSkillTypeAsync(Guid skillTypeId) 
+        {
+            var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
+            if (skillType == null || skillType.Status != "Active")
+            {
+                return new ApiErrorResult<bool>("Loại kỹ năng không tồn tại.");
+            }
+
+            skillType.Status = "InActive"; // Soft delete
+            _unitOfWork.SkillTypeRepository.Update(skillType);
+            await _unitOfWork.SaveChangesAsync();
+            return new ApiSuccessResult<bool>(true, "Xóa loại kỹ năng thành công.");
         }
     }
 }
