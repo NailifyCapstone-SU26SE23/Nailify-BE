@@ -895,12 +895,10 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 item.Price = itemPrice;
-                item.DiscountAmount = 0;
-                item.FinalPrice = itemPrice * Math.Max(item.Quantity, 1);
                 item.Duration = itemDuration;
 
                 totalDuration += item.Duration * Math.Max(item.Quantity, 1);
-                totalPrice += item.FinalPrice;
+                totalPrice += item.Price * Math.Max(item.Quantity, 1);
 
                 bookingItems.Add(item);
             }
@@ -1375,8 +1373,6 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 item.Price = unitPrice;
-                item.DiscountAmount = 0;
-                item.FinalPrice = unitPrice * Math.Max(item.Quantity, 1);
                 item.Duration = unitDuration;
                 totalPrice += unitPrice * item.Quantity;
                 totalDuration += unitDuration * item.Quantity;

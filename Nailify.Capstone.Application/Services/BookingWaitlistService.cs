@@ -155,10 +155,8 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
                     item.Price = itemPrice;
-                    item.DiscountAmount = 0;
-                    item.FinalPrice = itemPrice * Math.Max(x.Quantity, 1);
                     item.Duration = itemDuration;
-                    basePrice += item.FinalPrice;
+                    basePrice += item.Price * Math.Max(item.Quantity, 1);
                     totalDuration += item.Duration;
                     bookingItems.Add(item);
                 }

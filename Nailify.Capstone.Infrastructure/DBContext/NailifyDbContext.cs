@@ -411,8 +411,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             {
                 entity.HasKey(bi => bi.BookingItemId);
                 entity.Property(bi => bi.Price).HasPrecision(18, 2);
-                entity.Property(bi => bi.FinalPrice).HasPrecision(18, 2);
-                entity.Property(bi => bi.DiscountAmount).HasPrecision(18, 2);
                 // Thiết lập các mối quan hệ khóa ngoại
                 entity.HasOne(bi => bi.Booking)
                       .WithMany(b => b.BookingItems)

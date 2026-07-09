@@ -265,13 +265,21 @@ namespace Nailify.Capstone.Application.Services
                 var selectedPromotions = await SelectApplicablePromotionsAsync(item, applicablePromotions, usedPromotions);
                 if (!selectedPromotions.Any())
                 {
-                    SetFinalPriceIfMissing(item);
                     continue;
                 }
 
+                var lineAmount = GetLineAmount(item);
+                decimal itemDiscountTotal = 0;
+
                 foreach (var selectedPromotion in selectedPromotions)
                 {
-                    var discountAmount = CalculateItemDiscount(item, selectedPromotion);
+                    var remainingAmount = lineAmount - itemDiscountTotal;
+                    if (remainingAmount <= 0)
+                    {
+                        break;
+                    }
+
+                    var discountAmount = Math.Min(CalculateItemDiscount(item, selectedPromotion), remainingAmount);
                     if (discountAmount <= 0)
                     {
                         continue;
@@ -279,10 +287,7 @@ namespace Nailify.Capstone.Application.Services
 
                     usedPromotions.Add(selectedPromotion.PromotionId);
                     totalDiscount += discountAmount;
-
-                    item.DiscountAmount += discountAmount;
-                    item.FinalPrice = Math.Max(0, GetLineAmount(item) - item.DiscountAmount);
-                    item.DiscountAmount = Math.Min(item.DiscountAmount, GetLineAmount(item));
+                    itemDiscountTotal += discountAmount;
 
                     appliedDiscounts.Add(new BookingDiscount
                     {
@@ -464,14 +469,6 @@ namespace Nailify.Capstone.Application.Services
         private static decimal GetLineAmount(BookingItem item)
         {
             return item.Price * Math.Max(item.Quantity, 1);
-        }
-
-        private static void SetFinalPriceIfMissing(BookingItem item)
-        {
-            if (item.FinalPrice <= 0 && item.DiscountAmount <= 0)
-            {
-                item.FinalPrice = GetLineAmount(item);
-            }
         }
     }
 }
