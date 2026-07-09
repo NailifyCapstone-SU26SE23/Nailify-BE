@@ -47,6 +47,11 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IWalkInQueueRepository WalkInQueueRepository { get; }
         ITransactionRepository TransactionRepository { get; }
         IChairRepository ChairRepository { get; }
+        INailArtistBreakRepository NailArtistBreakRepository { get; }
+        IQuizQuestionRepository QuizQuestionRepository { get; }
+        IQuizOptionRepository QuizOptionRepository { get; }
+        ICustomerQuizAnswerRepository CustomerQuizAnswerRepository { get; }
+
         // Quản lý Transaction
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

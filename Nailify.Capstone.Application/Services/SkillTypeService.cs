@@ -77,7 +77,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<SkillTypeResponseDTO>> GetSkillTypeByIdAsync(Guid skillTypeId)
         {
             var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
-            if(skillType == null || skillType.Status != "InActive")
+            if(skillType == null || skillType.Status != "Active")
             {
                 return new ApiErrorResult<SkillTypeResponseDTO>("Loại kỹ năng không tồn tại.");
             }

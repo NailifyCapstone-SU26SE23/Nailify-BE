@@ -28,6 +28,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<Booking>> GetOverdueApprovedBookingsAsync(DateTime date, TimeSpan thresholdTime, bool trackChanges = false);
         Task<int> CountServingBookingsAsync(Guid artistId, DateTime date);
         Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime);
-
+        Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId);
     }
 }

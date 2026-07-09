@@ -50,7 +50,10 @@ namespace Nailify.Capstone.Infrastructure
         private IWalkInQueueRepository? _walkInQueueRepository;
         private ITransactionRepository? _transactionRepository;
         private IChairRepository? _chairRepository;
-
+        private INailArtistBreakRepository _nailArtistBreakRepository;
+        private IQuizQuestionRepository _quizQuestionRepository = null!;
+        private IQuizOptionRepository _quizOptionRepository = null!;
+        private ICustomerQuizAnswerRepository _customerQuizAnswerRepository = null!;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -108,6 +111,15 @@ namespace Nailify.Capstone.Infrastructure
         public IWalkInQueueRepository WalkInQueueRepository => _walkInQueueRepository ??= new WalkInQueueRepository(_context);
         public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
         public IChairRepository ChairRepository => _chairRepository ??= new ChairRepository(_context);
+
+        public INailArtistBreakRepository NailArtistBreakRepository =>
+         _nailArtistBreakRepository ??= new NailArtistBreakRepository(_context);
+
+        public IQuizQuestionRepository QuizQuestionRepository => _quizQuestionRepository ??= new QuizQuestionRepository(_context);
+
+        public IQuizOptionRepository QuizOptionRepository => _quizOptionRepository ??= new QuizOptionRepository(_context);
+
+        public ICustomerQuizAnswerRepository CustomerQuizAnswerRepository => _customerQuizAnswerRepository ??= new CustomerQuizAnswerRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

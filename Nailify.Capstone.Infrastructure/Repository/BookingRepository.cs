@@ -206,6 +206,16 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                            && x.StartTime <= thresholdTime)
                         .CountAsync();
         }
-
+        public Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId)
+        {
+            return FindByCondition(x => x.CustomerId == customerId 
+                                   && x.Status == BookingStatus.Completed)
+                .Include(b => b.BookingItems)
+                    .ThenInclude(bi => bi.NailVariant)
+                        .ThenInclude(nv => nv!.NailDesign)
+                            .ThenInclude(d => d!.NailCategories)
+                                .ThenInclude(c => c.Category)
+                .ToListAsync();
+        }
     }
 }

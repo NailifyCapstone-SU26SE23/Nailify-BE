@@ -117,4 +117,3 @@ void RegisterRecurringJobs()
     );
 }
 
-app.Run();
