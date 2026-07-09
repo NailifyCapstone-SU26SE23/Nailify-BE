@@ -43,7 +43,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     return (false, "Khong tim thay lich hen.", null);
                 }
 
-                var amountDue = booking.TotalPrice ?? booking.Price ?? 0;
+                var amountDue = booking.TotalPrice * 0.2m ?? 0m;
                 if (amountDue <= 0)
                 {
                     return (false, $"So tien khong hop le: {amountDue}.", null);
@@ -159,7 +159,8 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
                 if (transaction.Status == TransactionStatus.Paid)
                 {
-                    transaction.Booking.IsPaid = true;
+                    transaction.Booking.AmountPaid = transaction.Amount;
+                    transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -310,7 +311,8 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             if (newStatus == TransactionStatus.Paid)
             {
-                transaction.Booking.IsPaid = true;
+                transaction.Booking.AmountPaid = transaction.Amount;
+                transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);

@@ -298,6 +298,7 @@ namespace Nailify.Capstone.Application.Services
             booking.Status = BookingStatus.Pending;
             booking.BookingItems = bookingItems;
             booking.BookingDiscounts = appliedPromotionDiscounts;
+            booking.AmountDue = bookingPrice.TotalPrice;
 
             // BẮT ĐẦU TRANSACTION AN TOÀN TRÁNH RACE CONDITION KHI TẠO BOOKING
             await _unitOfWork.BeginTransactionAsync();

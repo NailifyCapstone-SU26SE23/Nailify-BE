@@ -389,7 +389,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.Property(b => b.Discount).HasPrecision(18, 2);
                 entity.Property(b => b.TotalPrice).HasPrecision(18, 2);
                 entity.Property(b => b.IsRated).HasDefaultValue(false);
-                entity.Property(b => b.IsPaid).HasDefaultValue(false);
                 entity.Property(b => b.IsRefunded).HasDefaultValue(false);
                 entity.Property(b => b.Status)
                     .HasConversion(
