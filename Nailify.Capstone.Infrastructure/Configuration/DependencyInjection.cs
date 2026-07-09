@@ -161,6 +161,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingSchedulingService, BookingSchedulingService>();
             services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();
             services.AddScoped<IWalkInQueueService, WalkInQueueService>();
+            services.AddScoped<INailRecommendationService, NailRecommendationService>();
+            services.AddScoped<INailRecommendationService, NailRecommendationService>();
+            services.AddScoped<ISmartSchedulingService, SmartSchedulingService>();
+            services.AddScoped<IDurationPredictionService, DurationPredictionService>();
+            // Third-party
             services.AddScoped<IEmailService, SmtpEmailService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddHttpClient();

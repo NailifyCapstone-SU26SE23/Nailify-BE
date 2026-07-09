@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
@@ -23,11 +24,15 @@ namespace Nailify.Capstone.Presentation.Controllers
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
+        private readonly ISmartSchedulingService _smartSchedulingService;
+        private readonly IBookingSchedulingService _bookingSchedulingService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService, ISmartSchedulingService smartSchedulingService, IBookingSchedulingService bookingSchedulingService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
             _slotHoldService = slotHoldService;
+            _smartSchedulingService = smartSchedulingService;
+            _bookingSchedulingService = bookingSchedulingService;
         }
 
         /// <summary>
@@ -488,6 +493,27 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 return UnauthorizedResponse();
             }
+        }
+        /// <summary>
+        /// Lấy danh sách các khung giờ hẹn gợi ý thông minh dựa trên kỹ năng thợ và độ phức tạp mẫu móng.
+        /// </summary>
+        [HttpPost("smart-slots")]
+        [ProducesResponseType(typeof(ApiResult<List<SmartSlotDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetSmartSlots([FromBody] SmartSlotRequestDTO request)
+        {
+            // 1. Tạo mock procedures từ danh sách items gửi lên để tính toán độ dài/bước làm
+            var mockProcedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems, request.SalonId);
+
+            if (mockProcedures == null || !mockProcedures.Any())
+            {
+                return BadRequest(new ApiResult<object>(false, "Không thể tạo danh sách quy trình cho các dịch vụ đã chọn."));
+            }
+            // 2. Gọi SmartSchedulingService để phân tích và trả về khung giờ tối ưu nhất
+            var response = await _smartSchedulingService.GetSmartSlotAsync(request.SalonId, request.Date, mockProcedures);
+
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
         }
     }
 

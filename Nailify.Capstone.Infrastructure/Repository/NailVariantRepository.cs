@@ -120,5 +120,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return capableVariants;
         }
+
+        public async Task<List<NailVariant>> GetAllActiveVariantAsync()
+          => await FindByCondition(x => x.Status == "Active")
+                   .Include(x => x.NailDesign)
+                   .ToListAsync();
     }
 }

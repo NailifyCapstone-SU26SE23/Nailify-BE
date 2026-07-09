@@ -207,5 +207,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
                         .CountAsync();
         }
 
+        public async Task<int> CountBookingsByCustomerIdAsync(Guid customerId)
+        {
+            return await FindByCondition(x => x.CustomerId == customerId)
+                         .CountAsync();
+        }
     }
 }

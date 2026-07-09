@@ -12,5 +12,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<NailVariant?> GetNailVariantDetailAsync(int nailVariantId);
         List<int> GetDistinctVariantIdsAsync(IEnumerable<BookingItem> items);
         Task<List<NailVariant>> GetNailVariantsCapableByArtistAsync(Guid artistId);
+        Task<List<NailVariant>> GetAllActiveVariantAsync();
     }
 }

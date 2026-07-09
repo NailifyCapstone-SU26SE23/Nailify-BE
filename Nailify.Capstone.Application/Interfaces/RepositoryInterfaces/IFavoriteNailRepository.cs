@@ -8,5 +8,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<FavoriteNail?> GetByIdForUserAsync(int id, Guid userId);
         Task<FavoriteNail?> GetTrackedByIdForUserAsync(int id, Guid userId);
         Task<PagedList<FavoriteNail>> GetPagedByUserAsync(Guid userId, int pageNumber, int pageSize);
+        Task<List<FavoriteNail>> GetAllWithVariantAsync();
+        Task<Dictionary<int, int>> GetFavoriteCountsByVariantAstbc();
+        Task<int> CountFavoritesWithVariantByUserIdAsync(Guid userId);
     }
 }

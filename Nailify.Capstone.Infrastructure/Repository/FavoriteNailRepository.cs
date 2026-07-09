@@ -45,5 +45,24 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     .ThenInclude(v => v!.NailShape)
                 .Include(f => f.NailVariant)
                     .ThenInclude(v => v!.NailSurface);
+
+        public async Task<List<FavoriteNail>> GetAllWithVariantAsync()
+           => await FindByCondition(x => x.NailVariantId != null)
+                    .ToListAsync();
+
+        public  async Task<Dictionary<int, int>> GetFavoriteCountsByVariantAstbc()
+        {
+            return await FindByCondition(f => f.NailVariantId != null)
+                   .GroupBy(f => f.NailVariantId!.Value)
+                   .Select(g => new { NailVariantId = g.Key, Count = g.Count() })
+                   .ToDictionaryAsync(x => x.NailVariantId, x => x.Count);
+        }
+
+        public async Task<int> CountFavoritesWithVariantByUserIdAsync(Guid userId)
+        {
+            return await FindByCondition(x => x.UserId == userId
+                                         && x.NailVariantId != null)
+                        .CountAsync();
+        }
     }
 }

@@ -81,5 +81,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return new PagedList<BookingRating>(items, count, pageNumber, pageSize);
         }
+
+        public async Task<List<BookingRating>> GetAllWithBookingItemsAsync()
+          => await FindByCondition(x => x.Status == "Active" 
+                                   && x.DeletedAt == null)
+                  .Include(x => x.Booking)
+                     .ThenInclude(x => x.BookingItems)
+                  .ToListAsync();
     }
 }

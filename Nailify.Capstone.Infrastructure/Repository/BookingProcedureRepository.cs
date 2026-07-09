@@ -87,5 +87,21 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     .ThenInclude(x => x.Booking)
                 .FirstOrDefaultAsync();
         }
+
+        public async Task<List<BookingProcedure>> GetCompletedProceduresForTrainingAsync()
+        {
+            return await FindByCondition(x => x.Status == BookingProcedureStatus.Completed
+                                         && x.ActualStartTime.HasValue
+                                         && x.ActualEndTime.HasValue, false)
+              .Include(x => x.BookingItem)
+                  .ThenInclude(x => x.Booking)
+                      .ThenInclude(x => x.BookingItems)
+                          .ThenInclude(x => x.BookingProcedures)
+              .Include(x => x.BookingItem)
+                  .ThenInclude(x => x.NailVariant)
+                      .ThenInclude(x => x.NailDesign)
+              .Include(x => x.AssignedArtist)
+              .ToListAsync();
+        }
     }
 }

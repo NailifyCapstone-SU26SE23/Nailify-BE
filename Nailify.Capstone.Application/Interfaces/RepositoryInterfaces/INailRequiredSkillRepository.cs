@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,5 +11,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<List<NailRequiredSkill>> GetSkillsByDesignIdAsync(int designId);
          Task<NailRequiredSkill> GetByNailDesignAndSkillAsync(int nailDesignId, Guid skillTypeId);
+        Task<List<NailRequiredSkill>> GetSkillsByVariantIdsAsync(List<int> variantIds);
     }
 }
