@@ -98,17 +98,27 @@ namespace Nailify.Capstone.Application.Services
         {
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(salonId);
             if (salon == null)
-                return new ApiErrorResult<bool>("Không tìm thấy chi nhánh để cập nhật giờ hoạt động.");
-
-            foreach (var item in operatingHours)
             {
-                var existingHour = salon.OperatingHours.FirstOrDefault(oh => oh.DayOfWeek == item.DayOfWeek);
-                if (existingHour != null)
+                return new ApiErrorResult<bool>("Không tìm thấy chi nhánh để cập nhật giờ hoạt động.");
+            }
+            var existingHours = salon.OperatingHours.ToList();
+            foreach(var x in existingHours)
+            {
+                _unitOfWork.SalonOperatingHourRepository.Delete(x);
+            }
+
+            foreach(var x in operatingHours)
+            {
+                var y = new SalonOperatingHour
                 {
-                    existingHour.OpenTime = TimeSpan.Parse(item.OpenTime);
-                    existingHour.CloseTime = TimeSpan.Parse(item.CloseTime);
-                    existingHour.IsClosed = item.IsClosed;
-                }
+                    SalonId = salonId,
+                    DayOfWeek = x.DayOfWeek,
+                    OpenTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.OpenTime),
+                    CloseTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.CloseTime),
+                    IsClosed = x.IsClosed
+                };
+
+                salon.OperatingHours.Add(y);
             }
 
             await _unitOfWork.SaveChangesAsync();

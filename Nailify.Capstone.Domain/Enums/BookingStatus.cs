@@ -18,7 +18,9 @@ namespace Nailify.Capstone.Domain.Enums
         InProgress,
         ServiceCompleted, // Thợ làm xong
         Completed, // Khách đã thanh toán và check-out hoàn toàn
-        Repaired
+        Repaired, // Đơn bảo hành đã hoàn thành
+        ReschedulePending,   // Khách yêu cầu đổi lịch, chờ quản lý duyệt
+        RescheduleSuggested   // Quản lý đề xuất giờ mới, chờ khách duyệt
     }
 }
     
