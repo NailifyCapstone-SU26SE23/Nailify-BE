@@ -18,6 +18,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public string? HoldToken { get; set; }
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
         public List<int>? SelectedPromotionIds { get; set; }
+        public Guid? WarrantyForBookingId { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CreateBookingRequestDTO, Booking>()
@@ -31,7 +32,8 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
                 .ForMember(dest => dest.CheckInImageUrl, opt => opt.Ignore())
                 .ForMember(dest => dest.CheckOutImagesUrl, opt => opt.Ignore())
                 .ForMember(dest => dest.QRCode, opt => opt.Ignore())
-                .ForMember(dest => dest.BookingItems, opt => opt.Ignore());
+                .ForMember(dest => dest.BookingItems, opt => opt.Ignore())
+                .ForMember(dest => dest.WarrantyForBookingId, opt => opt.MapFrom(src => src.WarrantyForBookingId));
         }
     }
 }

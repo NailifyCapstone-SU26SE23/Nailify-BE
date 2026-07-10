@@ -123,6 +123,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingWaitlistRepository, BookingWaitlistRepository>();
             services.AddScoped<IWalkInQueueRepository, WalkInQueueRepository>();
             services.AddScoped<ITransactionRepository, TransactionRepository>();
+            services.AddScoped<IQuizQuestionRepository, QuizQuestionRepository>();
+            services.AddScoped<IQuizOptionRepository, QuizOptionRepository>();
+            services.AddScoped<ICustomerQuizAnswerRepository, CustomerQuizAnswerRepository>();
+            services.AddScoped<ISalonOffDateRepository, SalonOffDateRepository>();
+
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
@@ -163,6 +168,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingSchedulingService, BookingSchedulingService>();
             services.AddScoped<IBookingWaitlistService, BookingWaitlistService>();
             services.AddScoped<IWalkInQueueService, WalkInQueueService>();
+            services.AddScoped<IQuizService, QuizService>();
+            services.AddScoped<ISalonOffDateService, SalonOffDateService>();
+            // Third Party
+            services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IEmailService, SmtpEmailService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddHttpClient();
