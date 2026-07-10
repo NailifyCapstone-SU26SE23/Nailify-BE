@@ -910,7 +910,7 @@ namespace Nailify.Capstone.Application.Services
                 var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), booking.SalonId);
                 var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
                 var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                request.NailArtistId.Value, request.BookingDate, timeline, capacity);
+                request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
                 if (isConflict)
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ đã bận, xin chọn giờ khác.");
