@@ -18,5 +18,6 @@ namespace Nailify.Capstone.Domain.Entities
         public string? ImageUrl { get; set; }
         public virtual ICollection<SalonOperatingHour> OperatingHours { get; set; }
         public virtual ICollection<Chair> Chairs { get; set; } = new List<Chair>();
-    } 
+        public virtual ICollection<SalonOffDate> OffDates { get; set; } = new List<SalonOffDate>();
+    }
 }

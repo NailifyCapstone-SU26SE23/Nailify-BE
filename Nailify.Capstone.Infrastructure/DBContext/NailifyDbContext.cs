@@ -64,6 +64,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<QuizQuestion> QuizQuestions { get; set; }
         public DbSet<QuizOption> QuizOptions { get; set; }
         public DbSet<CustomerQuizAnswer> CustomerQuizAnswers { get; set; }
+        public DbSet<SalonOffDate> SalonOffDates { get; set; }
 
         #endregion initial DBSet
 
@@ -837,6 +838,21 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .HasForeignKey(nab => nab.NailArtistId)
                       .OnDelete(DeleteBehavior.Cascade);
             });
+            modelBuilder.Entity<SalonOffDate>(entity =>
+            {
+                entity.HasKey(s => s.SalonOffDateId);
+                entity.Property(s => s.SalonOffDateId).ValueGeneratedOnAdd();
+                entity.Property(s => s.Description).HasMaxLength(250);
+                entity.HasOne(s => s.Salon)
+                      .WithMany(s => s.OffDates)
+                      .HasForeignKey(s => s.SalonId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.WarrantyForBooking)
+                .WithMany()
+                .HasForeignKey(b => b.WarrantyForBookingId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             ConfigureStatusDefaults(modelBuilder);
         }

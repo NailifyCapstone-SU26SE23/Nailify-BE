@@ -54,6 +54,7 @@ namespace Nailify.Capstone.Infrastructure
         private IQuizQuestionRepository _quizQuestionRepository = null!;
         private IQuizOptionRepository _quizOptionRepository = null!;
         private ICustomerQuizAnswerRepository _customerQuizAnswerRepository = null!;
+        private ISalonOffDateRepository _salonOffDateRepository = null!;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -120,6 +121,8 @@ namespace Nailify.Capstone.Infrastructure
         public IQuizOptionRepository QuizOptionRepository => _quizOptionRepository ??= new QuizOptionRepository(_context);
 
         public ICustomerQuizAnswerRepository CustomerQuizAnswerRepository => _customerQuizAnswerRepository ??= new CustomerQuizAnswerRepository(_context);
+
+        public ISalonOffDateRepository SalonOffDateRepository => _salonOffDateRepository ??= new SalonOffDateRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

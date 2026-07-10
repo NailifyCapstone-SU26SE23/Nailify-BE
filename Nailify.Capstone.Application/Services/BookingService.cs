@@ -176,8 +176,14 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-out thanh toán khi dịch vụ đã làm xong ('ServiceCompleted'). Trạng thái hiện tại; '{booking.Status}'.");
             }
-
-            booking.CheckOut(actorId);
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                booking.CheckOutWarranty(actorId);
+            }
+            else
+            {
+                booking.CheckOut(actorId);
+            }
             _unitOfWork.BookingRepository.Update(booking);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
@@ -229,7 +235,15 @@ namespace Nailify.Capstone.Application.Services
                     request.NailArtistId = approvedArtistId;
                 }
             }
-
+            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
+                                                         x.SalonId == request.SalonId
+                                                         && x.StartDate.Date <= localDate
+                                                         && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Chi nhánh đóng cửa nghỉ lễ vào ngày này.");
+            }
             var bookingId = Guid.NewGuid();
             var calculation = await BuildBookingItemsAsync(request.BookingItems, bookingId, request.SalonId, request.NailArtistId);
             if (!calculation.IsSucceeded)
@@ -280,6 +294,30 @@ namespace Nailify.Capstone.Application.Services
                 Discount = -totalDiscountAmount,
                 TotalPrice = Math.Max(0, calculation.Price - totalDiscountAmount)
             };
+            if (request.WarrantyForBookingId.HasValue)
+            {
+                var oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.WarrantyForBookingId.Value);
+                if (oldBooking == null)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy đơn hàng gốc cần bảo hành.");
+                }
+                if (oldBooking.CustomerId != customerId)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc không thuộc về tài khoản này.");
+                }
+                if (oldBooking.Status != BookingStatus.Completed)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc chưa hoàn thành để bảo hành.");
+                }
+                var completedDate = oldBooking.UpdatedAt; // Ngày hoàn thành
+                if (completedDate.HasValue && DateTime.UtcNow.Date > completedDate.Value.Date.AddDays(7))
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc đã quá hạn bảo hành (Hạn bảo hành là 7 ngày).");
+                }
+                bookingPrice.Price = 0;
+                bookingPrice.Discount = 0;
+                bookingPrice.TotalPrice = 0;
+            }
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
 
@@ -299,13 +337,12 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.BeginTransactionAsync();
             try
             {
-                var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
                 var dayOfWeek = (int)localDate.DayOfWeek;
 
                 var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(request.SalonId);
                 var operatingHours = salon?.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
                 var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
-                if(!operatingHours.IsWithinOperatingHours(request.StartTime, targetEndTime))
+                if (!operatingHours.IsWithinOperatingHours(request.StartTime, targetEndTime))
                 {
                     await _unitOfWork.RollbackTransactionAsync();
                     return new ApiErrorResult<BookingResponseDTO>("Thời gian đặt lịch không nằm trong giờ hoạt động của Salon.");
@@ -448,6 +485,21 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<ArtistAvailabilityResponseDTO>("Thợ nail không có lịch làm việc trong ngày này.");
             }
             var salonId = artist.Account?.SalonId ?? Guid.Empty;
+            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
+                                                            x.SalonId == salonId
+                                                            && x.StartDate.Date <= localDate
+                                                            && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiSuccessResult<ArtistAvailabilityResponseDTO>(new ArtistAvailabilityResponseDTO
+                {
+                    NailArtistId = artist.NailArtistId,
+                    ArtistName = $"{artist.Account.FirstName} {artist.Account.LastName}",
+                    AvailabilityStatus = "Off",
+                    TimeSlots = new List<TimeSlotResponseDTO>()
+                }, "Hôm nay là ngày nghỉ của Salon.");
+            }
             var mockProcedures = new List<BookingProcedure>();
             int tempStepOrder = 1;
             if (request.BookingItems != null)
@@ -534,13 +586,13 @@ namespace Nailify.Capstone.Application.Services
             var existingBusySegments = await _unitOfWork.BookingProcedureRepository
                                                         .GetArtistBusySegmentsByDateAsync(request.NailArtistId, request.BookingDate);
 
-            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+
             var dayOfWeek = (int)localDate.DayOfWeek;
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(salonId);
             var operatingHours = salon?.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
 
             var artistBreaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistAndDateAsync(request.NailArtistId, request.BookingDate);
-            
+
             var timeSlots = new List<TimeSlotResponseDTO>();
             var candidateStart = schedule.ShiftStart;
             var interval = TimeSpan.FromMinutes(15);
@@ -624,6 +676,15 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
             }
+            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
+                x.SalonId == request.SalonId
+                && x.StartDate.Date <= localDate
+                && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Salon đóng cửa nghỉ lễ vào ngày này.");
+            }
 
             // Custom: Nếu là đặt lịch mẫu custom, chỉ hiển thị thợ đã duyệt báo giá mẫu này
             var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailId.HasValue);
@@ -671,7 +732,15 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<SuggestedArtistResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
             }
-
+            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
+                x.SalonId == request.SalonId
+                && x.StartDate.Date <= localDate
+                && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiErrorResult<SuggestedArtistResponseDTO>("Salon đóng cửa nghỉ lễ vào ngày này.");
+            }
             int totalDuration = 0;
 
             foreach (var item in bookingItems)
@@ -751,7 +820,7 @@ namespace Nailify.Capstone.Application.Services
 
             var availableArtists = new List<NailArtist>();
             var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
-            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+
             var dayOfWeek = (int)localDate.DayOfWeek;
 
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(request.SalonId);
@@ -764,7 +833,7 @@ namespace Nailify.Capstone.Application.Services
             foreach (var artist in qualifiedArtists)
             {
                 var salonId = artist.Account.SalonId ?? Guid.Empty;
-             
+
                 var artistBreaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
                 bool overlapsBreak = artistBreaks.Any(x => request.StartTime < x.EndTime && targetEndTime > x.StartTime);
                 if (overlapsBreak)
@@ -901,7 +970,7 @@ namespace Nailify.Capstone.Application.Services
             var operatingHours = salon?.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
             var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
 
-            if(!operatingHours.IsWithinOperatingHours(request.StartTime, targetEndTime))
+            if (!operatingHours.IsWithinOperatingHours(request.StartTime, targetEndTime))
             {
                 return new ApiErrorResult<BookingResponseDTO>("Thời gian cập nhật đặt lịch không nằm trong giờ hoạt động của Salon.");
             }
@@ -1092,7 +1161,7 @@ namespace Nailify.Capstone.Application.Services
                     GuestName = $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}",
                     GuestPhone = booking.Customer.User.Phone,
                     RequestNote = "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ.",
-                    AssignedNailArtistId = originalArtistId 
+                    AssignedNailArtistId = originalArtistId
                 };
 
                 await _queueService.AddToQueueAsync(actorId, addToQueueRequest);
