@@ -341,20 +341,16 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
                 }
 
-                if (x.CustomerNailId.HasValue)
+                if (x.CustomerNailRequestId.HasValue)
                 {
-                   var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(x.CustomerNailId.Value, salonId);
-                   if(customNailRequest != null && customNailRequest.Duration.HasValue)
+                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(x.CustomerNailRequestId.Value);
+                    if (customNailRequest != null &&
+                        customNailRequest.SalonId == salonId &&
+                        (customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Approved ||
+                         customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Quoted))
                     {
-                        itemDuration += customNailRequest.Duration.Value;
-                    }
-                    else
-                    {
-                        var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(x.CustomerNailId.Value);
-                        if(customerNail != null)
-                        {
-                            itemDuration += (customerNail.Duration ?? 60);
-                        }
+                        var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailRequest.CustomerNailId);
+                        itemDuration += (customerNail?.Duration ?? 60) + (customNailRequest.Duration ?? 0);
                     }
                 }
 
@@ -414,7 +410,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     ServiceId = x.ServiceId,
                     NailVariantId = x.NailVariantId,
-                    CustomerNailId = x.CustomerNailId,
                     Quantity = x.Quantity
                 }).ToList();
                 var waitlistProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(waitlistItems, salonId);

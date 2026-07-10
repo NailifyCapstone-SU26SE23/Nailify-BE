@@ -17,13 +17,13 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public int? NailVariantId { get; set; }
         public string NailVariantName { get; set; } = string.Empty;
         public string NailVariantImageUrl { get; set; } = string.Empty;
-        public int? CustomerNailId { get; set; }
+        public int? ShapeMethodConfigId { get; set; }
+        public string ShapeMethodConfigName { get; set; } = string.Empty;
+        public Guid? CustomerNailRequestId { get; set; }
         public string CustomerNailName { get; set; } = string.Empty;
         public string CustomerNailImageUrl { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public decimal Price { get; set; }
-        public decimal FinalPrice { get; set; }
-        public decimal DiscountAmount { get; set; }
         public int Duration { get; set; }
         public void Mapping(Profile profile)
         {
@@ -31,8 +31,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                 .ForMember(dest => dest.ServiceName, opt => opt.MapFrom(src => src.Service != null ? src.Service.Name : ""))
                 .ForMember(dest => dest.NailVariantName, opt => opt.MapFrom(src => src.NailVariant != null ? src.NailVariant.Name : ""))
                 .ForMember(dest => dest.NailVariantImageUrl, opt => opt.MapFrom(src => src.NailVariant != null ? src.NailVariant.ImageUrl : ""))
-                .ForMember(dest => dest.CustomerNailName, opt => opt.MapFrom(src => src.CustomerNail != null ? src.CustomerNail.Name : ""))
-                .ForMember(dest => dest.CustomerNailImageUrl, opt => opt.MapFrom(src => src.CustomerNail != null ? src.CustomerNail.ImageUrl : ""));
+                .ForMember(dest => dest.ShapeMethodConfigName, opt => opt.MapFrom(src => src.ShapeMethodConfig != null ? src.ShapeMethodConfig.Name : ""))
+                .ForMember(dest => dest.CustomerNailName, opt => opt.MapFrom(src => src.CustomerNailRequest != null ? src.CustomerNailRequest.CustomerNail.Name : ""))
+                .ForMember(dest => dest.CustomerNailImageUrl, opt => opt.MapFrom(src => src.CustomerNailRequest != null ? src.CustomerNailRequest.CustomerNail.ImageUrl : ""));
         }
     }
 }

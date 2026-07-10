@@ -65,7 +65,6 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.NailShapeRepository.Update(shape);
             await _unitOfWork.SaveChangesAsync();
-            await RecalculateAffectedNailVariantsAsync(id);
 
             return new ApiSuccessResult<NailShapeDto>(_mapper.Map<NailShapeDto>(shape), "Cập nhật dáng móng thành công.");
         }
@@ -82,32 +81,6 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             return new ApiSuccessResult<bool>(true, "Xóa dáng móng thành công.");
-        }
-
-        private async Task RecalculateAffectedNailVariantsAsync(int nailShapeId)
-        {
-            var variants = await _unitOfWork.NailVariantRepository.GetAllNailVariantsAsync();
-            var affectedVariants = variants
-                .Where(variant => variant.NailShapeId == nailShapeId)
-                .ToList();
-
-            foreach (var variant in affectedVariants)
-            {
-                variant.Price = (variant.NailShape?.Price ?? 0m)
-                    + (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
-                variant.Duration = (variant.NailShape?.Duration ?? 0)
-                    + (variant.NailSurface?.Duration ?? 0)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
-
-                _unitOfWork.NailVariantRepository.Update(variant);
-            }
-
-            await _unitOfWork.SaveChangesAsync();
-            foreach (var nailDesignId in affectedVariants.Select(variant => variant.NailDesignId).Distinct())
-            {
-                await UpdateNailDesignPriceRangeAsync(nailDesignId);
-            }
         }
 
         private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)

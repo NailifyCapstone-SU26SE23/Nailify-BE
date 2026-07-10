@@ -47,7 +47,7 @@ namespace Nailify.Capstone.Application.Services
                     {
                         ServiceId = x.ServiceId,
                         NailVariantId = x.NailVariantId,
-                        CustomerNailId = x.CustomerNailId,
+                        CustomerNailRequestId = x.CustomerNailRequestId,
                         Quantity = x.Quantity
                     }).ToList();
                 }
@@ -97,7 +97,7 @@ namespace Nailify.Capstone.Application.Services
                     {
                         ServiceId = x.ServiceId,
                         NailVariantId = x.NailVariantId,
-                        CustomerNailId = x.CustomerNailId,
+                        CustomerNailRequestId = x.CustomerNailRequestId,
                         Quantity = x.Quantity
                     }).ToList();
                 }
@@ -172,7 +172,7 @@ namespace Nailify.Capstone.Application.Services
                         var b = await _unitOfWork.BookingRepository.GetBookingDetailAsync(ahead.OriginalBookingId.Value);
                         if (b != null)
                         {
-                            aheadItems = b.BookingItems.Select(x => new BookingItemRequestDTO { ServiceId = x.ServiceId, NailVariantId = x.NailVariantId, CustomerNailId = x.CustomerNailId, Quantity = x.Quantity }).ToList();
+                            aheadItems = b.BookingItems.Select(x => new BookingItemRequestDTO { ServiceId = x.ServiceId, NailVariantId = x.NailVariantId, CustomerNailRequestId = x.CustomerNailRequestId, Quantity = x.Quantity }).ToList();
                         }
                     }
                     var aheadProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(aheadItems, salonId);
@@ -295,7 +295,7 @@ namespace Nailify.Capstone.Application.Services
                         {
                             ServiceId = x.ServiceId,
                             NailVariantId = x.NailVariantId,
-                            CustomerNailId = x.CustomerNailId,
+                            CustomerNailRequestId = x.CustomerNailRequestId,
                             Quantity = x.Quantity
                         }).ToList();
                     }

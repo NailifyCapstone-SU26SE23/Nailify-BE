@@ -31,6 +31,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Schedule> Schedules { get; set; }
         public DbSet<Component> Components { get; set; }
         public DbSet<NailShape> NailShapes { get; set; }
+        public DbSet<ShapeMethodConfig> ShapeMethodConfigs { get; set; }
         public DbSet<NailSurface> NailSurfaces { get; set; }
         public DbSet<NailVariant> NailVariants { get; set; }
         public DbSet<NailComponent> NailComponents { get; set; }
@@ -129,9 +130,15 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<NailShape>()
                 .HasKey(ns => ns.NailShapeId);
 
-            modelBuilder.Entity<NailShape>()
-                .Property(ns => ns.Price)
-                .HasPrecision(18, 2);
+            modelBuilder.Entity<ShapeMethodConfig>(entity =>
+            {
+                entity.HasKey(smc => smc.ShapeMethodConfigId);
+                entity.Property(smc => smc.Price).HasPrecision(18, 2);
+                entity.HasOne(smc => smc.NailShape)
+                      .WithMany(ns => ns.ShapeMethodConfigs)
+                      .HasForeignKey(smc => smc.NailShapeId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
 
             modelBuilder.Entity<NailSurface>()
                 .HasKey(ns => ns.NailSurfaceId);
@@ -151,7 +158,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasOne(nv => nv.NailDesign)
                 .WithMany(nd => nd.NailVariants)
                 .HasForeignKey(nv => nv.NailDesignId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<NailVariant>()
                 .HasOne(nv => nv.NailShape)
@@ -388,7 +395,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.Property(b => b.Discount).HasPrecision(18, 2);
                 entity.Property(b => b.TotalPrice).HasPrecision(18, 2);
                 entity.Property(b => b.IsRated).HasDefaultValue(false);
-                entity.Property(b => b.IsPaid).HasDefaultValue(false);
                 entity.Property(b => b.IsRefunded).HasDefaultValue(false);
                 entity.Property(b => b.Status)
                     .HasConversion(
@@ -411,8 +417,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             {
                 entity.HasKey(bi => bi.BookingItemId);
                 entity.Property(bi => bi.Price).HasPrecision(18, 2);
-                entity.Property(bi => bi.FinalPrice).HasPrecision(18, 2);
-                entity.Property(bi => bi.DiscountAmount).HasPrecision(18, 2);
                 // Thiết lập các mối quan hệ khóa ngoại
                 entity.HasOne(bi => bi.Booking)
                       .WithMany(b => b.BookingItems)
@@ -425,6 +429,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.HasOne(bi => bi.NailVariant)
                       .WithMany()
                       .HasForeignKey(bi => bi.NailVariantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(bi => bi.ShapeMethodConfig)
+                      .WithMany()
+                      .HasForeignKey(bi => bi.ShapeMethodConfigId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<BookingHistory>(entity =>
@@ -680,9 +688,9 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                         .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<BookingItem>()
-                        .HasOne(bi => bi.CustomerNail)
+                        .HasOne(bi => bi.CustomerNailRequest)
                         .WithMany()
-                        .HasForeignKey(bi => bi.CustomerNailId)
+                        .HasForeignKey(bi => bi.CustomerNailRequestId)
                         .OnDelete(DeleteBehavior.SetNull);
 
 
@@ -698,6 +706,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.HasOne(np => np.NailVariant)
                       .WithMany(nv => nv.NailProcedures)
                       .HasForeignKey(np => np.NailVariantId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(np => np.CustomerNail)
+                      .WithMany(cn => cn.NailProcedures)
+                      .HasForeignKey(np => np.CustomerNailId)
                       .OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne(np => np.Procedure)
                       .WithMany(p => p.NailProcedures)

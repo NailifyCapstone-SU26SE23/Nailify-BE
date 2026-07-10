@@ -18,5 +18,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<bool>> DeleteProcedureAsync(Guid procedureId); 
         Task<ApiResult<List<ProcedureResponseDTO>>> GetProceduresByVariantIdAsync(int nailVariantId);
         Task<ApiResult<bool>> AssignProceduresToVariantAsync(int nailVariantId, List<AssignProcedureRequestDTO> request);
+        Task<ApiResult<List<NailProcedureResponseDTO>>> GetNailProceduresByCustomerNailIdAsync(int customerNailId);
+        Task<ApiResult<NailProcedureResponseDTO>> CreateCustomerNailProcedureAsync(int customerNailId, CustomerNailProcedureRequestDTO request);
+        Task<ApiResult<NailProcedureResponseDTO>> UpdateCustomerNailProcedureAsync(Guid nailProcedureId, CustomerNailProcedureRequestDTO request);
+        Task<ApiResult<bool>> DeleteCustomerNailProcedureAsync(Guid nailProcedureId);
+        Task<ApiResult<bool>> AssignProceduresToCustomerNailAsync(int customerNailId, List<CustomerNailProcedureRequestDTO> request);
     }
 }

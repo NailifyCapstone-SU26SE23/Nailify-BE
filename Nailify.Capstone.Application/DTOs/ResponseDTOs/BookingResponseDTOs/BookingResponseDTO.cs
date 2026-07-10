@@ -35,7 +35,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public DateTime? ActualStartTime { get; set; }
         public bool IsLateArrival { get; set; }
         public bool IsRated { get; set; }
-        public bool IsPaid { get; set; }
+        public decimal? AmountDue { get; set; }
+        public decimal? AmountPaid { get; set; }
         public bool IsRefunded { get; set; }
         public List<BookingItemResponseDTO> BookingItems { get; set; } = new();
         public List<SimpleDiscountDto> Discounts { get; set; } = new();

@@ -42,6 +42,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(r => r.CustomerNailRequestId == requestId)
                 .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailShape)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailSurface)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.CustomerNailComponents)
+                        .ThenInclude(c => c.CustomerComponent)
+                .Include(r => r.CustomerNail)
                     .ThenInclude(cn => cn.CustomerNailComponents)
                         .ThenInclude(c => c.Component)
                 .Include(r => r.Salon)
