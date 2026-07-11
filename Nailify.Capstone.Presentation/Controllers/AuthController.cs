@@ -63,24 +63,5 @@ namespace Nailify.Capstone.Presentation.Controllers
                 }
             });
         }
-
-        /// <summary>
-        /// Mã hóa mật khẩu (BCrypt Hash) dùng để seed database hoặc tạo mật khẩu mẫu.
-        /// </summary>
-        [HttpGet("hash-password")]
-        public IActionResult HashPassword([FromQuery] string password)
-        {
-            if (string.IsNullOrEmpty(password))
-            {
-                return BadRequest(new { isSucceeded = false, message = "Mật khẩu không được để trống." });
-            }
-            var hashed = BCrypt.Net.BCrypt.HashPassword(password);
-            return Ok(new
-            {
-                isSucceeded = true,
-                plainText = password,
-                hashed = hashed
-            });
-        }
     }
 }
