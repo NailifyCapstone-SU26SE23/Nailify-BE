@@ -205,6 +205,14 @@ namespace Nailify.Capstone.Application.Services
                 existbooking.AssignedArtistId = artistId;
                 existbooking.CompletedById = null;
             }
+            else if (status == BookingProcedureStatus.Pending)
+            {
+                existbooking.CompletedAt = null;
+                existbooking.ActualStartTime = null;
+                existbooking.AssignedArtistId = artistId;
+                existbooking.Status = BookingProcedureStatus.Pending;
+                existbooking.CompletedById = null;
+            }
             else
             {
                 existbooking.CompletedAt = null;
@@ -271,6 +279,20 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return new ApiSuccessResult<List<IdleArtistResponseDTO>>(responseList, "Lấy danh sách thợ rảnh thành công.");
+        }
+
+        public async Task<ApiResult<List<BookingProcedureResponseDTO>>> GetArtistActiveProceduresAsync(Guid artistId)
+        {
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetActiveProceduresByArtistIdAsync(artistId);
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
+            return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách công việc của thợ thành công.");
+        }
+
+        public async Task<ApiResult<List<BookingProcedureResponseDTO>>> GetClaimableProceduresAsync(Guid salonId)
+        {
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetClaimableProceduresBySalonIdAsync(salonId);
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
+            return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách công việc có thể nhận thành công.");
         }
     }
 }

@@ -319,6 +319,26 @@ namespace Nailify.Capstone.Application.Services
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc đã quá hạn bảo hành (Hạn bảo hành là 7 ngày).");
                 }
+                var isAlreadyWarranted = await _unitOfWork.BookingRepository.ExistsAsync(x =>
+                                                                x.WarrantyForBookingId == request.WarrantyForBookingId.Value
+                                                                && x.Status != BookingStatus.Cancelled
+                                                                && x.Status != BookingStatus.Rejected);
+                if (isAlreadyWarranted)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch gốc này đã được yêu cầu bảo hành trước đó.");
+                }
+                foreach (var item in request.BookingItems)
+                {
+                    bool isValidItem = oldBooking.BookingItems.Any(oldItem =>
+                                                                              (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                                                                              (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
+                                                                              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+                                                                   );
+                    if (!isValidItem)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>("Dịch vụ hoặc mẫu móng yêu cầu bảo hành không khớp với đơn đặt lịch gốc.");
+                    }
+                }
                 bookingPrice.Price = 0;
                 bookingPrice.Discount = 0;
                 bookingPrice.TotalPrice = 0;

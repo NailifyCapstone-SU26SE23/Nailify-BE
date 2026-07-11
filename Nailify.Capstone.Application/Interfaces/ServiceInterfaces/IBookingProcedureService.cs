@@ -23,5 +23,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         // Thêm mới phương thức Claim công đoạn
         Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId);
         Task<ApiResult<List<IdleArtistResponseDTO>>> GetAvailableArtistsForProcedureAsync(Guid bookingProcedureId);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetArtistActiveProceduresAsync(Guid artistId);
+
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetClaimableProceduresAsync(Guid salonId);
     }
 }

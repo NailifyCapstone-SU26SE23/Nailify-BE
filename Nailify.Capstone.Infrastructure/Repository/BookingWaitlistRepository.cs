@@ -54,7 +54,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await FindByCondition(x => x.WailistId == waitlistId, false)
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
-                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.PreferredNailArtist)
+                    .ThenInclude(a => a.Account)
+                .OrderBy(x => x.Position)
                 .FirstOrDefaultAsync();
         }
 
