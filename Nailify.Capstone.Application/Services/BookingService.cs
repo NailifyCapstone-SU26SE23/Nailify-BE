@@ -332,7 +332,7 @@ namespace Nailify.Capstone.Application.Services
                     bool isValidItem = oldBooking.BookingItems.Any(oldItem =>
                                                                               (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
                                                                               (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
-                                                                              (item.CustomerNailId.HasValue && oldItem.CustomerNailId == item.CustomerNailId)
+                                                                              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
                                                                    );
                     if (!isValidItem)
                     {

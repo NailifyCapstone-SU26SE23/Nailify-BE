@@ -57,11 +57,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
         }
 
         public async Task<List<BookingProcedure>> GetProceduresByBookingIdAsync(Guid bookingId, bool trackChanges = false)
-            => await FindByCondition(x => x.BookingItem.BookingId == bookingId,trackChanges)
+            => await FindByCondition(x => x.BookingItem.BookingId == bookingId, trackChanges)
                      .Include(x => x.CompletedBy)
-                          .ThenInclude(x =>x.Account)
+                          .ThenInclude(x => x.Account)
                      .Include(x => x.AssignedArtist)
-                          .ThenInclude(x =>x.Account)
+                          .ThenInclude(x => x.Account)
                      .OrderBy(x => x.StepOrder)
                      .ToListAsync();
 
@@ -79,7 +79,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<bool> HasAnyInProgressProcedureAsync(Guid artistId)
         {
-            return await FindByCondition(p => p.AssignedArtistId == artistId 
+            return await FindByCondition(p => p.AssignedArtistId == artistId
                                     && p.Status == Nailify.Capstone.Domain.Enums.BookingProcedureStatus.InProgress, false)
                         .AnyAsync();
         }
@@ -90,6 +90,61 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItem)
                     .ThenInclude(x => x.Booking)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<BookingProcedure>> GetActiveProceduresByArtistIdAsync(Guid artistId)
+        {
+            return await FindByCondition(x => x.AssignedArtistId == artistId
+                                         && (x.Status == BookingProcedureStatus.Pending || x.Status == BookingProcedureStatus.InProgress) &&
+                                         x.BookingItem.Booking.Status != BookingStatus.Cancelled &&
+                                         x.BookingItem.Booking.Status != BookingStatus.Rejected, false)
+                .Include(x => x.BookingItem)
+                    .ThenInclude(x => x.Booking)
+                        .ThenInclude(x => x.Customer)
+                                .ThenInclude(x => x.User)
+                 .Include(x => x.BookingItem)
+                    .ThenInclude(x => x.Booking)
+                        .ThenInclude(x => x.Chair)
+                .OrderBy(x => x.BookingItem.Booking.BookingDate)
+                    .ThenBy(x => x.BookingItem.Booking.StartTime)
+                    .ThenBy(x => x.StepOrder)
+                    .ToListAsync();
+
+
+        }
+
+        public async Task<List<BookingProcedure>> GetClaimableProceduresBySalonIdAsync(Guid salonId)
+        {
+            var pendingProcedures = await FindByCondition(x => x.BookingItem.Booking.SalonId == salonId
+                                                          && x.Status == BookingProcedureStatus.Pending 
+                                                          && x.AssignedArtist == null
+                                                          && (x.BookingItem.Booking.Status == BookingStatus.CheckedIn 
+                                                              || x.BookingItem.Booking.Status == BookingStatus.InProgress), false)
+                                         .Include(x => x.BookingItem)
+                                            .ThenInclude(x => x.Booking)
+                                                 .ThenInclude(x => x.Customer)
+                                                    .ThenInclude(x => x.User)
+                                         .Include(x => x.BookingItem)
+                                            .ThenInclude(x => x.Booking)
+                                                  .ThenInclude(x => x.Chair)
+                                         .ToListAsync();
+
+            if (!pendingProcedures.Any())
+            {
+                return new List<BookingProcedure>();
+            }
+
+            var bookingItemsIds = pendingProcedures.Select(x => x.BookingItemId).Distinct().ToList();
+            var allProceduresForItems = await FindByCondition(x => bookingItemsIds.Contains(x.BookingItemId), false)
+                                             .ToListAsync();
+
+            var claimableProcedures = pendingProcedures.Where(proc => !allProceduresForItems.Any(x => x.BookingItemId == proc.BookingItemId &&
+                                        x.StepOrder < proc.StepOrder &&
+                                        x.Status != BookingProcedureStatus.Completed &&
+                                        x.Status != BookingProcedureStatus.Skipped)
+                                       ).ToList();
+
+            return claimableProcedures;
         }
     }
 }

@@ -100,5 +100,27 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             return Ok(result);
         }
+        /// <summary>
+        /// Lấy danh sách công việc thực tế đang gán cho một thợ nail (chưa hoàn thành).
+        /// </summary>
+        [Authorize(Roles = "Staff_Artist,Receptionist,Manager")]
+        [HttpGet("artist/{artistId}/tasks")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetArtistTasks(Guid artistId)
+        {
+            var result = await _bookingProcedureService.GetArtistActiveProceduresAsync(artistId);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Lấy danh sách công việc sẵn sàng để thợ nail tự nhận (Chưa gán thợ, đã mở khóa các bước trước).
+        /// </summary>
+        [Authorize(Roles = "Staff_Artist,Receptionist,Manager")]
+        [HttpGet("claimable")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetClaimableTasks([FromQuery] Guid salonId)
+        {
+            var result = await _bookingProcedureService.GetClaimableProceduresAsync(salonId);
+            return Ok(result);
+        }
     }
 }
