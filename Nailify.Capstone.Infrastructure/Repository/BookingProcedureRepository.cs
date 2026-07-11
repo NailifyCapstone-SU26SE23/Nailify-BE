@@ -60,6 +60,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
             => await FindByCondition(x => x.BookingItem.BookingId == bookingId,trackChanges)
                      .Include(x => x.CompletedBy)
                           .ThenInclude(x =>x.Account)
+                     .Include(x => x.AssignedArtist)
+                          .ThenInclude(x =>x.Account)
                      .OrderBy(x => x.StepOrder)
                      .ToListAsync();
 
@@ -68,7 +70,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(bp => bp.BookingItemId == bookingItemId)
                 .Include(bp => bp.CompletedBy)
-                .ThenInclude(na => na.Account)
+                    .ThenInclude(na => na.Account)
+                .Include(x => x.AssignedArtist)
+                    .ThenInclude(na => na.Account)
                 .OrderBy(bp => bp.StepOrder)
                 .ToListAsync();
         }

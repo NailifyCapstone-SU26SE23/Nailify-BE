@@ -205,6 +205,14 @@ namespace Nailify.Capstone.Application.Services
                 existbooking.AssignedArtistId = artistId;
                 existbooking.CompletedById = null;
             }
+            else if (status == BookingProcedureStatus.Pending)
+            {
+                existbooking.CompletedAt = null;
+                existbooking.ActualStartTime = null;
+                existbooking.AssignedArtistId = artistId;
+                existbooking.Status = BookingProcedureStatus.Pending;
+                existbooking.CompletedById = null;
+            }
             else
             {
                 existbooking.CompletedAt = null;
