@@ -88,6 +88,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ICustomerRepository, CustomerRepository>();
             services.AddScoped<ICategoryTypeRepository, CategoryTypeRepository>();
             services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<INailCategoryRepository, NailCategoryRepository>();
             services.AddScoped<INailDesignRepository, NailDesignRepository>();
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped<ISalonRepository, SalonRepository>();
@@ -132,6 +133,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
             services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<INailCategoryService, NailCategoryService>();
             services.AddScoped<INailDesignService, NailDesignService>();
             services.AddScoped<IPasswordHasher, PasswordHasher>();
             services.AddScoped<ISalonService, SalonService>();
@@ -163,6 +165,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
             services.AddScoped<IBookingRatingService, BookingRatingService>();
             services.AddScoped<IPromotionService, PromotionService>();
+            services.AddScoped<IBookingDiscountService, BookingDiscountService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
             services.AddScoped<ICustomerNailRequestsService, CustomerNailRequestsService>();
             services.AddScoped<IBookingSchedulingService, BookingSchedulingService>();
