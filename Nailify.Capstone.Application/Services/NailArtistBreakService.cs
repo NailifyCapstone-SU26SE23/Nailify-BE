@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistBreakRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistBreakResponseDTOs;
@@ -29,9 +29,29 @@ namespace Nailify.Capstone.Application.Services
             var artistBreak = await _unitOfWork.NailArtistBreakRepository.GetByIdAsync(breakId);
             if (artistBreak == null)
                 return new ApiErrorResult<NailArtistBreakResponseDTO>("Không tìm thấy yêu cầu nghỉ.");
+
+            if (request.Status == ArtistBreakStatus.Pending)
+            {
+                return new ApiErrorResult<NailArtistBreakResponseDTO>("Trạng thái duyệt không hợp lệ. Vui lòng chọn Approved hoặc Rejected.");
+            }
+
+            if (request.Status == ArtistBreakStatus.Rejected)
+            {
+                if (string.IsNullOrWhiteSpace(request.RejectReason))
+                {
+                    return new ApiErrorResult<NailArtistBreakResponseDTO>("Vui lòng cung cấp lý do từ chối yêu cầu nghỉ.");
+                }
+                artistBreak.RejectReason = request.RejectReason;
+            }
+            else
+            {
+                artistBreak.RejectReason = null;
+            }
+
             artistBreak.Status = request.Status;
             _unitOfWork.NailArtistBreakRepository.Update(artistBreak);
             await _unitOfWork.SaveChangesAsync();
+
             var message = request.Status == ArtistBreakStatus.Approved ? "Đã duyệt yêu cầu nghỉ." : "Đã từ chối yêu cầu nghỉ.";
             var response = _mapper.Map<NailArtistBreakResponseDTO>(artistBreak);
             return new ApiSuccessResult<NailArtistBreakResponseDTO>(response, message);

@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Domain.Entities
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
         public string? Reason { get; set; }
+        public string? RejectReason { get; set; }
         public ArtistBreakStatus Status { get; set; } = ArtistBreakStatus.Approved;
         public virtual NailArtist NailArtist { get; set; }
     }

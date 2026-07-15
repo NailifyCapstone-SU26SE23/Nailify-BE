@@ -2,11 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
-using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 using Org.BouncyCastle.Asn1.Ocsp;
@@ -16,6 +16,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
@@ -26,19 +27,24 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly ISlotHoldConfiguration _config;
         private readonly ILogger<SlotHoldService> _logger;
         private readonly IBookingSchedulingService _bookingSchedulingService;
-
+        private readonly IScheduledJobService _scheduledJobService;
+        private readonly INotificationService _notificationService;
         public SlotHoldService(
                IDistributedCache cache,
                IUnitOfWork unitOfWork,
                ISlotHoldConfiguration config,
                ILogger<SlotHoldService> logger,
-               IBookingSchedulingService bookingSchedulingService)
+               IBookingSchedulingService bookingSchedulingService,
+               IScheduledJobService scheduledJobService,
+               INotificationService notificationService)
         {
             _cache = cache;
             _unitOfWork = unitOfWork;
             _config = config;
             _logger = logger;
             _bookingSchedulingService = bookingSchedulingService;
+            _scheduledJobService = scheduledJobService;
+            _notificationService = notificationService;
         }
 
         public async Task ConsumeHoldAsync(string holdToken)
@@ -149,6 +155,27 @@ namespace Nailify.Capstone.Infrastructure.Service
                 if (isConflict)
                 {
                     await _unitOfWork.RollbackTransactionAsync();
+                    
+                    var redisList = BuildSlotKey(request.NailArtistId, request.BookingDate);
+                    var activeHoldsSlot = await GetActiveHoldsFromRedisAsync(redisList);
+                    var overlappingHold = activeHoldsSlot.FirstOrDefault(x => x.StartTime < endTime 
+                                                                     && x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes)) > request.StartTime);
+                    if(overlappingHold != null)
+                    {
+                        var waitersKey = $"{_config.KeyPrefix}:waiters:{overlappingHold.HoldToken}";
+                        var waitersJson = await _cache.GetStringAsync(waitersKey);
+                        var waiters = string.IsNullOrEmpty(waitersJson)
+                            ? new List<Guid>()
+                            : JsonSerializer.Deserialize<List<Guid>>(waitersJson) ?? new List<Guid>();
+                        if (!waiters.Contains(customerId))
+                        {
+                            waiters.Add(customerId);
+                            await _cache.SetStringAsync(waitersKey, JsonSerializer.Serialize(waiters), new DistributedCacheEntryOptions
+                            {
+                                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(_config.HoldDurationSeconds + 60)
+                            });
+                        }
+                    }
                     return new ApiErrorResult<SlotHoldResponseDTO>("Thợ đã đầy lịch trong khoảng thời gian này, vui lòng chọn giờ khác.");
                 }
                 // Đọc danh sách Holds hiện tại từ Redis
@@ -189,6 +216,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var mapping = new TokenMapping { ArtistId = request.NailArtistId, BookingDate = request.BookingDate, SlotKey = holdToken };
                 await SetCacheAsync(tokenKey, mapping, _config.HoldDurationSeconds);
                 await _unitOfWork.CommitTransactionAsync();
+                _scheduledJobService.Schedule<ISlotHoldService>(
+                                                                x => x.ReleaseHoldAndNotifyWaitersAsync(holdToken),
+                                                                TimeSpan.FromSeconds(_config.HoldDurationSeconds)
+                );
                 var response = new SlotHoldResponseDTO
                 {
                     HoldToken = holdToken,
@@ -238,19 +269,24 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
 
                 var holdToRemove = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
-                if(holdToRemove != null)
+                TimeSpan startTime = TimeSpan.Zero; 
+                if (holdToRemove != null)
                 {
                     if(holdToRemove.CustomerId != customerId)
                     {
                         await _unitOfWork.RollbackTransactionAsync();
                         return new ApiErrorResult<bool>("Bạn không có quyền giải phóng giữ chỗ này.");
                     }
+                    startTime = holdToRemove.StartTime; // Lưu lại giờ để gửi thông báo
                     activeHolds.Remove(holdToRemove);
                     await SaveHoldToRedisAsync(redisListKey, activeHolds);
                 }
-
                 await _cache.RemoveAsync(tokenKey);
                 await _unitOfWork.CommitTransactionAsync();
+                if (holdToRemove != null)
+                {
+                    await NotifyWaitersInternalAsync(holdToken, mapping.ArtistId, mapping.BookingDate, startTime);
+                }
                 return new ApiResult<bool>(true, "Đã hủy giữ chỗ thành công.");
             }
             catch (Exception)
@@ -258,18 +294,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                 await _unitOfWork.RollbackTransactionAsync();
                 throw;
             }
-            var holdJson = await _cache.GetStringAsync(mapping.SlotKey);
-            if (!string.IsNullOrEmpty(holdJson))
-            {
-                var hold = JsonSerializer.Deserialize<SlotHoldData>(holdJson);
-                if (hold != null && hold.CustomerId != customerId)
-                {
-                    return new ApiErrorResult<bool>("Bạn không có quyền giải phóng giữ chỗ này");
-                }
-                await _cache.RemoveAsync(mapping.SlotKey);
-            }
-            await _cache.RemoveAsync(tokenKey);
-            return new ApiResult<bool>(true, "Đã hủy giữ chỗ thành công.");
         }
 
         public async Task<bool> ValidateHoldTokenAsync(string holdToken, Guid customerId, Guid artistId, DateTime date, TimeSpan startTime)
@@ -425,6 +449,94 @@ namespace Nailify.Capstone.Infrastructure.Service
                 simulatedSegments,
                 capacity
             );
+        }
+
+        public async Task ReleaseHoldAndNotifyWaitersAsync(string holdToken)
+        {
+            var tokenKey = $"{_config.KeyPrefix}:token:{holdToken}";
+            var mappingJson = await _cache.GetStringAsync(tokenKey);
+            if (string.IsNullOrEmpty(mappingJson))
+            {
+                return; // Đã đặt lịch thành công hoặc đã chủ động hủy
+            }
+            var mapping = JsonSerializer.Deserialize<TokenMapping>(mappingJson);
+            if(mapping == null)
+            {
+                return;
+            }
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                await _unitOfWork.NailArtistRepository.GetArtistWithLockAsync(mapping.ArtistId);
+                var redisListKey = BuildSlotKey(mapping.ArtistId, mapping.BookingDate);
+                var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+                var holdToRemove = activeHolds.FirstOrDefault(x => x.HoldToken == holdToken);
+                TimeSpan startTime = TimeSpan.Zero;
+                if (holdToRemove != null)
+                {
+                    startTime = holdToRemove.StartTime;
+                    activeHolds.Remove(holdToRemove);
+                    await SaveHoldToRedisAsync(redisListKey, activeHolds);
+                }
+                await _cache.RemoveAsync(tokenKey);
+                await _unitOfWork.CommitTransactionAsync();
+                if (holdToRemove != null)
+                {
+                    await NotifyWaitersInternalAsync(holdToken, mapping.ArtistId, mapping.BookingDate, startTime);
+                }
+            }
+            catch (Exception ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                _logger.LogError(ex, "Lỗi giải phóng giữ chỗ hết hạn: {HoldToken}", holdToken);
+                throw;
+            }
+        }
+
+        // Triển khai NotifyWaitersInternalAsync gửi tin nhắn SignalR
+        private async Task NotifyWaitersInternalAsync(string holdToken, Guid artistId, DateTime bookingDate, TimeSpan startTime)
+        {
+           var waitersKey = $"{_config.KeyPrefix}:waiters:{holdToken}";
+           var waitersJson = await _cache.GetStringAsync(waitersKey);
+            if (string.IsNullOrEmpty(waitersJson))
+            {
+                return; // Không có khách hàng nào đang chờ
+            }
+
+            var waiters = JsonSerializer.Deserialize<List<Guid>>(waitersJson);
+            if (waiters == null || !waiters.Any())
+            {
+                return; // Không có khách hàng nào đang chờ
+            }
+            try
+            {
+                var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
+                var artistName = artist != null ? $"{artist.Account.FirstName} {artist.Account.LastName}" : "Thợ nail";
+
+                foreach (var waiterId in waiters)
+                {
+                    await _notificationService.SendNotificationToUserAsync(
+                        waiterId.ToString(),
+                        "WaitlistPromoted",
+                        new
+                        {
+                            ArtistName = artistName,
+                            BookingDate = bookingDate.ToString("dd/MM/yyyy"),
+                            StartTime = startTime.ToString(@"hh\:mm"),
+                            Message = $"Lịch hẹn ngày {bookingDate:dd/MM/yyyy} lúc {startTime:hh\\:mm} với thợ {artistName} đã được giải phóng. Bạn hãy nhanh tay đăng ký giữ chỗ!"
+                        }
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi gửi thông báo cho waiters của token {HoldToken}", holdToken);
+            }
+            finally
+            {
+                await _cache.RemoveAsync(waitersKey);
+            }
         }
 
         /// <summary>

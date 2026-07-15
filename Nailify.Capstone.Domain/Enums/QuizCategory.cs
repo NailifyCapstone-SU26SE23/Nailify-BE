@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +13,8 @@ namespace Nailify.Capstone.Domain.Enums
         Style = 3,
         Occasion = 4,
         Shape = 5,
-        Complexity = 6
+        Complexity = 6,
+        HandShape = 7,
+        SkinShade = 8
     }
 }

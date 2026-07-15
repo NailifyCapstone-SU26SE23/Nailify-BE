@@ -18,11 +18,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly INotificationService _notificationService;
 
-        public BookingProcedureService(IUnitOfWork unitOfWork, IMapper mapper)
+        public BookingProcedureService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _notificationService = notificationService;
         }
 
         public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
@@ -39,8 +41,8 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var otherProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(procedure.BookingItem.BookingId);
-            var customerIsBusy = otherProcedures.Any(x => 
-                x.Status == BookingProcedureStatus.InProgress 
+            var customerIsBusy = otherProcedures.Any(x =>
+                x.Status == BookingProcedureStatus.InProgress
                 && x.BookingProcedureId != bookingProcedureId
                 && (!x.ActualStartTime.HasValue || (DateTime.UtcNow - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
             );
@@ -167,7 +169,7 @@ namespace Nailify.Capstone.Application.Services
                     ? null
                     : await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
 
-                var activeNailProcedures = customNail != null 
+                var activeNailProcedures = customNail != null
                     ? await _unitOfWork.NailProcedureRepository.GetActiveProceduresByCustomerNailIdAsync(customNail.CustomerNailId)
                     : new List<NailProcedure>();
 
@@ -244,8 +246,8 @@ namespace Nailify.Capstone.Application.Services
             if (status == BookingProcedureStatus.InProgress && existbooking.Status != BookingProcedureStatus.InProgress)
             {
                 var otherProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(existbooking.BookingItem.BookingId);
-                var customerIsBusy = otherProcedures.Any(x => 
-                    x.Status == BookingProcedureStatus.InProgress 
+                var customerIsBusy = otherProcedures.Any(x =>
+                    x.Status == BookingProcedureStatus.InProgress
                     && x.BookingProcedureId != bookingProcedureId
                     && (!x.ActualStartTime.HasValue || (DateTime.UtcNow - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
                 );
@@ -286,11 +288,49 @@ namespace Nailify.Capstone.Application.Services
                 existbooking.CompletedAt = DateTime.UtcNow;
                 existbooking.ActualEndTime = DateTime.UtcNow;
                 existbooking.CompletedById = artistId;
+                try
+                {
+                    var allProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingItemIdAsync(existbooking.BookingItemId);
+
+                    var nextProcedure = allProcedures
+                                                    .Where(x => x.StepOrder > existbooking.StepOrder
+                                                            && x.Status != BookingProcedureStatus.Completed
+                                                            && x.Status != BookingProcedureStatus.Skipped)
+                                                    .OrderBy(x => x.StepOrder)
+                                                    .FirstOrDefault();
+
+                    if (nextProcedure != null && nextProcedure.AssignedArtistId.HasValue)
+                    {
+                        var currentArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
+                        var currentArtistName = currentArtist != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}" : "Thợ nail";
+
+                        var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(existbooking.BookingItem.BookingId);
+                        var customerName = booking != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}" : "Khách hàng";
+
+                        var nextArtistAccountId = nextProcedure.AssignedArtist.AccountId;
+
+                        await _notificationService.SendNotificationToUserAsync(
+                            nextArtistAccountId.ToString(),
+                            "NextStepReady",
+                            new
+                            {
+                                BookingProcedureId = nextProcedure.BookingProcedureId,
+                                BookingItemId = nextProcedure.BookingItemId,
+                                Message = $"Thợ {currentArtistName} đã hoàn thành bước '{existbooking.ProcedureName}' cho khách {customerName}. Mời bạn vào thực hiện bước tiếp theo '{nextProcedure.ProcedureName}'."
+                            }
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Tránh việc lỗi SignalR/thông tin phụ làm gián đoạn luồng chính
+                    Console.WriteLine($"Error sending SignalR notification for next step: {ex.Message}");
+                }
             }
             else if (status == BookingProcedureStatus.InProgress)
             {
                 existbooking.CompletedAt = null;
-                existbooking.ActualStartTime = DateTime.UtcNow; 
+                existbooking.ActualStartTime = DateTime.UtcNow;
                 existbooking.AssignedArtistId = artistId;
                 existbooking.CompletedById = null;
             }

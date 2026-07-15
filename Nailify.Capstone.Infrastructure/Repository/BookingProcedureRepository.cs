@@ -94,8 +94,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<List<BookingProcedure>> GetActiveProceduresByArtistIdAsync(Guid artistId)
         {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+
             return await FindByCondition(x => x.AssignedArtistId == artistId
-                                         && (x.Status == BookingProcedureStatus.Pending || x.Status == BookingProcedureStatus.InProgress) &&
+                                         && (
+                                             x.Status == BookingProcedureStatus.Pending ||
+                                             x.Status == BookingProcedureStatus.InProgress ||
+                                             ((x.Status == BookingProcedureStatus.Completed || x.Status == BookingProcedureStatus.Skipped)
+                                              && x.BookingItem.Booking.BookingDate.Date == today)
+                                         ) &&
                                          x.BookingItem.Booking.Status != BookingStatus.Cancelled &&
                                          x.BookingItem.Booking.Status != BookingStatus.Rejected, false)
                 .Include(x => x.BookingItem)
