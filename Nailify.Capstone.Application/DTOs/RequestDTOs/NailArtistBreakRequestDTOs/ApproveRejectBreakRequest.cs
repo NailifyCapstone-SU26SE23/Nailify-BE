@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistBreakRequestDT
     public class ApproveRejectBreakRequest
     {
         public ArtistBreakStatus Status { get; set; }
+        public string? RejectReason { get; set; }
     }
 }

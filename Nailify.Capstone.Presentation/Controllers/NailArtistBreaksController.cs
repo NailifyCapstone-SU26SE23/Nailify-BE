@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistBreakRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistBreakResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -54,10 +55,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Quản lý Salon duyệt hoặc từ chối yêu cầu xin nghỉ phép của Thợ Nail.
         /// </summary>
-        [HttpPut("{id}/approve-reject")]
+        [HttpPost("{id}/approve-reject")]
         [ProducesResponseType(typeof(ApiResult<NailArtistBreakResponseDTO>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ApproveReject(Guid id, [FromBody] ApproveRejectBreakRequest request)
+        public async Task<IActionResult> ApproveReject(
+            Guid id,
+            [FromQuery] ArtistBreakStatus status,
+            [FromQuery] string? rejectReason = null)
         {
+            var request = new ApproveRejectBreakRequest { Status = status, RejectReason = rejectReason };
             var result = await _breakService.ApproveRejectBreakAsync(id, request);
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);

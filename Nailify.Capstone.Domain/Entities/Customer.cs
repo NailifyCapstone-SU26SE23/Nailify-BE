@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +13,8 @@ namespace Nailify.Capstone.Domain.Entities
         public int LifetimePoints { get; set; } = 0;
 
         public string? SkinTone { get; set; } = string.Empty;
+        public string? SkinShade { get; set; } = string.Empty;
+        public string? HandShape { get; set; } = string.Empty;
         public string? Occupation { get; set; } = string.Empty;
         public string? NailCondition { get; set; } = string.Empty;
         public string? PersonaId { get; set; } = string.Empty;

@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -17,6 +17,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistBreakResponse
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
         public string? Reason { get; set; }
+        public string? RejectReason { get; set; }
         public string Status { get; set; } = string.Empty;
         public void Mapping(Profile profile)
         {

@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -48,17 +48,37 @@ namespace Nailify.Capstone.Application.Services
             var shapes = shapeList.ToDictionary(x => x.NailShapeId, x => x.Name);
 
             var featureList = new List<string>();
-            // Lấy hết các category theo nail desgin 
-            var allCategories = variants.SelectMany(x => x.NailDesign.NailCategories.Select(x => x.Category.Name)).Distinct().ToList();
+            // Lấy hết các category của các variant đang xét và gom nhóm theo ID
+            var categories = variants
+                .SelectMany(x => x.NailDesign.NailCategories.Select(nc => nc.Category))
+                .GroupBy(c => c.CategoryId)
+                .Select(g => g.First())
+                .ToList();
 
             var allColors = variants.SelectMany(x => ParseColorJson(x.ColorJson)).Distinct().ToList();
-            var allShapes = variants.Select(x => $"Shape: {x.NailShapeId}").Distinct().ToList();
+            var allShapes = variants.Select(x => $"Shape:{x.NailShapeId}").Distinct().ToList();
             var allSurfaces = variants.Select(x => $"Surface:{x.NailSurfaceId}").Distinct().ToList();
             // Gom het dac trung cua mau nail
-
-            // Master Feature List
             // Rap danh sach cac chieu dac trung mau
-            featureList.AddRange(allCategories.Select(c => $"Style:{c}"));
+
+            // Gộp tất cả các nhãn thể loại từ các variant (Style, Occasion, Skin Tone, v.v.)
+            // Tạo tiền tố
+            foreach (var cat in categories)
+            {
+                var typeName = cat.CategoryType?.Name ?? "Style";
+                string prefix = typeName switch
+                {
+                    "Style" => "Style",
+                    "Occasion" => "Occasion",
+                    "SkinUndertone" => "SkinTone",
+                    "SkinTone" => "SkinTone",
+                    "SkinShade" => "SkinShade",
+                    "HandShape" => "HandShape",
+                    _ => typeName
+                };
+                featureList.Add($"{prefix}:{cat.Name}");
+            }
+
             featureList.AddRange(allColors.Select(c => $"Color:{c}"));
             featureList.AddRange(allShapes);
             featureList.AddRange(allSurfaces);
@@ -70,6 +90,7 @@ namespace Nailify.Capstone.Application.Services
             var featureIndex = featureList.Select((f, idx) => new { Feature = f, Index = idx }).ToDictionary(x => x.Feature, x => x.Index);
 
             // Khoi tao mang de luu so thich cua nguoi dung doi voi tung dac trung
+            // Khởi tạo vector sở thích khách hàng
             double[] userVector = new double[featureList.Count];
             foreach (var col in preferredColors)
             {
@@ -87,7 +108,7 @@ namespace Nailify.Capstone.Application.Services
             }
             foreach (var occasion in preferredOccasions)
             {
-                if (featureIndex.TryGetValue($"Style:{occasion}", out int idx))
+                if (featureIndex.TryGetValue($"Occasion:{occasion}", out int idx))
                 {
                     userVector[idx] += 2.0;
                 }
@@ -100,6 +121,29 @@ namespace Nailify.Capstone.Application.Services
             {
                 userVector[compIdx] += 1.0;
             }
+            if (!string.IsNullOrEmpty(customer.SkinTone))
+            {
+                if (featureIndex.TryGetValue($"SkinTone:{customer.SkinTone}", out int idx))
+                {
+                    userVector[idx] += 2.0;
+                }
+            }
+            if (!string.IsNullOrEmpty(customer.SkinShade))
+            {
+                if (featureIndex.TryGetValue($"SkinShade:{customer.SkinShade}", out int idx))
+                {
+                    userVector[idx] += 2.0;
+                }
+            }
+            if (!string.IsNullOrEmpty(customer.HandShape))
+            {
+                if (featureIndex.TryGetValue($"HandShape:{customer.HandShape}", out int idx))
+                {
+                    userVector[idx] += 2.0;
+                }
+            }
+
+            // Favorites
             foreach (var fav in favorites)
             {
                 // Biến thể móng
@@ -122,7 +166,18 @@ namespace Nailify.Capstone.Application.Services
                 {
                     foreach (var nc in design.NailCategories)
                     {
-                        if (featureIndex.TryGetValue($"Style:{nc.Category.Name}", out int idxCat))
+                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
+                        string prefix = typeName switch
+                        {
+                            "Style" => "Style",
+                            "Occasion" => "Occasion",
+                            "SkinUndertone" => "SkinTone",
+                            "SkinTone" => "SkinTone",
+                            "SkinShade" => "SkinShade",
+                            "HandShape" => "HandShape",
+                            _ => typeName
+                        };
+                        if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idxCat))
                         {
                             userVector[idxCat] += 0.5;
                         }
@@ -131,6 +186,7 @@ namespace Nailify.Capstone.Application.Services
             }
             // Dem so lan
             // Mau nail 1 : 12 lan
+            // Lịch sử đặt lịch
             var variantBookingCounts = new Dictionary<int, int>();
             foreach (var b in booking)
             {
@@ -164,7 +220,18 @@ namespace Nailify.Capstone.Application.Services
                             {
                                 foreach (var nc in item.NailVariant.NailDesign.NailCategories)
                                 {
-                                    if (featureIndex.TryGetValue($"Style:{nc.Category.Name}", out int idx))
+                                    var typeName = nc.Category.CategoryType?.Name ?? "Style";
+                                    string prefix = typeName switch
+                                    {
+                                        "Style" => "Style",
+                                        "Occasion" => "Occasion",
+                                        "SkinUndertone" => "SkinTone",
+                                        "SkinTone" => "SkinTone",
+                                        "SkinShade" => "SkinShade",
+                                        "HandShape" => "HandShape",
+                                        _ => typeName
+                                    };
+                                    if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idx))
                                     {
                                         userVector[idx] += 0.3;
                                     }
@@ -174,6 +241,7 @@ namespace Nailify.Capstone.Application.Services
                     }
                 }
             }
+
             var globalBookingCounts = await _unitOfWork.BookingItemRepository.GetGlobalBookingCountsAsync();
             // Tính toán Độ dài (Norm) của Vector sở thích khách hàng
             // Tinh do dai cua khach bang tong binh phuong cac dac trung cua khach
@@ -185,7 +253,7 @@ namespace Nailify.Capstone.Application.Services
                 // vector cua mot mau mong dang xet
                 double[] variantVector = new double[featureList.Count];
                 var vColors = ParseColorJson(v.ColorJson);
-                var vCats = v.NailDesign.NailCategories.Select(nc => nc.Category.Name).ToList();
+
                 foreach (var col in vColors)
                 {
                     if (featureIndex.TryGetValue($"Color:{col}", out int idx))
@@ -193,11 +261,25 @@ namespace Nailify.Capstone.Application.Services
                         variantVector[idx] = 1.0;
                     }
                 }
-                foreach (var cat in vCats)
+                if (v.NailDesign != null)
                 {
-                    if (featureIndex.TryGetValue($"Style:{cat}", out int idx))
+                    foreach (var nc in v.NailDesign.NailCategories)
                     {
-                        variantVector[idx] = 1.0;
+                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
+                        string prefix = typeName switch
+                        {
+                            "Style" => "Style",
+                            "Occasion" => "Occasion",
+                            "SkinUndertone" => "SkinTone",
+                            "SkinTone" => "SkinTone",
+                            "SkinShade" => "SkinShade",
+                            "HandShape" => "HandShape",
+                            _ => typeName
+                        };
+                        if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idx))
+                        {
+                            variantVector[idx] = 1.0;
+                        }
                     }
                 }
                 if (featureIndex.TryGetValue($"Shape:{v.NailShapeId}", out int shapeIdIdx))
@@ -214,6 +296,7 @@ namespace Nailify.Capstone.Application.Services
                     variantVector[compIdIdx] = 1.0;
                 }
                 // Tong diem so thich trung khop giua khach va mau (ti le % hop)
+                // Tính Cosine Similarity thô
                 double dotProduct = 0;
                 // La do lon hinhh hoc cua mau mong do
                 double variantNorm = 0;
@@ -230,26 +313,88 @@ namespace Nailify.Capstone.Application.Services
                 {
                     similarity = dotProduct / (userNorm * variantNorm);
                 }
+
                 var reasons = new List<string>();
-                for(int i = 0; i < featureList.Count; i++)
+
+                // Rules Engine 1: Hand Shape to Nail Shape Harmony
+                string? shapeNameStr = v.NailShape?.Name;
+                if (!string.IsNullOrEmpty(customer.HandShape) && !string.IsNullOrEmpty(shapeNameStr))
+                {
+                    if (customer.HandShape.Contains("Mu bàn tay rộng") || customer.HandShape.Contains("mập") || customer.HandShape.Contains("ngắn") || customer.HandShape.Contains("đều tròn"))
+                    {
+                        if (shapeNameStr.Contains("Vuông") || shapeNameStr.Contains("Square") || shapeNameStr.Contains("Thang") || shapeNameStr.Contains("Coffin"))
+                        {
+                            similarity -= 0.15; // Phạt
+                            reasons.Add("Kiểu tay hơi đầy đặn nên hạn chế dáng vuông/thang để tránh tay trông ngắn hơn.");
+                        }
+                        else if (shapeNameStr.Contains("Hạnh nhân") || shapeNameStr.Contains("Almond") || shapeNameStr.Contains("Tròn") || shapeNameStr.Contains("Round") || shapeNameStr.Contains("Bầu dục") || shapeNameStr.Contains("Oval"))
+                        {
+                            similarity += 0.05; // Thưởng
+                            reasons.Add("Dáng móng này giúp ngón tay của bạn trông thon dài và mềm mại hơn.");
+                        }
+                    }
+                    else if (customer.HandShape.Contains("thon dài") || customer.HandShape.Contains("nhỏ") || customer.HandShape.Contains("thanh mảnh"))
+                    {
+                        if (shapeNameStr.Contains("Vuông") || shapeNameStr.Contains("Square") || shapeNameStr.Contains("Nhọn") || shapeNameStr.Contains("Stiletto"))
+                        {
+                            similarity += 0.05; // Thưởng
+                            reasons.Add("Cực kỳ phù hợp và tôn dáng ngón tay thon dài thanh mảnh sẵn có.");
+                        }
+                    }
+                }
+
+                // Rules Engine 2: Color Harmony by Skin Tone
+                if (!string.IsNullOrEmpty(customer.SkinTone))
+                {
+                    bool hasWarmColor = vColors.Any(IsWarmColor);
+                    bool hasCoolColor = vColors.Any(IsCoolColor);
+
+                    if (customer.SkinTone.Contains("Warm") || customer.SkinTone.Contains("Ấm"))
+                    {
+                        if (hasWarmColor)
+                        {
+                            similarity += 0.10;
+                            reasons.Add("Gam màu ấm rất đồng điệu và làm sáng tông da ấm của bạn.");
+                        }
+                    }
+                    else if (customer.SkinTone.Contains("Cool") || customer.SkinTone.Contains("Lạnh"))
+                    {
+                        if (hasCoolColor)
+                        {
+                            similarity += 0.10;
+                            reasons.Add("Gam màu lạnh tương phản dịu mát, giúp tôn tông da lạnh sáng hồng.");
+                        }
+                    }
+                }
+
+                // Giới hạn tương đồng trong khoảng [0.0, 1.0]
+                similarity = Math.Clamp(similarity, 0.0, 1.0);
+
+                // Thêm lý do khớp từ vector đặc trưng
+                for (int i = 0; i < featureList.Count; i++)
                 {
                     if (userVector[i] > 0 && variantVector[i] > 0)
                     {
                         var featureKey = featureList[i];
                         if (featureKey.StartsWith("Color:"))
                         {
-                            reasons.Add($"Phù hợp với tông màu {featureKey.Replace("Color:", "")} bạn yêu thích.");
+                            reasons.Add($"Tông màu {featureKey.Replace("Color:", "")} khớp với màu bạn thích.");
                         }
                         else if (featureKey.StartsWith("Style:"))
                         {
-                            reasons.Add($"Khớp với phong cách/dịp {featureKey.Replace("Style:", "")} bạn muốn tìm.");
+                            reasons.Add($"Mang phong cách {featureKey.Replace("Style:", "")} yêu thích của bạn.");
+                        }
+                        else if (featureKey.StartsWith("Occasion:"))
+                        {
+                            reasons.Add($"Thiết kế rất phù hợp cho dịp {featureKey.Replace("Occasion:", "")}.");
                         }
                         else if (featureKey.StartsWith("Shape:") && v.NailShapeId.HasValue && shapes.TryGetValue(v.NailShapeId.Value, out var shapeName))
                         {
-                            reasons.Add($"Đúng kiểu dáng form móng {shapeName} ưa thích.");
+                            reasons.Add($"Mẫu móng dáng {shapeName} theo sở thích.");
                         }
                     }
                 }
+
                 double finalScore = similarity * 100;
                 if (finalScore == 0)
                 {
@@ -331,12 +476,18 @@ namespace Nailify.Capstone.Application.Services
 
                 var complexityOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.Complexity)?.OptionValue;
                 var skinToneOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinTone)?.OptionValue;
+                var handShapeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.HandShape)?.OptionValue;
+                var skinShadeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinShade)?.OptionValue;
+
                 customer.PreferredColorsJson = JsonSerializer.Serialize(colorValues);
                 customer.PreferredStylesJson = JsonSerializer.Serialize(styleValues);
                 customer.PreferredOccasionsJson = JsonSerializer.Serialize(occasionValues);
                 customer.PreferredNailShapeId = shapeId;
                 customer.PreferredComplexity = complexityOpt ?? string.Empty;
                 customer.SkinTone = skinToneOpt ?? customer.SkinTone;
+                customer.HandShape = handShapeOpt ?? customer.HandShape;
+                customer.SkinShade = skinShadeOpt ?? customer.SkinShade;
+
                 _unitOfWork.CustomerRepository.Update(customer);
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransactionAsync();
@@ -445,6 +596,50 @@ namespace Nailify.Capstone.Application.Services
             if (duration <= 60) return "simple";
             if (duration <= 90) return "moderate";
             return "complex";
+        }
+
+        private bool IsWarmColor(string color)
+        {
+            if (string.IsNullOrEmpty(color)) return false;
+            if (color.StartsWith("#"))
+            {
+                var hex = color.Trim().Replace("#", "");
+                if (hex.Length == 6)
+                {
+                    if (int.TryParse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber, null, out int r) &&
+                        int.TryParse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber, null, out int g) &&
+                        int.TryParse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber, null, out int b))
+                    {
+                        return r > b + 15;
+                    }
+                }
+                return false;
+            }
+
+            var warmKeywords = new[] { "Vàng", "Cam", "Đỏ", "Nâu", "Champagne", "Vàng hồng", "Rose Gold", "Gold", "Warm", "Yellow", "Orange", "Red", "Brown", "Nude" };
+            return warmKeywords.Any(key => color.Contains(key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool IsCoolColor(string color)
+        {
+            if (string.IsNullOrEmpty(color)) return false;
+            if (color.StartsWith("#"))
+            {
+                var hex = color.Trim().Replace("#", "");
+                if (hex.Length == 6)
+                {
+                    if (int.TryParse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber, null, out int r) &&
+                        int.TryParse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber, null, out int g) &&
+                        int.TryParse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber, null, out int b))
+                    {
+                        return b > r + 15;
+                    }
+                }
+                return false;
+            }
+
+            var coolKeywords = new[] { "Xanh", "Bạc", "Tím", "Mint", "Silver", "Đen", "Blue", "Green", "Purple", "Lavender", "Black" };
+            return coolKeywords.Any(key => color.Contains(key, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

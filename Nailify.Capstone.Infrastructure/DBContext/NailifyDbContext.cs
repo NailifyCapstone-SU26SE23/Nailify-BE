@@ -600,6 +600,8 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.HasKey(c => c.UserId);
                 entity.Property(c => c.LoyaltyPoint).HasDefaultValue(0);
                 entity.Property(c => c.SkinTone).HasDefaultValue(string.Empty).HasMaxLength(100);
+                entity.Property(c => c.SkinShade).HasDefaultValue(string.Empty).HasMaxLength(100);
+                entity.Property(c => c.HandShape).HasDefaultValue(string.Empty).HasMaxLength(100);
                 entity.Property(c => c.Occupation).HasDefaultValue(string.Empty).HasMaxLength(250);
                 entity.Property(c => c.NailCondition).HasDefaultValue(string.Empty).HasMaxLength(500);
                 entity.Property(c => c.PersonaId).HasDefaultValue(string.Empty).HasMaxLength(100);
@@ -743,6 +745,8 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany()
                       .HasForeignKey(bp => bp.AssignedArtistId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(bp => bp.AssignedArtistId)
+                      .IsConcurrencyToken();
             });
             modelBuilder.Entity<BookingWaitlist>(entity =>
             {
