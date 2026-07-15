@@ -743,6 +743,8 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany()
                       .HasForeignKey(bp => bp.AssignedArtistId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(bp => bp.AssignedArtistId)
+                      .IsConcurrencyToken();
             });
             modelBuilder.Entity<BookingWaitlist>(entity =>
             {

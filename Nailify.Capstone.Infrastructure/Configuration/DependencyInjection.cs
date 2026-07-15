@@ -127,6 +127,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IQuizOptionRepository, QuizOptionRepository>();
             services.AddScoped<ICustomerQuizAnswerRepository, CustomerQuizAnswerRepository>();
             services.AddScoped<ISalonOffDateRepository, SalonOffDateRepository>();
+            services.AddScoped<INailArtistBreakRepository, NailArtistBreakRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
@@ -170,6 +171,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IWalkInQueueService, WalkInQueueService>();
             services.AddScoped<IQuizService, QuizService>();
             services.AddScoped<ISalonOffDateService, SalonOffDateService>();
+            services.AddScoped<INailArtistBreakService, NailArtistBreakService>();
             // Third Party
             services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IEmailService, SmtpEmailService>();

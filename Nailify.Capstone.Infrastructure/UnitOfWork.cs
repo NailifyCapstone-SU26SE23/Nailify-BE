@@ -128,7 +128,14 @@ namespace Nailify.Capstone.Infrastructure
 
         public async Task<int> SaveChangesAsync()
         {
-            return await _context.SaveChangesAsync();
+            try
+            {
+                return await _context.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+            {
+                throw new Nailify.Capstone.Application.Exceptions.ConcurrencyException("Dữ liệu đã bị thay đổi bởi một tác vụ khác. Vui lòng tải lại trang.", ex);
+            }
         }
 
         public void Dispose()

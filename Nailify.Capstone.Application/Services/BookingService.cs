@@ -936,6 +936,7 @@ namespace Nailify.Capstone.Application.Services
             int totalDuration = 0;
             decimal totalPrice = 0;
             var bookingItems = new List<BookingItem>();
+            var newCustomNailRequests = new List<CustomerNailRequest>();
 
             foreach (var x in request.BookingItems)
             {
@@ -1074,54 +1075,104 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
-            // Xóa các items cũ khỏi DB trước
-            var oldItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
-            foreach (var oldItem in oldItems)
+            // BẮT ĐẦU TRANSACTION AN TOÀN TRÁNH RACE CONDITION KHI CẬP NHẬT BOOKING
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                oldItem.Booking = null!;
-                oldItem.NailVariant = null;
-                oldItem.Service = null;
-                oldItem.CustomerNailRequest = null;
-                _unitOfWork.BookingItemRepository.Delete(oldItem);
-            }
+                // 1. Tạo các CustomerNailRequest mới (nếu có)
+                foreach (var req in newCustomNailRequests)
+                {
+                    await _unitOfWork.CustomerNailRequestRepository.CreateAsync(req);
+                }
 
-            booking.BookingDate = request.BookingDate;
-            booking.StartTime = request.StartTime;
-            booking.NailArtistId = request.NailArtistId;
-            var priceResult = await CalculateDiscountedPriceAsync(booking.CustomerId, totalPrice);
-            if (!priceResult.IsSucceeded)
+                // 2. Xóa các items cũ khỏi DB trước
+                var oldItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
+                foreach (var oldItem in oldItems)
+                {
+                    oldItem.Booking = null!;
+                    oldItem.NailVariant = null;
+                    oldItem.Service = null;
+                    oldItem.CustomerNailRequest = null;
+                    _unitOfWork.BookingItemRepository.Delete(oldItem);
+                }
+
+                booking.BookingDate = request.BookingDate;
+                booking.StartTime = request.StartTime;
+                booking.NailArtistId = request.NailArtistId;
+                var priceResult = await CalculateDiscountedPriceAsync(booking.CustomerId, totalPrice);
+                if (!priceResult.IsSucceeded)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
+                }
+
+                booking.Price = totalPrice;
+                booking.Discount = -priceResult.DiscountAmount;
+                booking.TotalPrice = priceResult.TotalPrice;
+                booking.TotalDuration = totalDuration;
+                booking.UpdatedAt = DateTime.UtcNow;
+
+                // Clear list trong memory của booking
+                booking.BookingItems.Clear();
+
+                booking.Updated(oldPrice, oldDuration, actorId);
+
+                booking.Customer = null!;
+                booking.Salon = null!;
+                booking.NailArtist = null;
+                booking.BookingHistories.Clear();
+
+                _unitOfWork.BookingRepository.Update(booking);
+
+                // 3. Tạo các BookingItem mới
+                foreach (var item in bookingItems)
+                {
+                    await _unitOfWork.BookingItemRepository.CreateAsync(item);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                // 4. Tạo các quy trình (Procedures) mặc định cho booking sau khi cập nhật
+                foreach (var item in bookingItems)
+                {
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
+                }
+                await _unitOfWork.SaveChangesAsync();
+
+                // 5. Tính toán timeline và gán ngay lập tức nếu đã chọn thợ
+                if (booking.NailArtistId.HasValue)
+                {
+                    var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
+                    if (procedures.Any())
+                    {
+                        var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                        foreach (var segment in timeline)
+                        {
+                            var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                            procedure.EstimatedStartTime = segment.StartTime;
+                            procedure.EstimatedEndTime = segment.EndTime;
+                            if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
+                            {
+                                procedure.AssignedArtistId = booking.NailArtistId.Value;
+                            }
+                            _unitOfWork.BookingProcedureRepository.Update(procedure);
+                        }
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                }
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
+                var response = _mapper.Map<BookingResponseDTO>(savedBooking);
+                return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật đơn đặt lịch thành công.");
+            }
+            catch (Exception ex)
             {
-                return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
+                await _unitOfWork.RollbackTransactionAsync();
+                _logger.LogError(ex, "Lỗi xảy ra khi UpdateBookingAsync");
+                return new ApiErrorResult<BookingResponseDTO>("Có lỗi hệ thống xảy ra khi cập nhật đơn hàng.");
             }
-
-            booking.Price = totalPrice;
-            booking.Discount = -priceResult.DiscountAmount;
-            booking.TotalPrice = priceResult.TotalPrice;
-            booking.TotalDuration = totalDuration;
-            booking.UpdatedAt = DateTime.UtcNow;
-
-            // Clear list trong memory của booking
-            booking.BookingItems.Clear();
-
-            booking.Updated(oldPrice, oldDuration, actorId);
-
-            booking.Customer = null!;
-            booking.Salon = null!;
-            booking.NailArtist = null;
-            booking.BookingHistories.Clear();
-
-            _unitOfWork.BookingRepository.Update(booking);
-
-            foreach (var item in bookingItems)
-            {
-                await _unitOfWork.BookingItemRepository.CreateAsync(item);
-            }
-
-            await _unitOfWork.SaveChangesAsync();
-
-            var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
-            var response = _mapper.Map<BookingResponseDTO>(savedBooking);
-            return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật đơn đặt lịch thành công.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
