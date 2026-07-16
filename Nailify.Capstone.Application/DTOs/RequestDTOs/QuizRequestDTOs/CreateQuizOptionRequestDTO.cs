@@ -11,12 +11,14 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs
 {
     public class CreateQuizOptionRequestDTO : IMapFrom<QuizOption>
     {
-        public string OptionValue { get; set; } = string.Empty;
+        public List<string> OptionValues { get; set; } = new();
         public string Label { get; set; } = string.Empty;
         public string? Description { get; set; }
         public void Mapping(Profile profile)
         {
-            profile.CreateMap<CreateQuizOptionRequestDTO, QuizOption>();
+            profile.CreateMap<CreateQuizOptionRequestDTO, QuizOption>()
+                   .ForMember(dest => dest.OptionValue,
+                    opt => opt.MapFrom(src => System.Text.Json.JsonSerializer.Serialize(src.OptionValues, (System.Text.Json.JsonSerializerOptions?)null)));
         }
     }
 }

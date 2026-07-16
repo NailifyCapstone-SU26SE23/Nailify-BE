@@ -407,6 +407,127 @@ namespace Nailify.Capstone.Application.Services
                 dto.Name = $"{v.NailDesign.Name} - {v.Name}";
                 dto.Score = Math.Round(finalScore, 1);
                 dto.Reasons = reasons.Distinct().Take(3).ToList();
+
+                var matchedChars = new List<MatchedCharacteristicDTO>();
+
+                // Colors
+                foreach (var col in vColors)
+                {
+                    bool isMatch = preferredColors.Any(c => string.Equals(c, col, StringComparison.OrdinalIgnoreCase));
+                    matchedChars.Add(new MatchedCharacteristicDTO
+                    {
+                        Category = "Color",
+                        Value = col,
+                        Label = $"Màu {col}",
+                        IsMatchingPreference = isMatch,
+                        Description = isMatch ? "Trùng khớp với màu sắc ưa thích của bạn." : "Màu sắc của mẫu móng."
+                    });
+                }
+
+                // Nail Categories
+                if (v.NailDesign != null)
+                {
+                    foreach (var nc in v.NailDesign.NailCategories)
+                    {
+                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
+                        string prefix = typeName switch
+                        {
+                            "Style" => "Style",
+                            "Occasion" => "Occasion",
+                            "SkinUndertone" => "SkinTone",
+                            "SkinTone" => "SkinTone",
+                            "SkinShade" => "SkinShade",
+                            "HandShape" => "HandShape",
+                            _ => typeName
+                        };
+
+                        bool isMatch = false;
+                        string desc = string.Empty;
+
+                        if (prefix == "Style")
+                        {
+                            isMatch = preferredStyles.Any(s => string.Equals(s, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
+                            desc = isMatch ? "Trùng khớp với phong cách thiết kế bạn yêu thích." : "Phong cách của mẫu móng.";
+                        }
+                        else if (prefix == "Occasion")
+                        {
+                            isMatch = preferredOccasions.Any(o => string.Equals(o, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
+                            desc = isMatch ? "Thiết kế phù hợp với dịp bạn lựa chọn." : "Dịp phù hợp cho mẫu móng.";
+                        }
+                        else if (prefix == "SkinTone")
+                        {
+                            isMatch = !string.IsNullOrEmpty(customer.SkinTone) && string.Equals(customer.SkinTone, nc.Category.Name, StringComparison.OrdinalIgnoreCase);
+                            desc = isMatch ? "Tông da phù hợp lý tưởng." : "Tông da khuyên dùng.";
+                        }
+                        else if (prefix == "SkinShade")
+                        {
+                            isMatch = !string.IsNullOrEmpty(customer.SkinShade) && string.Equals(customer.SkinShade, nc.Category.Name, StringComparison.OrdinalIgnoreCase);
+                            desc = isMatch ? "Độ sáng da phù hợp lý tưởng." : "Độ sáng da khuyên dùng.";
+                        }
+                        else if (prefix == "HandShape")
+                        {
+                            isMatch = !string.IsNullOrEmpty(customer.HandShape) && customer.HandShape.Contains(nc.Category.Name, StringComparison.OrdinalIgnoreCase);
+                            desc = isMatch ? "Dáng tay phù hợp lý tưởng." : "Dáng tay khuyên dùng.";
+                        }
+
+                        matchedChars.Add(new MatchedCharacteristicDTO
+                        {
+                            Category = prefix,
+                            Value = nc.Category.Name,
+                            Label = nc.Category.Name,
+                            IsMatchingPreference = isMatch,
+                            Description = desc
+                        });
+                    }
+                }
+
+                // Nail Shape
+                if (v.NailShapeId.HasValue && shapes.TryGetValue(v.NailShapeId.Value, out var matchedShapeName))
+                {
+                    bool isMatch = preferredNailShapeId == v.NailShapeId;
+                    string desc = isMatch ? "Dáng móng ưa thích của bạn." : "Dáng móng của mẫu thiết kế.";
+                    
+                    if (!isMatch && !string.IsNullOrEmpty(customer.HandShape))
+                    {
+                        if (customer.HandShape.Contains("Mu bàn tay rộng") || customer.HandShape.Contains("mập") || customer.HandShape.Contains("ngắn") || customer.HandShape.Contains("đều tròn"))
+                        {
+                            if (matchedShapeName.Contains("Hạnh nhân") || matchedShapeName.Contains("Almond") || matchedShapeName.Contains("Tròn") || matchedShapeName.Contains("Round") || matchedShapeName.Contains("Bầu dịch") || matchedShapeName.Contains("Oval"))
+                            {
+                                isMatch = true;
+                                desc = "Dáng móng này giúp ngón tay của bạn trông thon dài và mềm mại hơn.";
+                            }
+                        }
+                        else if (customer.HandShape.Contains("thon dài") || customer.HandShape.Contains("nhỏ") || customer.HandShape.Contains("thanh mảnh"))
+                        {
+                            if (matchedShapeName.Contains("Vuông") || matchedShapeName.Contains("Square") || matchedShapeName.Contains("Nhọn") || matchedShapeName.Contains("Stiletto"))
+                            {
+                                isMatch = true;
+                                desc = "Cực kỳ phù hợp và tôn dáng ngón tay thon dài thanh mảnh sẵn có.";
+                            }
+                        }
+                    }
+
+                    matchedChars.Add(new MatchedCharacteristicDTO
+                    {
+                        Category = "Shape",
+                        Value = matchedShapeName,
+                        Label = $"Dáng móng: {matchedShapeName}",
+                        IsMatchingPreference = isMatch,
+                        Description = desc
+                    });
+                }
+
+                bool compMatch = !string.IsNullOrEmpty(preferredComplexity) && string.Equals(preferredComplexity, vComplexity, StringComparison.OrdinalIgnoreCase);
+                matchedChars.Add(new MatchedCharacteristicDTO
+                {
+                    Category = "Complexity",
+                    Value = vComplexity,
+                    Label = $"Độ phức tạp: {vComplexity}",
+                    IsMatchingPreference = compMatch,
+                    Description = compMatch ? "Mức độ phức tạp phù hợp với thói quen làm móng của bạn." : "Mức độ phức tạp thiết kế."
+                });
+
+                dto.MatchedCharacteristics = matchedChars;
                 recommendedList.Add(dto);
             }
             var results = recommendedList.OrderByDescending(r => r.Score).Take(limit).ToList();
@@ -462,31 +583,40 @@ namespace Nailify.Capstone.Application.Services
                 }
                 await _unitOfWork.SaveChangesAsync();
 
-                var colorValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Color).Select(o => o.OptionValue).ToList();
-                var styleValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Style).Select(o => o.OptionValue).ToList();
-                var occasionValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Occasion).Select(o => o.OptionValue).ToList();
+                var colorValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Color).SelectMany(o => ParseOptionValues(o.OptionValue)).ToList();
+                var styleValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Style).SelectMany(o => ParseOptionValues(o.OptionValue)).ToList();
+                var occasionValues = options.Where(x => x.QuizQuestion.Category == QuizCategory.Occasion).SelectMany(o => ParseOptionValues(o.OptionValue)).ToList();
 
                 var shapeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.Shape);
 
                 int? shapeId = null;
-                if (shapeOpt != null && int.TryParse(shapeOpt.OptionValue, out int parsedId))
+                if (shapeOpt != null)
                 {
-                    shapeId = parsedId;
+                    var shapeVal = ParseOptionValues(shapeOpt.OptionValue).FirstOrDefault();
+                    if (shapeVal != null && int.TryParse(shapeVal, out int parsedId))
+                    {
+                        shapeId = parsedId;
+                    }
                 }
 
-                var complexityOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.Complexity)?.OptionValue;
-                var skinToneOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinTone)?.OptionValue;
-                var handShapeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.HandShape)?.OptionValue;
-                var skinShadeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinShade)?.OptionValue;
+                var complexityOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.Complexity);
+                var complexityVal = complexityOpt != null? ParseOptionValues(complexityOpt.OptionValue).FirstOrDefault() : null;
+                var skinToneOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinTone);
+                var skinToneVal = skinToneOpt != null ? ParseOptionValues(skinToneOpt.OptionValue).FirstOrDefault() : null;
+
+                var handShapeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.HandShape);
+                var handShapeVal = handShapeOpt != null ? string.Join(", ", ParseOptionValues(handShapeOpt.OptionValue)) : null;
+                var skinShadeOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinShade);
+                var skinShadeVal = skinShadeOpt != null ? ParseOptionValues(skinShadeOpt.OptionValue).FirstOrDefault() : null;
 
                 customer.PreferredColorsJson = JsonSerializer.Serialize(colorValues);
                 customer.PreferredStylesJson = JsonSerializer.Serialize(styleValues);
                 customer.PreferredOccasionsJson = JsonSerializer.Serialize(occasionValues);
                 customer.PreferredNailShapeId = shapeId;
-                customer.PreferredComplexity = complexityOpt ?? string.Empty;
-                customer.SkinTone = skinToneOpt ?? customer.SkinTone;
-                customer.HandShape = handShapeOpt ?? customer.HandShape;
-                customer.SkinShade = skinShadeOpt ?? customer.SkinShade;
+                customer.PreferredComplexity = complexityVal ?? string.Empty;
+                customer.SkinTone = skinToneVal ?? customer.SkinTone;
+                customer.HandShape = handShapeVal ?? customer.HandShape;
+                customer.SkinShade = skinShadeVal ?? customer.SkinShade;
 
                 _unitOfWork.CustomerRepository.Update(customer);
                 await _unitOfWork.SaveChangesAsync();
@@ -641,5 +771,22 @@ namespace Nailify.Capstone.Application.Services
             var coolKeywords = new[] { "Xanh", "Bạc", "Tím", "Mint", "Silver", "Đen", "Blue", "Green", "Purple", "Lavender", "Black" };
             return coolKeywords.Any(key => color.Contains(key, StringComparison.OrdinalIgnoreCase));
         }
+        private List<string> ParseOptionValues(string optionValueJson)
+        {
+            if (string.IsNullOrEmpty(optionValueJson)) return new List<string>();
+            try
+            {
+                if (optionValueJson.TrimStart().StartsWith("["))
+                {
+                    return JsonSerializer.Deserialize<List<string>>(optionValueJson) ?? new List<string>();
+                }
+                return new List<string> { optionValueJson };
+            }
+            catch
+            {
+                return new List<string> { optionValueJson };
+            }
+        }
+
     }
 }

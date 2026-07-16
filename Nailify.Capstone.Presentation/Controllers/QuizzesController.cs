@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -6,6 +6,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.QuizResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -62,9 +63,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpPost("questions")]
         [ProducesResponseType(typeof(ApiResult<StyleQuizQuestionResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> CreateQuestion([FromBody] CreateQuizQuestionRequestDTO request)
+        public async Task<IActionResult> CreateQuestion(
+            [FromQuery] QuizQuestionType type,
+            [FromQuery] QuizCategory category,
+            [FromBody] CreateQuizQuestionRequestDTO request)
         {
-            var result = await _quizService.CreateQuestionAsync(request);
+            var result = await _quizService.CreateQuestionAsync(type, category, request);
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);
@@ -77,9 +81,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpPut("questions/{id}")]
         [ProducesResponseType(typeof(ApiResult<StyleQuizQuestionResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UpdateQuestion(Guid id, [FromBody] UpdateQuizQuestionRequestDTO request)
+        public async Task<IActionResult> UpdateQuestion(
+            Guid id,
+            [FromQuery] QuizQuestionType type,
+            [FromQuery] QuizCategory category,
+            [FromBody] UpdateQuizQuestionRequestDTO request)
         {
-            var result = await _quizService.UpdateQuestionAsync(id, request);
+            var result = await _quizService.UpdateQuestionAsync(id, type, category, request);
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);
@@ -95,6 +103,51 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> DeleteQuestion(Guid id)
         {
             var result = await _quizService.DeleteQuestionAsync(id);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+        /// <summary>
+        /// Thêm một phương án trả lời vào câu hỏi Quiz (Admin).
+        /// optionValues là mảng string — nhấn [+] để thêm giá trị, [-] để xóa.
+        /// </summary>
+        /// <param name="questionId">ID câu hỏi cần thêm phương án.</param>
+        /// <param name="label">Nhãn hiển thị của phương án (VD: "Màu Hồng").</param>
+        /// <param name="description">Mô tả thêm (tùy chọn).</param>
+        /// <param name="optionValues">Mảng giá trị — thêm nhiều lần để tạo array (VD: "#FF0000", "#FFC0CB").</param>
+        [HttpPost("questions/{questionId}/options")]
+        [ProducesResponseType(typeof(ApiResult<StyleQuizQuestionResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AddOption(
+            Guid questionId,
+            [FromQuery] string label,
+            [FromQuery] string? description,
+            [FromQuery] List<string> optionValues)
+        {
+            var request = new AddQuizOptionRequestDTO
+            {
+                Label = label,
+                Description = description,
+                OptionValues = optionValues
+            };
+            var result = await _quizService.AddOptionToQuestionAsync(questionId, request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+        /// <summary>
+        /// Xóa một phương án trả lời khỏi câu hỏi Quiz (Admin).
+        /// </summary>
+        [HttpDelete("options/{optionId}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> DeleteOption(Guid optionId)
+        {
+            var result = await _quizService.DeleteOptionAsync(optionId);
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);
