@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.OpenApi.Models;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Configuration;
@@ -101,9 +102,42 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
     DashboardTitle = "Nailify Background Jobs Dashboard",
     Authorization = new[] { new HangfireNoAuthFilter() } 
 });
-RegisterRecurringJobs();
+await RegisterRecurringJobsAsync();
 app.Run();
-void RegisterRecurringJobs()
+
+async Task RegisterRecurringJobsAsync()
+{
+    const int maxAttempts = 3;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            RegisterRecurringJobs();
+            return;
+        }
+        catch (PostgreSqlDistributedLockException ex) when (attempt < maxAttempts)
+        {
+            app.Logger.LogWarning(
+                ex,
+                "Could not acquire Hangfire recurring-job lock. Retrying job registration in {DelaySeconds} seconds. Attempt {Attempt}/{MaxAttempts}.",
+                10,
+                attempt,
+                maxAttempts);
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
+        }
+        catch (PostgreSqlDistributedLockException ex)
+        {
+            app.Logger.LogError(
+                ex,
+                "Could not acquire Hangfire recurring-job lock after {MaxAttempts} attempts. Continuing startup; existing recurring jobs remain in Hangfire storage.",
+                maxAttempts);
+        }
+    }
+}
+
+static void RegisterRecurringJobs()
 {
     // A. Quét và hủy lịch trễ check-in quá 15 phút (Chạy định kỳ mỗi 10 phút)
     RecurringJob.AddOrUpdate<IBookingJobExecutor>(
