@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
         {
-            var procedure = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId);
+            var procedure = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId, trackChanges: true);
             if (procedure == null)
             {
                 return new ApiErrorResult<BookingProcedureResponseDTO>("Không tìm thấy bước quy trình yêu cầu.");
@@ -232,7 +232,7 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<BookingProcedureResponseDTO>> UpdateProcedureStatusAsync(Guid bookingProcedureId, Guid artistId, BookingProcedureStatus status)
         {
-            var existbooking = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId);
+            var existbooking = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId, trackChanges: true);
             if (existbooking == null)
             {
                 return new ApiErrorResult<BookingProcedureResponseDTO>("Không tìm thấy bước quy trình yêu cầu.");
