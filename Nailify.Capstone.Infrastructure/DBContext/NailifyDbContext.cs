@@ -354,10 +354,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasForeignKey(c => c.LoyaltyTierId)
                 .OnDelete(DeleteBehavior.SetNull); // Keep customer if tier is deleted
 
-            modelBuilder.Entity<LoyaltyTier>()
-                .HasIndex(lt => lt.MinLifetimePoints)
-                .IsUnique(); // Ensure unique point thresholds
-
             modelBuilder.Entity<LoyaltyTransaction>()
                 .HasKey(lt => lt.LoyaltyTransactionId);
 

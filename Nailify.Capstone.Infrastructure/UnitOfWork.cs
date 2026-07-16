@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Infrastructure
         private ICustomerRepository? _customerRepository;
         private ICategoryTypeRepository? _categoryTypeRepository;
         private ICategoryRepository? _categoryRepository;
+        private INailCategoryRepository? _nailCategoryRepository;
         private INailDesignRepository? _nailDesignRepository;
         private ISalonOperatingHourRepository? _salonOperatingHourRepository;
         private ISalonRepository? _salonRepository;
@@ -64,6 +65,7 @@ namespace Nailify.Capstone.Infrastructure
         public ICustomerRepository CustomerRepository => _customerRepository ??= new CustomerRepository(_context);
         public ICategoryTypeRepository CategoryTypeRepository => _categoryTypeRepository ??= new CategoryTypeRepository(_context);
         public ICategoryRepository CategoryRepository => _categoryRepository ??= new CategoryRepository(_context);
+        public INailCategoryRepository NailCategoryRepository => _nailCategoryRepository ??= new NailCategoryRepository(_context);
         public INailDesignRepository NailDesignRepository => _nailDesignRepository ??= new NailDesignRepository(_context);
 
         public ISalonOperatingHourRepository SalonOperatingHourRepository => _salonOperatingHourRepository ??= new SalonOperatingHourRepository(_context);

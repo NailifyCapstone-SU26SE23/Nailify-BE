@@ -12,6 +12,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         ICustomerRepository CustomerRepository { get; }
         ICategoryTypeRepository CategoryTypeRepository { get; }
         ICategoryRepository CategoryRepository { get; }
+        INailCategoryRepository NailCategoryRepository { get; }
         INailDesignRepository NailDesignRepository { get; }
         ISalonOperatingHourRepository SalonOperatingHourRepository { get; }
         ISalonRepository SalonRepository { get; }
