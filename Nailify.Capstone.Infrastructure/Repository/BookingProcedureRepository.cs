@@ -84,9 +84,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                         .AnyAsync();
         }
 
-        public async Task<BookingProcedure?> GetProcedureWithBookingItemAsync(Guid bookingProcedureId)
+        public async Task<BookingProcedure?> GetProcedureWithBookingItemAsync(Guid bookingProcedureId, bool trackChanges = false)
         {
-            return await FindByCondition(x => x.BookingProcedureId == bookingProcedureId, false)
+            return await FindByCondition(x => x.BookingProcedureId == bookingProcedureId, trackChanges)
                 .Include(x => x.BookingItem)
                     .ThenInclude(x => x.Booking)
                 .FirstOrDefaultAsync();
