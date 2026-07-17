@@ -1280,11 +1280,6 @@ namespace Nailify.Capstone.Application.Services
             return score;
         }
 
-        private List<string> SelectRecommendedColors(RecommendationCompositionRequest request)
-        {
-            return BuildRandomizedColors(request, new List<string>());
-        }
-
         private List<string> BuildRandomizedColors(RecommendationCompositionRequest request, List<string> suggestedColors)
         {
             var preferredColors = (request.PreferredColors ?? new List<string>())
