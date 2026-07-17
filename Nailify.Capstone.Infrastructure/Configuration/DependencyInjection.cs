@@ -202,6 +202,12 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                 ?? new RedisConfiguration { UseMemoryCache = true };
             services.AddSingleton<IRedisConfiguration>(redisSettings);
 
+            var nemotronSettings = configuration.GetSection("NemotronConfig")
+                                                .Get<NemotronConfiguration>()
+                                   ?? new NemotronConfiguration();
+           
+            services.AddSingleton<INemotronConfiguration>(nemotronSettings);
+
             if (redisSettings.UseMemoryCache)
             {
                 services.AddDistributedMemoryCache();

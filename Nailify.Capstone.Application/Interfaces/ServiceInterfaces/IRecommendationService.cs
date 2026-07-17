@@ -1,4 +1,5 @@
 ﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using System;
@@ -14,5 +15,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<List<RecommendedNailVariantResponseDTO>>> SubmitQuizAnswersAsync(Guid userId, SubmitQuizAnswersRequestDto request);
         Task<ApiResult<List<RecommendedNailVariantResponseDTO>>> GetRecommendationsAsync(Guid userId, int limit = 10);
         Task<ApiResult<PagedList<RecommendedNailVariantResponseDTO>>> GetRecommendationsFeedAsync(Guid userId, int pageNumber, int pageSize);
+        Task<ApiResult<RecommendedNailCompositionDto>> GetRecommendedCompositionAsync(Guid userId);
+        Task<ApiResult<RecommendedNailCompositionDto>> GetRecommendedCompositionAsync(RecommendationCompositionRequest request);
     }
 }

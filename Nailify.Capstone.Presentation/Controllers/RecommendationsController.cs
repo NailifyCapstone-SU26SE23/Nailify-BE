@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 
@@ -69,6 +70,59 @@ namespace Nailify.Capstone.Presentation.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return UnauthorizedResponse();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new ApiErrorResult<object>($"Lỗi máy chủ: {ex.Message}"));
+            }
+        }
+        /// <summary>
+        /// Lấy gợi ý cấu hình móng từ sở thích của khách hàng.
+        /// </summary>
+        [HttpGet("composition/customer")]
+        [Authorize(Roles = "Customer")]
+        [ProducesResponseType(typeof(ApiResult<RecommendedNailCompositionDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetRecommendedComposition()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _recommendationService.GetRecommendedCompositionAsync(userId);
+
+                if (!result.IsSucceeded)
+                    return BadRequest(result);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new ApiErrorResult<object>($"Lỗi máy chủ: {ex.Message}"));
+            }
+        }
+
+        /// <summary>
+        /// Lấy gợi ý cấu hình móng từ thông tin sở thích
+        /// </summary>
+        [HttpPost("composition")]
+        [ProducesResponseType(typeof(ApiResult<RecommendedNailCompositionDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetRecommendedComposition([FromBody] RecommendationCompositionRequest request)
+        {
+            try
+            {
+                var result = await _recommendationService.GetRecommendedCompositionAsync(request);
+
+                if (!result.IsSucceeded)
+                    return BadRequest(result);
+
+                return Ok(result);
             }
             catch (Exception ex)
             {

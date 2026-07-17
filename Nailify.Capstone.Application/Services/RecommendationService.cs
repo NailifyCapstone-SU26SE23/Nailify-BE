@@ -1,7 +1,9 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -9,6 +11,7 @@ using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -17,13 +20,87 @@ namespace Nailify.Capstone.Application.Services
 {
     public class RecommendationService : IRecommendationService
     {
+        private static readonly HttpClient OpenRouterHttpClient = new HttpClient();
+        private static readonly JsonSerializerOptions LlmJsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly INemotronConfiguration _nemotronConfiguration;
 
-        public RecommendationService(IUnitOfWork unitOfWork, IMapper mapper)
+        public RecommendationService(IUnitOfWork unitOfWork, IMapper mapper, INemotronConfiguration nemotronConfiguration)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _nemotronConfiguration = nemotronConfiguration;
+        }
+
+        public async Task<ApiResult<RecommendedNailCompositionDto>> GetRecommendedCompositionAsync(Guid userId)
+        {
+            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(userId);
+            if (customer == null)
+            {
+                return new ApiErrorResult<RecommendedNailCompositionDto>("Không tìm thấy khách hàng");
+            }
+
+            var request = new RecommendationCompositionRequest
+            {
+                SkinTone = customer.SkinTone,
+                SkinShade = customer.SkinShade,
+                HandShape = customer.HandShape,
+                Occupation = customer.Occupation,
+                NailCondition = customer.NailCondition,
+                PreferredColors = DeserializeList(customer.PreferredColorsJson),
+                PreferredStyles = DeserializeList(customer.PreferredStylesJson),
+                PreferredOccasions = DeserializeList(customer.PreferredOccasionsJson),
+                PreferredNailShapeId = customer.PreferredNailShapeId,
+                PreferredComplexity = customer.PreferredComplexity
+            };
+
+            return await GetRecommendedCompositionAsync(request);
+        }
+
+        public async Task<ApiResult<RecommendedNailCompositionDto>> GetRecommendedCompositionAsync(RecommendationCompositionRequest request)
+        {
+            if (request == null)
+            {
+                return new ApiErrorResult<RecommendedNailCompositionDto>("Dữ liệu gợi ý không hợp lệ");
+            }
+
+            var shapes = await _unitOfWork.NailShapeRepository.GetAllNailShapesAsync();
+            var surfaces = await _unitOfWork.NailSurfaceRepository.GetAllNailSurfacesAsync();
+            var components = await _unitOfWork.ComponentRepository.GetAllComponentsAsync();
+
+            if (!shapes.Any())
+            {
+                return new ApiErrorResult<RecommendedNailCompositionDto>("Không có dữ liệu cho dáng móng");
+            }
+
+            if (!surfaces.Any())
+            {
+                return new ApiErrorResult<RecommendedNailCompositionDto>("Không có dữ liệu cho bề mặt móng");
+            }
+
+            var llmResult = await TryGetOpenRouterCompositionAsync(request, shapes, surfaces, components);
+            var selectedShape = ResolveRecommendedShape(llmResult, request, shapes);
+            var selectedSurface = ResolveRecommendedSurface(llmResult, request, surfaces);
+            var selectedComponents = ResolveRecommendedComponents(llmResult, request, components);
+            var colors = ResolveRecommendedColors(llmResult, request);
+
+            var dto = new RecommendedNailCompositionDto
+            {
+                NailShapeId = selectedShape.NailShapeId,
+                NailSurfaceId = selectedSurface.NailSurfaceId,
+                ComponentIds = selectedComponents.Select(component => component.ComponentId).ToList(),
+                NailShape = _mapper.Map<NailShapeDto>(selectedShape),
+                NailSurface = _mapper.Map<NailSurfaceDto>(selectedSurface),
+                Components = _mapper.Map<List<ComponentDto>>(selectedComponents),
+                Colors = colors
+            };
+
+            return new ApiSuccessResult<RecommendedNailCompositionDto>(dto, "Lấy gợi ý cấu hình móng thành công");
         }
 
         public async Task<ApiResult<List<RecommendedNailVariantResponseDTO>>> GetRecommendationsAsync(Guid userId, int limit = 10)
@@ -786,6 +863,488 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new List<string> { optionValueJson };
             }
+        }
+
+        private NailShape SelectRecommendedShape(RecommendationCompositionRequest request, List<NailShape> shapes)
+        {
+            if (request.PreferredNailShapeId.HasValue)
+            {
+                var preferredShape = shapes.FirstOrDefault(shape => shape.NailShapeId == request.PreferredNailShapeId.Value);
+                if (preferredShape != null)
+                {
+                    return preferredShape;
+                }
+            }
+
+            var handShape = request.HandShape ?? string.Empty;
+            var shapeKeywords = handShape.Contains("elong", StringComparison.OrdinalIgnoreCase)
+                || handShape.Contains("thon", StringComparison.OrdinalIgnoreCase)
+                || handShape.Contains("dai", StringComparison.OrdinalIgnoreCase)
+                    ? new[] { "Square", "Vuong", "Stiletto", "Nhon" }
+                    : new[] { "Almond", "Hanh nhan", "Oval", "Bau", "Round", "Tron" };
+
+            return shapes.FirstOrDefault(shape => shapeKeywords.Any(keyword => shape.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+                ?? shapes.OrderBy(shape => shape.NailShapeId).First();
+        }
+
+        private async Task<LlmCompositionResult?> TryGetOpenRouterCompositionAsync(
+            RecommendationCompositionRequest request,
+            List<NailShape> shapes,
+            List<NailSurface> surfaces,
+            List<Component> components)
+        {
+            var provider = _nemotronConfiguration.LlmProvider;
+            var apiKey = _nemotronConfiguration.OpenRouterApiKey;
+            var model = _nemotronConfiguration.OpenRouterModel;
+            var baseUrl = _nemotronConfiguration.OpenRouterBaseUrl;
+
+            try
+            {
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, baseUrl);
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                httpRequest.Content = new StringContent(
+                    JsonSerializer.Serialize(BuildOpenRouterRequest(model, request, shapes, surfaces, components), LlmJsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                using var response = await OpenRouterHttpClient.SendAsync(httpRequest);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                var body = await response.Content.ReadAsStringAsync();
+                var content = ExtractOpenRouterMessageContent(body);
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return null;
+                }
+
+                return ParseLlmCompositionResult(content);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private object BuildOpenRouterRequest(
+            string model,
+            RecommendationCompositionRequest request,
+            List<NailShape> shapes,
+            List<NailSurface> surfaces,
+            List<Component> components)
+        {
+            var prompt = BuildCompositionPrompt(request, shapes, surfaces, components);
+            return new
+            {
+                model,
+                temperature = 0.7,
+                top_p = 0.9,
+                max_tokens = 800,
+                messages = new[]
+                {
+                    new
+                    {
+                        role = "system",
+                        content = "You are a nail recommendation engine. Return only valid JSON. Use only IDs from the provided catalog."
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = prompt
+                    }
+                }
+            };
+        }
+
+        private string BuildCompositionPrompt(
+            RecommendationCompositionRequest request,
+            List<NailShape> shapes,
+            List<NailSurface> surfaces,
+            List<Component> components)
+        {
+            var catalog = new
+            {
+                shapes = shapes.Select(shape => new { id = shape.NailShapeId, shape.Name }),
+                surfaces = surfaces.Select(surface => new { id = surface.NailSurfaceId, surface.Name, surface.FinishType, surface.Price }),
+                components = components.Select(component => new { id = component.ComponentId, component.Name, type = component.ComponentType.ToString(), component.Price })
+            };
+
+            var profile = new
+            {
+                request.SkinTone,
+                request.SkinShade,
+                request.HandShape,
+                request.Occupation,
+                request.NailCondition,
+                request.PreferredColors,
+                request.PreferredStyles,
+                request.PreferredOccasions,
+                request.PreferredNailShapeId,
+                request.PreferredComplexity
+            };
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Customer profile:");
+            builder.AppendLine(JsonSerializer.Serialize(profile));
+            builder.AppendLine();
+            builder.AppendLine("Available catalog:");
+            builder.AppendLine(JsonSerializer.Serialize(catalog));
+            builder.AppendLine();
+            builder.AppendLine("Choose one nail shape, one nail surface, up to five components, and two or three colors.");
+            builder.AppendLine("Respect preferredNailShapeId when it exists in the catalog.");
+            builder.AppendLine("Colors must be #RRGGBB hex values.");
+            builder.AppendLine();
+            builder.AppendLine("Return only this JSON shape:");
+            builder.AppendLine("{");
+            builder.AppendLine("  \"nail_shape_id\": 1,");
+            builder.AppendLine("  \"surface_id\": 1,");
+            builder.AppendLine("  \"colors\": [\"#F5F5DC\"],");
+            builder.AppendLine("  \"component_ids\": [1]");
+            builder.AppendLine("}");
+            return builder.ToString();
+        }
+
+        private string? ExtractOpenRouterMessageContent(string body)
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var first = choices.EnumerateArray().FirstOrDefault();
+            if (first.ValueKind == JsonValueKind.Undefined)
+            {
+                return null;
+            }
+
+            if (!first.TryGetProperty("message", out var message))
+            {
+                return null;
+            }
+
+            if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return content.GetString();
+        }
+
+        private LlmCompositionResult? ParseLlmCompositionResult(string content)
+        {
+            var json = ExtractJsonObject(content);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                var result = new LlmCompositionResult();
+
+                result.NailShapeId = GetNullableInt(root, "nail_shape_id") ?? GetNullableInt(root, "nailShapeId");
+                result.NailSurfaceId = GetNullableInt(root, "surface_id") ?? GetNullableInt(root, "nailSurfaceId");
+
+                if (root.TryGetProperty("component_ids", out var componentIds)
+                    || root.TryGetProperty("componentIds", out componentIds))
+                {
+                    result.ComponentIds = ReadIntArray(componentIds);
+                }
+
+                if (root.TryGetProperty("colors", out var colors))
+                {
+                    result.Colors = ReadStringArray(colors);
+                }
+
+                return result;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string? ExtractJsonObject(string content)
+        {
+            var trimmed = content.Trim();
+            var start = trimmed.IndexOf('{');
+            var end = trimmed.LastIndexOf('}');
+
+            if (start < 0 || end <= start)
+            {
+                return null;
+            }
+
+            return trimmed.Substring(start, end - start + 1);
+        }
+
+        private int? GetNullableInt(JsonElement root, string propertyName)
+        {
+            if (!root.TryGetProperty(propertyName, out var value))
+            {
+                return null;
+            }
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var intValue))
+            {
+                return intValue;
+            }
+
+            if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out intValue))
+            {
+                return intValue;
+            }
+
+            return null;
+        }
+
+        private List<int> ReadIntArray(JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Array)
+            {
+                return new List<int>();
+            }
+
+            return element.EnumerateArray()
+                .Select(item => item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var value) ? value : (int?)null)
+                .Where(value => value.HasValue)
+                .Select(value => value!.Value)
+                .ToList();
+        }
+
+        private List<string> ReadStringArray(JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Array)
+            {
+                return new List<string>();
+            }
+
+            return element.EnumerateArray()
+                .Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!)
+                .ToList();
+        }
+
+        private NailSurface SelectRecommendedSurface(RecommendationCompositionRequest request, List<NailSurface> surfaces)
+        {
+            var preferredStyles = request.PreferredStyles ?? new List<string>();
+
+            if (preferredStyles.Any(style => style.Contains("matte", StringComparison.OrdinalIgnoreCase)))
+            {
+                var matteSurface = surfaces.FirstOrDefault(surface =>
+                    surface.Name.Contains("matte", StringComparison.OrdinalIgnoreCase)
+                    || surface.FinishType.Contains("matte", StringComparison.OrdinalIgnoreCase));
+                if (matteSurface != null) return matteSurface;
+            }
+
+            if (preferredStyles.Any(style => style.Contains("glitter", StringComparison.OrdinalIgnoreCase)))
+            {
+                var glitterSurface = surfaces.FirstOrDefault(surface =>
+                    surface.Name.Contains("glitter", StringComparison.OrdinalIgnoreCase)
+                    || surface.FinishType.Contains("glitter", StringComparison.OrdinalIgnoreCase));
+                if (glitterSurface != null) return glitterSurface;
+            }
+
+            var glossySurface = surfaces.FirstOrDefault(surface =>
+                surface.Name.Contains("gloss", StringComparison.OrdinalIgnoreCase)
+                || surface.FinishType.Contains("gloss", StringComparison.OrdinalIgnoreCase));
+
+            return glossySurface ?? surfaces.OrderBy(surface => surface.NailSurfaceId).First();
+        }
+
+        private NailShape ResolveRecommendedShape(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<NailShape> shapes)
+        {
+            if (request.PreferredNailShapeId.HasValue)
+            {
+                var preferredShape = shapes.FirstOrDefault(shape => shape.NailShapeId == request.PreferredNailShapeId.Value);
+                if (preferredShape != null)
+                {
+                    return preferredShape;
+                }
+            }
+
+            if (llmResult?.NailShapeId.HasValue == true)
+            {
+                var llmShape = shapes.FirstOrDefault(shape => shape.NailShapeId == llmResult.NailShapeId.Value);
+                if (llmShape != null)
+                {
+                    return llmShape;
+                }
+            }
+
+            return SelectRecommendedShape(request, shapes);
+        }
+
+        private NailSurface ResolveRecommendedSurface(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<NailSurface> surfaces)
+        {
+            if (llmResult?.NailSurfaceId.HasValue == true)
+            {
+                var llmSurface = surfaces.FirstOrDefault(surface => surface.NailSurfaceId == llmResult.NailSurfaceId.Value);
+                if (llmSurface != null)
+                {
+                    return llmSurface;
+                }
+            }
+
+            return SelectRecommendedSurface(request, surfaces);
+        }
+
+        private List<Component> ResolveRecommendedComponents(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<Component> components)
+        {
+            if (llmResult?.ComponentIds.Any() == true)
+            {
+                var catalogById = components.ToDictionary(component => component.ComponentId);
+                var selected = llmResult.ComponentIds
+                    .Distinct()
+                    .Where(catalogById.ContainsKey)
+                    .Select(componentId => catalogById[componentId])
+                    .ToList();
+
+                if (selected.Any())
+                {
+                    return selected;
+                }
+            }
+
+            return SelectRecommendedComponents(request, components);
+        }
+
+        private List<string> ResolveRecommendedColors(LlmCompositionResult? llmResult, RecommendationCompositionRequest request)
+        {
+            var llmColors = (llmResult?.Colors ?? new List<string>())
+                .Where(IsHexColor)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return BuildRandomizedColors(request, llmColors);
+        }
+
+        private List<Component> SelectRecommendedComponents(RecommendationCompositionRequest request, List<Component> components)
+        {
+            if (!components.Any())
+            {
+                return new List<Component>();
+            }
+
+            var preferredStyles = request.PreferredStyles ?? new List<string>();
+            var preferredComplexity = request.PreferredComplexity ?? string.Empty;
+            var maxComponents = preferredComplexity.Equals("complex", StringComparison.OrdinalIgnoreCase)
+                ? 5
+                : preferredComplexity.Equals("moderate", StringComparison.OrdinalIgnoreCase)
+                    ? 3
+                    : 2;
+
+            return components
+                .Select(component => new
+                {
+                    Component = component,
+                    Score = ScoreComponent(component, preferredStyles)
+                })
+                .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.Component.Price)
+                .ThenBy(item => item.Component.ComponentId)
+                .Take(maxComponents)
+                .Select(item => item.Component)
+                .ToList();
+        }
+
+        private int ScoreComponent(Component component, List<string> preferredStyles)
+        {
+            var score = 0;
+
+            foreach (var style in preferredStyles)
+            {
+                if (!string.IsNullOrWhiteSpace(style) && component.Name.Contains(style, StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 3;
+                }
+            }
+
+            if (preferredStyles.Any(style => style.Contains("minimal", StringComparison.OrdinalIgnoreCase)))
+            {
+                var simpleKeywords = new[] { "pearl", "line", "dot", "foil", "minimal", "simple" };
+                if (simpleKeywords.Any(keyword => component.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+                {
+                    score += 2;
+                }
+            }
+
+            return score;
+        }
+
+        private List<string> SelectRecommendedColors(RecommendationCompositionRequest request)
+        {
+            return BuildRandomizedColors(request, new List<string>());
+        }
+
+        private List<string> BuildRandomizedColors(RecommendationCompositionRequest request, List<string> suggestedColors)
+        {
+            var preferredColors = (request.PreferredColors ?? new List<string>())
+                .Where(IsHexColor)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var palette = new List<string>();
+            if (!string.IsNullOrWhiteSpace(request.SkinTone)
+                && request.SkinTone.Contains("warm", StringComparison.OrdinalIgnoreCase))
+            {
+                palette.AddRange(new[] { "#F5F5DC", "#D4A5A5", "#C9B1A0", "#E8C39E", "#B76E79", "#C8A951", "#F2D6B3" });
+            }
+            else
+            {
+                palette.AddRange(new[] { "#FFFFFF", "#F2D7E6", "#C7D8F4", "#D9E7E2", "#D8C7F4", "#B7C9E2", "#E7E7EA" });
+            }
+
+            palette.AddRange(suggestedColors.Where(IsHexColor));
+            palette.AddRange(preferredColors);
+
+            var colors = new List<string>();
+            if (preferredColors.Any())
+            {
+                colors.Add(preferredColors[Random.Shared.Next(preferredColors.Count)]);
+            }
+
+            foreach (var color in palette
+                .Where(color => !colors.Contains(color, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(_ => Random.Shared.Next()))
+            {
+                colors.Add(color);
+                if (colors.Count == 3)
+                {
+                    break;
+                }
+            }
+
+            return colors
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+        }
+
+        private bool IsHexColor(string color)
+        {
+            if (string.IsNullOrWhiteSpace(color)) return false;
+
+            var value = color.Trim();
+            if (!value.StartsWith("#") || value.Length != 7) return false;
+
+            return value.Skip(1).All(Uri.IsHexDigit);
+        }
+
+        private sealed class LlmCompositionResult
+        {
+            public int? NailShapeId { get; set; }
+            public int? NailSurfaceId { get; set; }
+            public List<int> ComponentIds { get; set; } = new List<int>();
+            public List<string> Colors { get; set; } = new List<string>();
         }
 
     }
