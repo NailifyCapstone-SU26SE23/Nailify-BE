@@ -132,6 +132,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IDashboardService, DashboardService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<INailCategoryService, NailCategoryService>();

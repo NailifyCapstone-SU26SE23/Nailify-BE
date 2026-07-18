@@ -72,7 +72,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, IFormFile? image)
         {
             var validationResult = await _designCreateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -80,15 +80,15 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
             }
 
-            var uploadedImageUrls = new List<string>();
+            var uploadedImageUrl = string.Empty;
 
             try
             {
-                uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.CreateNailDesignAsync(request, uploadedImageUrls);
+                uploadedImageUrl = await UploadImageAsync(image);
+                var result = await _nailDesignService.CreateNailDesignAsync(request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
-                    await DeleteImagesAsync(uploadedImageUrls);
+                    await DeleteImageAsync(uploadedImageUrl);
                     return BadRequest(result);
                 }
 
@@ -96,7 +96,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                await DeleteImagesAsync(uploadedImageUrls);
+                await DeleteImageAsync(uploadedImageUrl);
                 return BadRequest(new ApiResult<object>(false, $"Tạo mẫu nail thất bại khi tải ảnh: {ex.Message}"));
             }
         }
@@ -109,7 +109,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, IFormFile? image)
         {
             var validationResult = await _designUpdateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -123,29 +123,31 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return NotFound(existingResult);
             }
 
-            var uploadedImageUrls = new List<string>();
+            var uploadedImageUrl = string.Empty;
 
             try
             {
-                uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrls);
+                uploadedImageUrl = await UploadImageAsync(image);
+                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
-                    await DeleteImagesAsync(uploadedImageUrls);
+                    await DeleteImageAsync(uploadedImageUrl);
                     return BadRequest(result);
                 }
 
-                var keptImageUrls = request.ExistingImageUrls.Distinct().ToList();
-                var removedImageUrls = existingResult.Data.ImageUrls
-                    .Except(keptImageUrls)
-                    .ToList();
-                await DeleteImagesAsync(removedImageUrls);
+                var oldImageUrl = existingResult.Data.ImageUrl;
+                var currentImageUrl = result.Data.ImageUrl;
+                if (!string.IsNullOrWhiteSpace(oldImageUrl)
+                    && !string.Equals(oldImageUrl, currentImageUrl, StringComparison.Ordinal))
+                {
+                    await DeleteImageAsync(oldImageUrl);
+                }
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                await DeleteImagesAsync(uploadedImageUrls);
+                await DeleteImageAsync(uploadedImageUrl);
                 return BadRequest(new ApiResult<object>(false, $"Cập nhật mẫu nail thất bại khi tải ảnh: {ex.Message}"));
             }
         }
@@ -170,7 +172,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return NotFound(result);
             }
 
-            await DeleteImagesAsync(existingResult.Data.ImageUrls);
+            await DeleteImageAsync(existingResult.Data.ImageUrl);
             return Ok(result);
         }
 
@@ -185,30 +187,21 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
-        private async Task<List<string>> UploadImagesAsync(List<IFormFile>? images)
+        private async Task<string> UploadImageAsync(IFormFile? image)
         {
-            var validImages = images?
-                .Where(image => image != null && image.Length > 0)
-                .ToList() ?? new List<IFormFile>();
-
-            if (!validImages.Any())
+            if (image == null || image.Length == 0)
             {
-                return new List<string>();
+                return string.Empty;
             }
 
-            return await _cloudinaryService.UploadMultipleImagesAsync(validImages);
+            return await _cloudinaryService.UploadImageAsync(image);
         }
 
-        private async Task DeleteImagesAsync(IEnumerable<string>? imageUrls)
+        private async Task DeleteImageAsync(string? imageUrl)
         {
-            var urls = imageUrls?
-                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
-                .Distinct()
-                .ToList() ?? new List<string>();
-
-            if (urls.Any())
+            if (!string.IsNullOrWhiteSpace(imageUrl))
             {
-                await _cloudinaryService.DeleteMultipleImagesAsync(urls);
+                await _cloudinaryService.DeleteImageAsync(imageUrl);
             }
         }
     }

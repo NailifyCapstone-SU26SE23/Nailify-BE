@@ -68,7 +68,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
         private IQueryable<NailDesign> BuildNailDesignQuery()
         {
             return _dbSet
-                .Include(nd => nd.NailDesignImages)
                 .Include(nd => nd.NailCategories)
                 .ThenInclude(nc => nc.Category)
                 .ThenInclude(c => c.CategoryType)
