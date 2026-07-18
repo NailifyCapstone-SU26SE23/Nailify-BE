@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Application.Services
         {
             var salon = _mapper.Map<Salon>(request);
             salon.SalonId = Guid.NewGuid();
-            salon.Status = "Open";
+            salon.Status = "Active";
             salon.ImageUrl = imageUrl;
 
             // Tự sinh 7 ca làm mặc định
@@ -64,7 +64,7 @@ namespace Nailify.Capstone.Application.Services
             if (salon == null)
                 return new ApiResult<bool>(false, "Không tìm thấy chi nhánh để xóa.");
             _unitOfWork.SalonRepository.Delete(salon);
-            salon.Status = "Closed";
+            salon.Status = "Inactive";
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Xóa chi nhánh thành công.");
         }
