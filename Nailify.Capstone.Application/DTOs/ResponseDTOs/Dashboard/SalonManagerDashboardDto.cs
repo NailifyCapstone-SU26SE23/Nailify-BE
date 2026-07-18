@@ -17,7 +17,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard
         public ChartResponse<decimal> RevenueBreakdown { get; set; } = new();
         public List<ArtistPerformanceDto> ArtistPerformanceLeaderboard { get; set; } = new();
         public ChartResponse<int> PeakHoursHeatmap { get; set; } = new();
-        public ChartResponse<int> CustomerLoyaltyOverview { get; set; } = new();
         public List<ChairUtilizationDto> ChairUtilization { get; set; } = new();
         public ChartResponse<double> CustomerRetentionRate { get; set; } = new();
         public List<StaffLeaveAlertDto> StaffLeaveAlerts { get; set; } = new();

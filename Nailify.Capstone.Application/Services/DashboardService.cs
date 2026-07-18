@@ -92,6 +92,95 @@ namespace Nailify.Capstone.Application.Services
                 Data = customerGrowth.Select(g => g.Count).ToList()
             });
 
+            var paidBookings = await _unitOfWork.BookingRepository
+                .FindByCondition(b => b.BookingDate >= start && b.BookingDate <= end)
+                .Include(b => b.Salon)
+                .Include(b => b.BookingItems)
+                    .ThenInclude(i => i.Service)
+                .Include(b => b.BookingItems)
+                    .ThenInclude(i => i.NailVariant)
+                        .ThenInclude(v => v.NailDesign)
+                .Include(b => b.BookingDiscounts)
+                    .ThenInclude(d => d.Promotion)
+                .ToListAsync();
+
+            var periodBookingIds = paidBookings.Select(b => b.BookingId).ToList();
+            var paidTransactions = await _unitOfWork.TransactionRepository
+                .FindByCondition(t => periodBookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
+                .ToListAsync();
+
+            var paidBookingIds = paidTransactions.Select(t => t.BookingId).ToHashSet();
+            var topSalons = paidBookings
+                .Where(b => paidBookingIds.Contains(b.BookingId))
+                .GroupBy(b => new { b.SalonId, SalonName = b.Salon.Name })
+                .Select(g => new
+                {
+                    g.Key.SalonName,
+                    Revenue = paidTransactions.Where(t => g.Any(b => b.BookingId == t.BookingId)).Sum(t => t.Amount)
+                })
+                .OrderByDescending(g => g.Revenue)
+                .Take(10)
+                .ToList();
+
+            dto.TopPerformingSalons.Labels = topSalons.Select(g => g.SalonName).ToList();
+            dto.TopPerformingSalons.Datasets.Add(new ChartDataset<decimal>
+            {
+                Label = "Revenue",
+                Data = topSalons.Select(g => g.Revenue).ToList()
+            });
+
+            var servicePopularity = paidBookings
+                .SelectMany(b => b.BookingItems)
+                .Select(i => i.Service?.Name ?? i.NailVariant?.NailDesign?.Name ?? i.NailVariant?.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .GroupBy(name => name!)
+                .Select(g => new { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(g => g.Count)
+                .Take(10)
+                .ToList();
+
+            dto.GlobalServicePopularity.Labels = servicePopularity.Select(g => g.Name).ToList();
+            dto.GlobalServicePopularity.Datasets.Add(new ChartDataset<int>
+            {
+                Label = "Bookings",
+                Data = servicePopularity.Select(g => g.Count).ToList()
+            });
+
+            var salonRatings = await _unitOfWork.BookingRatingRepository
+                .FindByCondition(r => r.Booking.BookingDate >= start && r.Booking.BookingDate <= end)
+                .Include(r => r.Booking)
+                    .ThenInclude(b => b.Salon)
+                .ToListAsync();
+
+            dto.SalonRatingDistribution = salonRatings
+                .GroupBy(r => new { r.Booking.SalonId, SalonName = r.Booking.Salon.Name })
+                .Select(g => new SalonRatingDistributionDto
+                {
+                    SalonId = g.Key.SalonId,
+                    SalonName = g.Key.SalonName,
+                    AverageRating = Math.Round(g.Average(r => r.OverallScore), 2),
+                    RatingCount = g.Count()
+                })
+                .OrderByDescending(s => s.AverageRating)
+                .ToList();
+
+            dto.GlobalPromotionPerformance = paidBookings
+                .SelectMany(b => b.BookingDiscounts.Select(d => new { Booking = b, Discount = d }))
+                .Where(x => x.Discount.PromotionId.HasValue || !string.IsNullOrWhiteSpace(x.Discount.Name))
+                .GroupBy(x => new { x.Discount.PromotionId, PromotionName = x.Discount.Promotion?.Name ?? x.Discount.Name })
+                .Select(g => new PromotionPerformanceDto
+                {
+                    PromotionId = g.Key.PromotionId ?? 0,
+                    PromotionName = g.Key.PromotionName,
+                    UsageCount = g.Count(),
+                    DiscountGiven = g.Sum(x => x.Discount.DiscountAmount),
+                    RevenueGenerated = paidTransactions
+                        .Where(t => g.Select(x => x.Booking.BookingId).Contains(t.BookingId))
+                        .Sum(t => t.Amount)
+                })
+                .OrderByDescending(p => p.RevenueGenerated)
+                .ToList();
+
             // 3. Save to Redis Cache (TTL = 15 minutes)
             var cacheOptions = new DistributedCacheEntryOptions
             {
@@ -141,6 +230,41 @@ namespace Nailify.Capstone.Application.Services
             dto.EstimatedEarnings = await _unitOfWork.TransactionRepository
                 .FindByCondition(t => bookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
                 .SumAsync(t => t.Amount);
+
+            var earningsByDay = await _unitOfWork.TransactionRepository
+                .FindByCondition(t => bookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
+                .GroupBy(t => t.CreatedAt.Date)
+                .Select(g => new { Date = g.Key, Total = g.Sum(t => t.Amount) })
+                .OrderBy(g => g.Date)
+                .ToListAsync();
+
+            dto.EarningsTracker.Labels = earningsByDay.Select(g => g.Date.ToString("dd/MM")).ToList();
+            dto.EarningsTracker.Datasets.Add(new ChartDataset<decimal>
+            {
+                Label = "Earnings",
+                Data = earningsByDay.Select(g => g.Total).ToList()
+            });
+
+            var completedWithActualTime = periodBookings
+                .Where(b => (b.Status == BookingStatus.Completed || b.Status == BookingStatus.ServiceCompleted)
+                    && b.ActualStartTime.HasValue
+                    && b.UpdatedAt.HasValue
+                    && b.UpdatedAt.Value > b.ActualStartTime.Value)
+                .ToList();
+
+            var averagePlannedMinutes = completedWithActualTime.Any()
+                ? Math.Round(completedWithActualTime.Average(b => b.TotalDuration), 2)
+                : 0;
+            var averageActualMinutes = completedWithActualTime.Any()
+                ? Math.Round(completedWithActualTime.Average(b => (b.UpdatedAt!.Value - b.ActualStartTime!.Value).TotalMinutes), 2)
+                : 0;
+
+            dto.ServiceTimeEfficiency.Labels = new List<string> { "Planned Avg", "Actual Avg" };
+            dto.ServiceTimeEfficiency.Datasets.Add(new ChartDataset<double>
+            {
+                Label = "Minutes",
+                Data = new List<double> { averagePlannedMinutes, averageActualMinutes }
+            });
 
             var breaks = await _unitOfWork.NailArtistBreakRepository
                 .FindByCondition(b => b.NailArtistId == artistId && b.BreakDate >= start && b.BreakDate <= end)
@@ -241,6 +365,11 @@ namespace Nailify.Capstone.Application.Services
 
             var waitlist = await _unitOfWork.BookingWaitlistRepository
                 .FindByCondition(w => w.SalonId == salonId && w.Status == WaitlistStatus.Waiting && w.RequestedDate >= startOfDay && w.RequestedDate <= endOfDay)
+                .Include(w => w.Customer)
+                    .ThenInclude(c => c.User)
+                .Include(w => w.PreferredNailArtist)
+                    .ThenInclude(a => a.Account)
+                .OrderBy(w => w.Position)
                 .ToListAsync();
 
             dto.CurrentWalkInQueueSize = walkInQueue.Count;
@@ -294,6 +423,20 @@ namespace Nailify.Capstone.Application.Services
                 EstimatedWait = w.EstimatedWait ?? 0
             }).ToList();
 
+            dto.LiveWaitlist = waitlist.Select(w => new WaitlistDashboardItemDto
+            {
+                WaitlistId = w.WailistId,
+                CustomerName = w.Customer?.User != null
+                    ? $"{w.Customer.User.FirstName} {w.Customer.User.LastName}"
+                    : "Unknown Customer",
+                RequestedStartTime = w.RequestedStartTime,
+                EstimatedDuration = w.EstimatedDuration,
+                Position = w.Position,
+                PreferredArtistName = w.PreferredNailArtist?.Account != null
+                    ? $"{w.PreferredNailArtist.Account.FirstName} {w.PreferredNailArtist.Account.LastName}"
+                    : "Any artist"
+            }).ToList();
+
             // Upcoming Arrivals (Next 2 hours)
             var upcomingBookings = pendingBookings
                 .Where(b => b.BookingDate.Add(b.StartTime) >= now && b.BookingDate.Add(b.StartTime) <= now.AddHours(2))
@@ -323,6 +466,46 @@ namespace Nailify.Capstone.Application.Services
                 IsOccupied = occupiedChairs.ContainsKey(c.ChairId),
                 CurrentCustomer = occupiedChairs.ContainsKey(c.ChairId) ? occupiedChairs[c.ChairId] : string.Empty
             }).ToList();
+
+            var todaysBreaks = await _unitOfWork.NailArtistBreakRepository
+                .FindByCondition(b => b.NailArtist.Account.SalonId == salonId && b.BreakDate >= startOfDay && b.BreakDate <= endOfDay)
+                .Include(b => b.NailArtist)
+                    .ThenInclude(a => a.Account)
+                .ToListAsync();
+
+            var scheduleItems = todaysBookings
+                .Where(b => b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Rejected)
+                .Select(b => new SalonScheduleItemDto
+                {
+                    BookingId = b.BookingId,
+                    ArtistId = b.NailArtistId,
+                    ArtistName = b.NailArtist?.Account != null
+                        ? $"{b.NailArtist.Account.FirstName} {b.NailArtist.Account.LastName}"
+                        : "Unassigned",
+                    CustomerName = b.Customer?.User != null
+                        ? $"{b.Customer.User.FirstName} {b.Customer.User.LastName}"
+                        : "Unknown Customer",
+                    StartTime = b.StartTime,
+                    DurationMinutes = b.TotalDuration,
+                    Type = "Booking",
+                    Status = b.Status.ToString()
+                })
+                .Concat(todaysBreaks.Select(b => new SalonScheduleItemDto
+                {
+                    ArtistId = b.NailArtistId,
+                    ArtistName = b.NailArtist?.Account != null
+                        ? $"{b.NailArtist.Account.FirstName} {b.NailArtist.Account.LastName}"
+                        : "Unknown Artist",
+                    CustomerName = b.Reason ?? "Break",
+                    StartTime = b.StartTime,
+                    DurationMinutes = (int)(b.EndTime - b.StartTime).TotalMinutes,
+                    Type = "Break",
+                    Status = b.Status.ToString()
+                }))
+                .OrderBy(s => s.StartTime)
+                .ToList();
+
+            dto.MasterSalonSchedule = scheduleItems;
 
             // No-Show / Late Alerts (Pending/Approved bookings that are 10+ mins past StartTime)
             var lateBookings = pendingBookings
@@ -443,22 +626,6 @@ namespace Nailify.Capstone.Application.Services
             {
                 Label = "Bookings",
                 Data = peakHours.Select(g => g.Count).ToList()
-            });
-
-            var loyaltyOverview = periodBookings
-                .Select(b => b.Customer)
-                .Where(c => c != null)
-                .DistinctBy(c => c.UserId)
-                .GroupBy(c => c.LoyaltyTier?.Name ?? "No tier")
-                .OrderBy(g => g.Key)
-                .Select(g => new { Tier = g.Key, Count = g.Count() })
-                .ToList();
-
-            dto.CustomerLoyaltyOverview.Labels = loyaltyOverview.Select(g => g.Tier).ToList();
-            dto.CustomerLoyaltyOverview.Datasets.Add(new ChartDataset<int>
-            {
-                Label = "Customers",
-                Data = loyaltyOverview.Select(g => g.Count).ToList()
             });
 
             var chairs = await _unitOfWork.ChairRepository

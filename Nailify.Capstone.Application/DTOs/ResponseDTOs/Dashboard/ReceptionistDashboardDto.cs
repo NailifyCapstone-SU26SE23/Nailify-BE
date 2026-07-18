@@ -15,6 +15,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard
 
         // Lists & Widgets
         public List<WalkInQueueItemDto> LiveWalkInQueue { get; set; } = new();
+        public List<WaitlistDashboardItemDto> LiveWaitlist { get; set; } = new();
+        public List<SalonScheduleItemDto> MasterSalonSchedule { get; set; } = new();
         public List<UpcomingArrivalDto> UpcomingArrivals { get; set; } = new();
         public List<ChairStatusDto> LiveChairStatus { get; set; } = new();
         public List<NoShowAlertDto> NoShowLateAlerts { get; set; } = new();
@@ -26,6 +28,28 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard
         public string RequestNote { get; set; } = string.Empty;
         public int QueuePosition { get; set; }
         public int EstimatedWait { get; set; }
+    }
+
+    public class WaitlistDashboardItemDto
+    {
+        public Guid WaitlistId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public TimeSpan RequestedStartTime { get; set; }
+        public int EstimatedDuration { get; set; }
+        public int Position { get; set; }
+        public string PreferredArtistName { get; set; } = string.Empty;
+    }
+
+    public class SalonScheduleItemDto
+    {
+        public Guid? BookingId { get; set; }
+        public Guid? ArtistId { get; set; }
+        public string ArtistName { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public TimeSpan StartTime { get; set; }
+        public int DurationMinutes { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
     }
 
     public class UpcomingArrivalDto
