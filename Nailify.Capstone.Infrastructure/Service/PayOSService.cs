@@ -166,6 +166,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                     transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
                 }
 
+                if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
+                {
+                    transaction.Booking.CheckOut(Guid.Empty);
+                }
+
                 _unitOfWork.TransactionRepository.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
                 return (true, "Xu ly webhook thanh cong.");

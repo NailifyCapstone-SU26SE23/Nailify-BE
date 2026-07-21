@@ -1372,6 +1372,14 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<PagedList<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Thợ làm móng thành công.");
         }
 
+        public async Task<ApiResult<BookingIdResponseDTO>> GetBookingIdByOrderCodeAsync(long orderCode)
+        {
+            var bookingId = await _unitOfWork.TransactionRepository.GetBookingIdByOrderCodeAsync(orderCode.ToString());
+            return bookingId.HasValue
+                ? new ApiSuccessResult<BookingIdResponseDTO>(new BookingIdResponseDTO { BookingId = bookingId.Value }, "Lấy mã lịch hẹn thành công.")
+                : new ApiErrorResult<BookingIdResponseDTO>("Không tìm thấy giao dịch.");
+        }
+
         public async Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);

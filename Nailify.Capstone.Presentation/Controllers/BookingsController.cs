@@ -314,6 +314,15 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Lấy thông tin chi tiết của một đơn đặt lịch hẹn cụ thể.
         /// </summary>
+        [HttpGet("by-order-code/{orderCode:long}/booking-id")]
+        [ProducesResponseType(typeof(ApiResult<BookingIdResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBookingIdByOrderCode(long orderCode)
+        {
+            var response = await _bookingService.GetBookingIdByOrderCodeAsync(orderCode);
+            return response.IsSucceeded ? Ok(response) : NotFound(response);
+        }
+
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
