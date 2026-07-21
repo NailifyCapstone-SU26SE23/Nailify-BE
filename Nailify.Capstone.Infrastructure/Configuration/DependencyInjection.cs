@@ -235,6 +235,14 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             var paymentUrls = configuration.GetSection("PaymentUrls")
                                   .Get<PaymentUrls>()
                     ?? new PaymentUrls();
+            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+            {
+                paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
+            }
+            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+            {
+                paymentUrls.CancelUrl = paymentSettings.CancelUrl;
+            }
             services.AddSingleton<IPaymentUrls>(paymentUrls);
 
             // Đăng ký FluentValidation từ tầng Application

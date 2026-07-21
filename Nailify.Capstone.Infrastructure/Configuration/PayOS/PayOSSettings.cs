@@ -10,5 +10,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration.PayOS
         public string PayoutClientId { get; set; } = string.Empty;
         public string PayoutApiKey { get; set; } = string.Empty;
         public string PayoutChecksumKey { get; set; } = string.Empty;
+        public string ReturnUrl { get; set; } = string.Empty;
+        public string CancelUrl { get; set; } = string.Empty;
     }
 }
