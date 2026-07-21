@@ -1120,6 +1120,7 @@ namespace Nailify.Capstone.Application.Services
                 booking.Price = totalPrice;
                 booking.Discount = -priceResult.DiscountAmount;
                 booking.TotalPrice = priceResult.TotalPrice;
+                booking.AmountDue = Math.Max(0, priceResult.TotalPrice - (booking.AmountPaid ?? 0));
                 booking.TotalDuration = totalDuration;
                 booking.UpdatedAt = DateTime.UtcNow;
 
