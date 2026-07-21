@@ -33,6 +33,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public int ActiveDuration { get; set; }
         public int PassiveDuration { get; set; }
         public bool CanOverlap { get; set; }
+        public int TransitionBuffer { get; set; } = 1;
         public bool IsMainStep { get; set; }
         public Guid? BookingId { get; set; }
         public string? CustomerName { get; set; }

@@ -106,7 +106,16 @@ namespace Nailify.Capstone.Application.Services
             var walkInProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(items, queue.SalonId);
             if (!walkInProcs.Any())
             {
-                walkInProcs.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10, CanOverlap = false });
+                var bookProcedures = new BookingProcedure
+                {
+                    Duration = 30,
+                    ActiveDuration = 20,
+                    PassiveDuration = 10,
+                    CanOverlap = true,
+                    TransitionBuffer = 1
+                };
+
+                walkInProcs.Add(bookProcedures);
             }
 
             var timeline = _bookingSchedulingService.BuildProcedureTimeline(walkInProcs, currentTime);
@@ -137,13 +146,24 @@ namespace Nailify.Capstone.Application.Services
         {
             var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(salonId);
             var workingArtists = activeArtists.Where(a => a.Status == "Active").ToList();
-            if (!workingArtists.Any()) return 60;
+            if (!workingArtists.Any())
+            {
+                return 60;
+            }
             // Giả lập mock procedure cho khách hàng mới này
             var mockProcedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(requestedItems, salonId);
             if (!mockProcedures.Any())
             {
+                var bookProcedures = new BookingProcedure
+                {
+                    Duration = 30,
+                    ActiveDuration = 20,
+                    PassiveDuration = 10,
+                    CanOverlap = true,
+                    TransitionBuffer = 1
+                };
                 // Mặc định 30 phút nếu không có dịch vụ cụ thể
-                mockProcedures.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10, CanOverlap = false });
+                mockProcedures.Add(bookProcedures);
             }
             int totalDuration = mockProcedures.Sum(p => p.Duration);
 
@@ -159,11 +179,15 @@ namespace Nailify.Capstone.Application.Services
             foreach (var artist in workingArtists)
             {
                 var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, DateTime.Today);
-                if (schedule == null) continue;
+                if (schedule == null)
+                {
+                    continue;
+                }
                 var candidateStart = localNow < schedule.ShiftStart ? schedule.ShiftStart : localNow;
                 var artistSimulatedSegments = new List<ProcedureScheduleSegment>();
 
-                foreach (var ahead in waitingQueue.Where(q => q.AssignedNailArtistId == artist.NailArtistId || !q.AssignedNailArtistId.HasValue))
+                var waitingQueueForArtist = waitingQueue.Where(x => x.AssignedNailArtistId == artist.NailArtistId || !x.AssignedNailArtistId.HasValue);
+                foreach (var ahead in waitingQueueForArtist)
                 {
                     // Lấy các item của khách đi trước
                     var aheadItems = new List<BookingItemRequestDTO>();
@@ -176,7 +200,18 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
                     var aheadProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(aheadItems, salonId);
-                    if (!aheadProcs.Any()) aheadProcs.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10 });
+                    if (!aheadProcs.Any())
+                    {
+                        var bookingProcedures = new BookingProcedure
+                        {
+                            Duration = 30,
+                            ActiveDuration = 20,
+                            PassiveDuration = 10,
+                            CanOverlap = true,
+                            TransitionBuffer = 1
+                        };
+                        aheadProcs.Add(bookingProcedures);
+                    }
                     // Tìm slot rảnh sớm nhất cho khách đi trước
                     var aheadStart = candidateStart;
                     while (aheadStart.Add(TimeSpan.FromMinutes(aheadProcs.Sum(x => x.Duration))) <= schedule.ShiftEnd)
@@ -260,9 +295,9 @@ namespace Nailify.Capstone.Application.Services
                 {
                     // Nếu có đè vào, xem lượng thời gian đè (delay) là bao nhiêu
                     var delayMinutes = (overlapWalkIn.EndTime - booking.StartTime).TotalMinutes;
-                    if (delayMinutes > 15)
+                    if (delayMinutes > 5)
                     {
-                        return true; // Làm trễ hẹn khách đặt trước quá 15 phút -> Block!
+                        return true; // Làm trễ hẹn khách đặt trước quá 5 phút -> Block!
                     }
                 }
             }

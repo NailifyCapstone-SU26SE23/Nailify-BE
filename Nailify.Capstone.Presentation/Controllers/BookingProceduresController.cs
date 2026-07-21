@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
@@ -121,6 +122,48 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _bookingProcedureService.GetClaimableProceduresAsync(salonId);
             return Ok(result);
+        }
+
+        /// <summary>
+        /// Kiểm tra khả năng làm đè ca Interleaving (Passive Overlapping) khi Khách A Check-in
+        /// </summary>
+        [HttpGet("bookings/{bookingId}/interleaving-opportunity")]
+        public async Task<IActionResult> EvaluateInterleavingOpportunity(Guid bookingId)
+        {
+            var result = await _bookingProcedureService.EvaluateInterleavingOpportunityAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        /// <summary>
+        /// Tự động điều phối Thợ phụ C làm bước chuẩn bị Prep cho Khách A
+        /// </summary>
+        [HttpPost("bookings/{bookingId}/auto-assign-prep-artist")]
+        public async Task<IActionResult> AutoAssignPrepArtist(Guid bookingId, [FromQuery] Guid mainArtistId)
+        {
+            var result = await _bookingProcedureService.AutoAssignSecondaryArtistForPrepAsync(bookingId, mainArtistId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Thợ bấm chọn danh sách dịch vụ phát sinh (Ví dụ: Rửa tay + Cắt móng) trên App Thợ -> Giả lập xung đột & báo SignalR Lễ tân
+        /// </summary>
+        [HttpPost("onsite-addon/simulate")]
+        [ProducesResponseType(typeof(ApiResult<OnsiteAddonSimulationResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> SimulateOnsiteAddon([FromBody] SimulateOnsiteAddonRequestDTO request)
+        {
+            var result = await _bookingProcedureService.SimulateOnsiteAddonAsync(request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Lễ tân bấm Xác nhận phân công thợ phụ trên POS (hoặc thợ chính tự chốt)
+        /// </summary>
+        [HttpPost("onsite-addon/confirm")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ConfirmOnsiteAddon([FromBody] ConfirmOnsiteAddonRequestDTO request)
+        {
+            var result = await _bookingProcedureService.ConfirmOnsiteAddonAsync(request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
     }
 }

@@ -1,11 +1,13 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.Exceptions;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
-using Nailify.Capstone.Application.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,12 +21,14 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IBookingSchedulingService _bookingSchedulingService;
 
-        public BookingProcedureService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService)
+        public BookingProcedureService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService, IBookingSchedulingService bookingSchedulingService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _notificationService = notificationService;
+            _bookingSchedulingService = bookingSchedulingService;
         }
 
         public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
@@ -431,6 +435,509 @@ namespace Nailify.Capstone.Application.Services
             var procedures = await _unitOfWork.BookingProcedureRepository.GetClaimableProceduresBySalonIdAsync(salonId);
             var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
             return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách công việc có thể nhận thành công.");
+        }
+        /// <summary>
+        /// Hàm này dùng để xem thợ có thể làm song song (đè ca hay không)
+        /// </summary>
+        /// <param name="bookingId"></param>
+        /// <returns></returns>
+        public async Task<ApiResult<InterleavingOpportunityResponseDTO>> EvaluateInterleavingOpportunityAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
+            if (booking == null)
+            {
+                return new ApiErrorResult<InterleavingOpportunityResponseDTO>("Không tìm thấy booking yêu cầu.");
+            }
+
+            if (!booking.NailArtistId.HasValue)
+            {
+                var activeArtist = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(booking.SalonId);
+
+                // Lấy ra các RequiredSkill của booking có nail
+                var requiredSkills = booking.BookingItems?
+                                            .SelectMany(x => x.NailVariant?.NailRequiredSkills ?? Enumerable.Empty<NailRequiredSkill>())
+                                            .ToList() ?? new List<NailRequiredSkill>();
+
+                // Lọc ra các thợ có kỹ năng phù hợp
+                var qualifiedArtists = activeArtist.Where(x => requiredSkills.All(
+                                                                                  req => x.NailArtistSkills != null
+                                                                                  && x.NailArtistSkills.Any(
+                                                                                                             skill => skill.SkillTypeId == req.SkillTypeId
+                                                                                                             && skill.Level >= req.RequiredLevel
+                                                                                                            )
+                                                                                 )
+                                                         ).ToList();
+                if (!qualifiedArtists.Any())
+                {
+                    return new ApiErrorResult<InterleavingOpportunityResponseDTO>("Salon hiện tại không có thợ nào đủ kỹ năng thực hiện mẫu Nail này. Vui lòng kiểm tra lại dịch vụ.");
+                }
+
+                NailArtist? freeArtist = null;
+
+                foreach (var artist in qualifiedArtists)
+                {
+                    var isBusy = await _unitOfWork.BookingProcedureRepository.HasAnyInProgressProcedureAsync(artist.NailArtistId);
+                    if (!isBusy)
+                    {
+                        freeArtist = artist;
+                        break;
+                    }
+                }
+                if (freeArtist != null)
+                {
+                    booking.NailArtistId = freeArtist.NailArtistId;
+                    _unitOfWork.BookingRepository.Update(booking);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    await _notificationService.SendNotificationToUserAsync(
+                                               freeArtist.AccountId.ToString(),
+                                               "NewCustomerAssigned",
+                                               new
+                                               {
+                                                   BookingId = booking.BookingId,
+                                                   Message = $"Khách hàng đã Check-in. Bạn được hệ thống tự động phân công phục vụ ngay bây giờ!"
+                                               }
+                    );
+
+                    var resp = _mapper.Map<InterleavingOpportunityResponseDTO>(booking);
+                    resp.CanStartImmediately = true;
+                    resp.IsPassiveInterleaving = false;
+                    resp.RecommendationMessage = $"Đã tự động gán Thợ {freeArtist.Account?.FirstName} (đang rảnh). Có thể phục vụ ngay!";
+                    return new ApiSuccessResult<InterleavingOpportunityResponseDTO>(resp);
+                }
+                booking.NailArtistId = qualifiedArtists.First().NailArtistId;
+                _unitOfWork.BookingRepository.Update(booking);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            Guid assignedArtistId = booking.NailArtistId.Value;
+
+            var activeProcedures = await _unitOfWork.BookingProcedureRepository.GetActiveProceduresByArtistIdAsync(assignedArtistId);
+            var currentInProgress = activeProcedures.FirstOrDefault(x => x.Status == BookingProcedureStatus.InProgress);
+            if (currentInProgress == null)
+            {
+                var response = _mapper.Map<InterleavingOpportunityResponseDTO>(booking);
+                response.CanStartImmediately = true;
+                response.IsPassiveInterleaving = false;
+                response.RecommendationMessage = "Thợ phân công hiện đang rảnh. Có thể phục vụ ngay.";
+                return new ApiSuccessResult<InterleavingOpportunityResponseDTO>(response);
+            }
+
+            bool isPassivePhase = false;
+            int remainingPassive = 0;
+            if (currentInProgress.ActualStartTime.HasValue)
+            {
+                var localNow = DateTime.UtcNow.AddHours(7);
+                var elapsedActiveMinutes = (localNow - currentInProgress.ActualStartTime.Value).TotalMinutes;
+                if (elapsedActiveMinutes >= currentInProgress.ActiveDuration && currentInProgress.PassiveDuration >= 4)
+                {
+                    isPassivePhase = true;
+                    remainingPassive = (int)(currentInProgress.Duration - elapsedActiveMinutes);
+                }
+            }
+            var dto = _mapper.Map<InterleavingOpportunityResponseDTO>(booking);
+            var isWalkInClient = await _unitOfWork.WalkInQueueRepository.ExistsAsync(x => x.OriginalBookingId == currentInProgress.BookingItem.BookingId);
+            dto.OverlappingClientType = isWalkInClient ? BookingClientType.WalkIn : BookingClientType.PreBooked;
+
+            if (isPassivePhase && currentInProgress.CanOverlap)
+            {
+                dto.CanStartImmediately = true;
+                dto.IsPassiveInterleaving = true;
+                dto.CurrentProcedureName = currentInProgress.ProcedureName;
+                dto.RemainingPasiveMinutes = Math.Max(0, remainingPassive);
+                dto.RecommendationMessage = $"Thợ đang trong giai đoạn chờ gel khô của khách khác. Có thể phục vụ khách này song song.";
+                return new ApiSuccessResult<InterleavingOpportunityResponseDTO>(dto);
+            }
+
+            dto.CanStartImmediately = false;
+            dto.IsPassiveInterleaving = false;
+            dto.CurrentProcedureName = currentInProgress.ProcedureName;
+            dto.RecommendationMessage = "Thợ đang bận làm công đoạn cho khách, không thể ngắt quãng.";
+            return new ApiSuccessResult<InterleavingOpportunityResponseDTO>(dto);
+        }
+
+        /// <summary>
+        /// Khi khách đặt lịch đến nơi nhưng Thợ chính đang bận nốt vài phút với khách trước, hệ thống tự động tìm một đang rảnh tay để làm trước.
+        /// </summary>
+        /// <param name="bookingId"></param>
+        /// <param name="mainArtistId"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<ApiResult<BookingProcedureResponseDTO>> AutoAssignSecondaryArtistForPrepAsync(Guid bookingId, Guid mainArtistId)
+        {
+            var bookingProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+
+            var prepProcedure = bookingProcedures.FirstOrDefault(x => x.StepOrder == 1 && x.Status == BookingProcedureStatus.Pending);
+            if (prepProcedure == null)
+            {
+                return new ApiErrorResult<BookingProcedureResponseDTO>("Không tìm thấy bước chuẩn bị (Step 1) cần phân công.");
+            }
+
+            var salonId = prepProcedure.BookingItem.Booking.SalonId;
+            var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(salonId);
+
+            NailArtist? secondaryArtist = null;
+            foreach (var artst in activeArtists.Where(x => x.NailArtistId != mainArtistId))
+            {
+                var isBusy = await _unitOfWork.BookingProcedureRepository.HasAnyInProgressProcedureAsync(artst.NailArtistId);
+                if (!isBusy)
+                {
+                    secondaryArtist = artst;
+                    break;
+                }
+            }
+
+            if (secondaryArtist == null)
+            {
+                return new ApiErrorResult<BookingProcedureResponseDTO>("Không tìm thấy thợ phụ rảnh để phân công.");
+            }
+
+            prepProcedure.AssignedArtistId = secondaryArtist.NailArtistId;
+            _unitOfWork.BookingProcedureRepository.Update(prepProcedure);
+
+            // Kích hoạt luôn ko cần chờ thợ chính bấm start service, vì thợ phụ đang rảnh, khách đang ngồi chờ -> bắt đầu luôn
+            var booking = prepProcedure.BookingItem.Booking;
+            if (booking.Status == BookingStatus.CheckedIn)
+            {
+                booking.StartService(mainArtistId);
+                _unitOfWork.BookingRepository.Update(booking);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _notificationService.SendNotificationToUserAsync(
+                secondaryArtist.AccountId.ToString(),
+                "SecondaryPrepAssigned",
+                new
+                {
+                    BookingId = booking.BookingId,
+                    BookingProcedureId = prepProcedure.BookingProcedureId,
+                    Message = $"Bạn được phân công làm bước chuẩn bị cho đơn đặt lịch {bookingId}. Sau khi xong sẽ bàn giao lại cho Thợ chính."
+                }
+            );
+
+            var response = _mapper.Map<BookingProcedureResponseDTO>(prepProcedure);
+            return new ApiSuccessResult<BookingProcedureResponseDTO>(response, $"Đã gán thành công Thợ phụ {secondaryArtist.Account?.FirstName} {secondaryArtist.Account?.LastName} làm bước chuẩn bị.");
+        }
+
+        public async Task<ApiResult<OnsiteAddonSimulationResponseDTO>> SimulateOnsiteAddonAsync(SimulateOnsiteAddonRequestDTO request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Không tìm thấy booking yêu cầu.");
+            }
+            if (booking.Status != BookingStatus.CheckedIn && booking.Status != BookingStatus.InProgress)
+            {
+                return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Chỉ có thể phát sinh dịch vụ khi khách đã Check-in hoặc đang làm.");
+            }
+            if (!booking.NailArtistId.HasValue)
+            {
+                return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Lịch hẹn chưa được gán thợ chính.");
+            }
+            if (request.AddonItems == null || !request.AddonItems.Any())
+            {
+                return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Vui lòng chọn ít nhất một dịch vụ hoặc mẫu móng phát sinh.");
+            }
+
+            var addonNames = new List<string>();
+            int totalDurationMinutes = 0;
+            decimal totalAddonPrice = 0;
+
+            foreach (var item in request.AddonItems)
+            {
+                if (item.ServiceId.HasValue)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                    if (service != null)
+                    {
+                        addonNames.Add(service.Name);
+                        totalDurationMinutes += service.Duration;
+                        totalAddonPrice += service.Price;
+                    }
+                }
+                else if (item.NailVariantId.HasValue)
+                {
+                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
+                    if (variant != null)
+                    {
+                        addonNames.Add(variant.Name);
+                        totalDurationMinutes += (variant.Duration ?? 60);
+                        totalAddonPrice += variant.Price;
+                    }
+                }
+            }
+            if (!addonNames.Any())
+            {
+                return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Không tìm thấy thông tin các dịch vụ chọn thêm.");
+            }
+            var primaryArtistId = booking.NailArtistId.Value;
+            var primaryArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(primaryArtistId);
+            var primaryArtistName = primaryArtist != null ? $"{primaryArtist.Account.FirstName} {primaryArtist.Account.LastName}" : "Thợ chính";
+
+            // 2. Tính toán thời gian bắt đầu của danh sách dịch vụ phát sinh
+            var existingProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
+            var timeline = _bookingSchedulingService.BuildProcedureTimeline(existingProcedures, booking.StartTime);
+
+
+            var addonStartTime = timeline.Any() ? timeline.Max(x => x.EndTime) : booking.StartTime;
+            var addonEndTime = addonStartTime.Add(TimeSpan.FromMinutes(totalDurationMinutes));
+
+            var newSegment = new ProcedureScheduleSegment
+            {
+                BookingProcedureId = Guid.NewGuid(),
+                BookingId = booking.BookingId,
+                AssignedArtistId = primaryArtistId,
+                IsMainStep = true,
+                StartTime = addonStartTime,
+                EndTime = addonEndTime,
+                ArtistBusyStart = addonStartTime,
+                ArtistBusyEnd = addonStartTime.Add(TimeSpan.FromMinutes(totalDurationMinutes + 1)),
+                CanOverlap = false,
+                TransitionBuffer = 1
+            };
+
+            var hasPrimaryConflict = await _bookingSchedulingService.HasSimulationConflictAsync(
+              primaryArtistId,
+              booking.BookingDate,
+              new List<ProcedureScheduleSegment> { newSegment },
+              new List<ProcedureScheduleSegment>(),
+              capacity: primaryArtist?.ConcurrentCapacity ?? 1,
+              excludingBookingId: booking.BookingId
+            );
+
+            string joinedNames = string.Join(", ", addonNames);
+            var response = new OnsiteAddonSimulationResponseDTO
+            {
+                PrimaryArtistId = primaryArtistId,
+                PrimaryArtistName = primaryArtistName,
+                AddonNames = addonNames,
+                TotalAddonDurationMinutes = totalDurationMinutes,
+                TotalAddonPrice = totalAddonPrice,
+                NewTotalDurationMinutes = booking.TotalDuration + totalDurationMinutes,
+                NewTotalPrice = (booking.TotalPrice ?? 0) + totalAddonPrice
+            };
+            // Thợ chính rảnh
+            if (!hasPrimaryConflict)
+            {
+                response.HasConflict = false;
+                response.CanMultiArtistSplit = false;
+                response.RecommendationMessage = $"Thợ {primaryArtistName} rảnh từ {addonStartTime:hh\\:mm} - {addonEndTime:hh\\:mm}. Đã tự động thêm các dịch vụ phát sinh: [{joinedNames}].";
+
+                await ConfirmOnsiteAddonAsync(new ConfirmOnsiteAddonRequestDTO
+                {
+                    BookingId = request.BookingId,
+                    AddonItems = request.AddonItems,
+                    AssignedArtistId = primaryArtistId
+                });
+
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                   booking.SalonId.ToString(),
+                  "OnsiteAddonAddedAutoApproved",
+                  new
+                  {
+                      BookingId = booking.BookingId,
+                      PrimaryArtistId = primaryArtistId,
+                      PrimaryArtistName = primaryArtistName,
+                      AddonNames = addonNames,
+                      DurationMinutes = totalDurationMinutes,
+                      Price = totalAddonPrice,
+                      Message = $"Thợ {primaryArtistName} vừa thêm {addonNames.Count} dịch vụ phát sinh [{joinedNames}] (+{totalDurationMinutes}p, +{totalAddonPrice:N0}đ) cho khách."
+                  }
+                );
+
+                return new ApiSuccessResult<OnsiteAddonSimulationResponseDTO>(response, "Thêm các dịch vụ phát sinh thành công (Thợ chính rảnh).");
+            }
+            // Thợ chính bận
+            response.HasConflict = true;
+            var activeArtist = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+            var candidateSecondaryArtist = activeArtist.Where(x => x.NailArtistId != primaryArtistId).ToList();
+
+            NailArtist? availableSecondary = null;
+            foreach (var candidate in candidateSecondaryArtist)
+            {
+                var secondarySegment = new ProcedureScheduleSegment
+                {
+                    BookingProcedureId = Guid.NewGuid(),
+                    BookingId = booking.BookingId,
+                    AssignedArtistId = candidate.NailArtistId,
+                    IsMainStep = true,
+                    StartTime = addonStartTime,
+                    EndTime = addonEndTime,
+                    ArtistBusyStart = addonStartTime,
+                    ArtistBusyEnd = addonStartTime.Add(TimeSpan.FromMinutes(totalDurationMinutes + 1)),
+                    CanOverlap = false,
+                    TransitionBuffer = 1
+                };
+
+                var hasSecondaryConflict = await _bookingSchedulingService.HasSimulationConflictAsync(
+                                            candidate.NailArtistId,
+                                            booking.BookingDate,
+                                            new List<ProcedureScheduleSegment> { secondarySegment },
+                                            new List<ProcedureScheduleSegment>(),
+                                            capacity: candidate.ConcurrentCapacity,
+                                            excludingBookingId: booking.BookingId
+                );
+
+                if (!hasSecondaryConflict)
+                {
+                    availableSecondary = candidate;
+                    break;
+                }
+            }
+            if (availableSecondary != null)
+            {
+                var secondaryName = availableSecondary.Account != null ? $"{availableSecondary.Account.FirstName} {availableSecondary.Account.LastName}" : "Thơ phụ";
+                response.CanMultiArtistSplit = true;
+                response.SuggestedSecondaryArtistId = availableSecondary.NailArtistId;
+                response.SuggestedSecondaryArtistName = secondaryName;
+                response.WarningMessage = $"Thợ {primaryArtistName} bận ca tiếp theo lúc {addonStartTime:hh\\:mm}.";
+                response.RecommendationMessage = $"Gợi ý Lễ tân: Bàn giao Khách D cho Thợ phụ {secondaryName} làm các dịch vụ phát sinh [{joinedNames}] ({totalDurationMinutes}p) từ {addonStartTime:hh\\:mm}.";
+
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                    booking.Salon.ToString(),
+                    "OnsiteAddonConflictNotification",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        PrimaryArtistId = primaryArtistId,
+                        PrimaryArtistName = primaryArtistName,
+                        AddonNames = addonNames,
+                        DurationMinutes = totalDurationMinutes,
+                        CanMultiArtistSplit = true,
+                        SuggestedSecondaryArtistId = availableSecondary.NailArtistId,
+                        SuggestedSecondaryArtistName = secondaryName,
+                        Message = response.RecommendationMessage
+                    }
+                );
+                return new ApiSuccessResult<OnsiteAddonSimulationResponseDTO>(response, "Thợ chính bận ca tiếp theo. Đã gửi cảnh báo và gợi ý Thợ phụ tới Lễ tân.");
+            }
+            // Ko có thợ rảnh => hẹn lịch khác
+            response.CanMultiArtistSplit = false;
+            var alternativeTime = addonEndTime.Add(TimeSpan.FromSeconds(30));
+            response.SuggestedAlternativeTime = alternativeTime;
+
+            response.WarningMessage = $"Thợ {primaryArtistName} bận ca tiếp theo và Salon không có Thợ phụ rảnh khung giờ {addonStartTime:hh\\:mm}.";
+            response.RecommendationMessage = $"Gợi ý Lễ tân: Trao đổi hẹn khách làm các dịch vụ phát sinh [{joinedNames}] lúc {alternativeTime:hh\\:mm} sau khi xong ca trùng.";
+            await _notificationService.SendNotificationToSalonStaffAsync(
+                                     booking.SalonId.ToString(),
+                                    "OnsiteAddonConflictNotification",
+                                     new
+                                    {
+                                        BookingId = booking.BookingId,
+                                        PrimaryArtistId = primaryArtistId,
+                                        PrimaryArtistName = primaryArtistName,
+                                        AddonNames = addonNames,
+                                        CanMultiArtistSplit = false,
+                                        SuggestedAlternativeTime = alternativeTime,
+                                        Message = response.RecommendationMessage
+                                     }
+            );
+            return new ApiSuccessResult<OnsiteAddonSimulationResponseDTO>(response, "Salon hết thợ rảnh. Đã gửi thông báo tới Lễ tân để  hẹn giờ khác");
+        }
+
+        public async Task<ApiResult<List<BookingProcedureResponseDTO>>> ConfirmOnsiteAddonAsync(ConfirmOnsiteAddonRequestDTO request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
+            if(booking == null)
+            {
+                return new ApiErrorResult<List<BookingProcedureResponseDTO>>("Không tìm thấy đơn đặt lịch.");
+            }
+            if(request.AddonItems == null || !request.AddonItems.Any())
+            {
+                return new ApiErrorResult<List<BookingProcedureResponseDTO>>("Không có dịch vụ phát sinh nào được chọn.");
+            }
+            var assignedArtistId = request.AssignedArtistId ?? booking.NailArtistId;
+            var existingProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
+            int nextStepOrder = existingProcedures.Any() ? existingProcedures.Max(x => x.StepOrder) + 1 : 1;
+
+            int totalAddedDuration = 0;
+            decimal totalAddedPrice = 0;
+            var createdProcedures = new List<BookingProcedure>();
+
+            foreach(var item in request.AddonItems)
+            {
+                string procedureName = null;
+                int durationMinutes = 30;
+                decimal addonPrice = 0;
+
+                if (item.ServiceId.HasValue)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                    if(service != null)
+                    {
+                        procedureName = service.Name;
+                        addonPrice = service.Price;
+                        durationMinutes = service.Duration;
+                    }
+                }
+                else if (item.NailVariantId.HasValue)
+                {
+                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
+                    if(variant != null)
+                    {
+                        procedureName = variant.Name;
+                        durationMinutes = variant.Duration ?? 60;
+                        addonPrice = variant.Price;
+                    }
+                }
+                var bookingItem = new BookingItem
+                {
+                    BookingItemId = Guid.NewGuid(),
+                    BookingId = booking.BookingId,
+                    ServiceId = item.ServiceId,
+                    NailVariantId = item.NailVariantId,
+                    Price = addonPrice,
+                    Duration = durationMinutes,
+                    Quantity = 1
+                };
+
+                await _unitOfWork.BookingItemRepository.CreateAsync(bookingItem);
+                var newProcedure = new BookingProcedure
+                {
+                    BookingProcedureId = Guid.NewGuid(),
+                    BookingItemId = bookingItem.BookingItemId,
+                    ProcedureName = procedureName,
+                    StepOrder = nextStepOrder++,
+                    Duration = durationMinutes,
+                    ActiveDuration = durationMinutes,
+                    PassiveDuration = 0,
+                    CanOverlap = false,
+                    IsRequired = true,
+                    IsMainStep = true,
+                    Status = BookingProcedureStatus.Pending,
+                    AssignedArtistId = assignedArtistId
+                };
+                await _unitOfWork.BookingProcedureRepository.CreateAsync(newProcedure);
+
+                totalAddedDuration += durationMinutes;
+                totalAddedPrice += addonPrice;
+                createdProcedures.Add(newProcedure);
+            }
+
+            booking.TotalDuration += totalAddedDuration;
+            booking.Price = (booking.Price ?? 0) + totalAddedPrice;
+            booking.TotalPrice = (booking.TotalPrice ?? 0) + totalAddedPrice;
+
+            _unitOfWork.BookingRepository.Update(booking);
+            await _unitOfWork.SaveChangesAsync();
+
+            if (assignedArtistId.HasValue && assignedArtistId != booking.NailArtistId)
+            {
+                var secondaryArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(assignedArtistId.Value);
+                if (secondaryArtist != null)
+                {
+                    await _notificationService.SendNotificationToUserAsync(
+                        secondaryArtist.AccountId.ToString(),
+                        "MultiArtistHandoffAssigned",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            Message = $"Bạn được Lễ tân phân công tiếp nhận {request.AddonItems.Count} dịch vụ phát sinh (+{totalAddedDuration}p) cho khách hàng."
+                        }
+                    );
+                }
+            }
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(createdProcedures);
+            return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, $"Thêm {request.AddonItems.Count} dịch vụ phát sinh thành công!");
         }
     }
 }

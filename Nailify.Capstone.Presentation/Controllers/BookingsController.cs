@@ -489,6 +489,15 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return UnauthorizedResponse();
             }
         }
+        /// <summary>
+        /// BR-01.4: Lấy đếm ngược ETA thời gian chờ & Tự động cộng đền bù nếu chờ quá 10 phút
+        /// </summary>
+        [HttpGet("{bookingId}/wait-eta")]
+        public async Task<IActionResult> GetWaitEtaAndCompensate(Guid bookingId)
+        {
+            var result = await _bookingService.GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
     }
 
     public class CheckInForm

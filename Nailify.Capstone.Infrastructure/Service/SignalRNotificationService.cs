@@ -21,5 +21,15 @@ namespace Nailify.Capstone.Infrastructure.Service
             // Gửi tới toàn bộ client đang kết nối
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", messageType, payload);
         }
+
+        public async Task SendNotificationToGroupAsync(string groupName, string messageType, object payload)
+        {
+            await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", messageType, payload);
+        }
+
+        public async Task SendNotificationToSalonStaffAsync(string salonId, string messageType, object payload)
+        {
+            await _hubContext.Clients.Group($"Salon_{salonId}").SendAsync("ReceiveNotification", messageType, payload);
+        }
     }
 }

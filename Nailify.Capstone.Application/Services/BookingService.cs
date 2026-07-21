@@ -26,12 +26,15 @@ namespace Nailify.Capstone.Application.Services
         private readonly ILogger<BookingService> _logger;
         private readonly IBookingSchedulingService _bookingSchedulingService;
         private readonly IWalkInQueueService _queueService;
-        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, ILogger<BookingService> logger, IBookingSchedulingService bookingSchedulingService, IWalkInQueueService queueService)
+        private readonly INotificationService _notificationService;
+
+        public BookingService(IUnitOfWork unitOfWork, IMapper mapper, IQRService qrService, IBookingProcedureService bookingProcedureService, INailVariantService nailVariantService, ISlotHoldService slotHoldService, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, ILogger<BookingService> logger, IBookingSchedulingService bookingSchedulingService, IWalkInQueueService queueService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _qrService = qrService;
             _bookingProcedureService = bookingProcedureService;
+            _notificationService = notificationService;
             _nailVariantService = nailVariantService;
             _loyaltyTierService = loyaltyTierService;
             _slotHoldService = slotHoldService;
@@ -544,7 +547,8 @@ namespace Nailify.Capstone.Application.Services
                                 Duration = x.Procedure.Duration ?? 0,
                                 ActiveDuration = x.Procedure.ActiveDuration,
                                 PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.CanOverlap
+                                CanOverlap = x.Procedure.PassiveDuration >= 4 && x.Procedure.CanOverlap,
+                                TransitionBuffer = x.Procedure.TransitionBuffer > 0 ? x.Procedure.TransitionBuffer : 1
                             });
                         }
                     }
@@ -1684,7 +1688,10 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
 
-            if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved && booking.Status != BookingStatus.CheckedIn)
+            if (booking.Status != BookingStatus.Pending 
+                && booking.Status != BookingStatus.Approved 
+                && booking.Status != BookingStatus.CheckedIn 
+                && booking.Status != BookingStatus.InProgress)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Không thể chỉ định thợ cho lịch hẹn ở trạng thái '{booking.Status}'.");
             }
@@ -1705,20 +1712,31 @@ namespace Nailify.Capstone.Application.Services
                 );
                 if (isConflict)
                 {
-                    return new ApiErrorResult<BookingResponseDTO>($"Thợ {artist.Account.FirstName} đã bị trùng hoặc quá tải lịch làm việc trong khung giờ này.");
+                    return new ApiErrorResult<BookingResponseDTO>($"Thợ {artist.Account.FirstName} {artist.Account.LastName} đã bị trùng hoặc quá tải lịch làm việc trong khung giờ này.");
                 }
 
                 // Cập nhật gán thợ và timeline cho các bước con
                 foreach (var segment in timeline)
                 {
                     var proc = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                    /*
                     proc.EstimatedStartTime = segment.StartTime;
                     proc.EstimatedEndTime = segment.EndTime;
                     if (proc.ActiveDuration > 0 && proc.IsMainStep)
                     {
                         proc.AssignedArtistId = request.StaffArtistId;
                     }
-                    _unitOfWork.BookingProcedureRepository.Update(proc);
+                    */
+                    if(proc.Status == BookingProcedureStatus.Pending)
+                    {
+                        proc.EstimatedStartTime = segment.StartTime;
+                        proc.EstimatedEndTime = segment.EndTime;
+                        if (proc.IsMainStep)
+                        {
+                            proc.AssignedArtistId = request.StaffArtistId;
+                        }
+                        _unitOfWork.BookingProcedureRepository.Update(proc);
+                    }
                 }
             }
             // Cập nhật thợ nail
@@ -1727,6 +1745,12 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
 
+            // Bắn SignalR cập nhật
+            await _notificationService.SendNotificationToUserAsync(
+                booking.CustomerId.ToString(),
+                "ArtistReassigned",
+                new { BookingId = bookingId, NewArtistName = $"{artist.Account?.FirstName} {artist.Account?.LastName}" }
+            );
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             var response = _mapper.Map<BookingResponseDTO>(savedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Tiếp tân chỉ định thợ nail thành công.");
@@ -1867,6 +1891,61 @@ namespace Nailify.Capstone.Application.Services
             var refreshedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
             var response = _mapper.Map<BookingResponseDTO>(refreshedBooking);
             return new ApiSuccessResult<BookingResponseDTO>(response, $"Phân bổ ghế '{chair.ChairName}' cho lịch hẹn thành công.");
+        }
+        /// <summary>
+        /// Lấy ETA Thời Gian Chờ & Tự Động Cộng Điểm/Voucher Đền Bù
+        /// </summary>
+        /// <param name="bookingId"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<ApiResult<CustomerWaitEtaResponseDTO>> GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(Guid bookingId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if(booking == null)
+            {
+                return new ApiErrorResult<CustomerWaitEtaResponseDTO>("Không tìm thấy lịch hẹn.");
+            }
+            if (!booking.NailArtistId.HasValue)
+            {
+                return new ApiErrorResult<CustomerWaitEtaResponseDTO>("Lịch hẹn chưa được gán thợ.");
+            }
+
+            var artistId = booking.NailArtistId.Value;
+            var activeProcs = await _unitOfWork.BookingProcedureRepository.GetActiveProceduresByArtistIdAsync(artistId);
+            var inProgress = activeProcs.FirstOrDefault(x => x.Status == BookingProcedureStatus.InProgress);
+
+            var localNow = DateTime.UtcNow.AddHours(7);
+            int estimatedWaitMinutes = 0;   
+            if(inProgress != null && inProgress.ActualStartTime.HasValue)
+            {
+                var elapsed = (localNow - inProgress.ActualStartTime.Value).TotalMinutes;
+                estimatedWaitMinutes = Math.Max(1, (int)(inProgress.Duration - elapsed));
+            }
+
+            bool compensationApplied = false;
+            string compType = string.Empty;
+            string displayMsg = $"Thợ của bạn đang hoàn thiện bước cuối, dự kiến phục vụ sau {estimatedWaitMinutes} phút.";
+
+            // Nếu thời gian chờ thực tế vượt quá 10 phút so với giờ hẹn
+            var localBookingDate = (booking.BookingDate.Kind == DateTimeKind.Utc ? booking.BookingDate.AddHours(7) : booking.BookingDate).Date;
+            var scheduledStartTime = localBookingDate + booking.StartTime;
+            var delayFromStartTime = (localNow - scheduledStartTime).TotalMinutes;
+            if(delayFromStartTime > 10) 
+            {
+                // Đoạn logic dưới đây xử lý Đền bù cho Khách hàng khi chờ quá 10 phút. 
+            }
+
+            // Đoạn logic dưới đây xử lý Đền bù cho Khách hàng khi chờ quá 10 phút. 
+
+            /*
+            var existingHistory = await _unitOfWork.BookingHistoryRepository.ExistsAsync(h =>
+                      h.BookingId == bookingId && h.EventType == "WaitTimeCompensationApplied");
+            */
+            var result = _mapper.Map<CustomerWaitEtaResponseDTO>(booking);
+            result.EstimatedWaitMinutes = estimatedWaitMinutes;
+            result.StatusMessage = "Tính toán ETA thời gian chờ thành công.";
+            result.DisplayMessage = displayMsg;
+            return new ApiSuccessResult<CustomerWaitEtaResponseDTO>(result);
         }
     }
 }

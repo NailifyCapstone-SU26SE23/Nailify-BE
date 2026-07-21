@@ -25,7 +25,7 @@ namespace Nailify.Capstone.Application.Services
             TimeSpan bookingStartTime)
         {
             var result = new List<ProcedureScheduleSegment>();
-            
+
             // Sắp xếp tuần tự tất cả các bước của các dịch vụ khác nhau trong cùng đơn đặt lịch
             var orderedProcedures = procedures
                 .OrderBy(x => x.BookingItemId)
@@ -37,6 +37,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 var start = cursor;
                 var end = start.Add(TimeSpan.FromMinutes(procedure.Duration));
+                var transition = procedure.TransitionBuffer > 0 ? procedure.TransitionBuffer : 1;
 
                 result.Add(new ProcedureScheduleSegment
                 {
@@ -48,8 +49,9 @@ namespace Nailify.Capstone.Application.Services
                     StartTime = start,
                     EndTime = end,
                     ArtistBusyStart = start,
-                    ArtistBusyEnd = start.Add(TimeSpan.FromMinutes(procedure.ActiveDuration)),
-                    CanOverlap = procedure.CanOverlap
+                    ArtistBusyEnd = start.Add(TimeSpan.FromMinutes(procedure.ActiveDuration + transition)),
+                    CanOverlap = procedure.PassiveDuration >= 4 && procedure.CanOverlap,
+                    TransitionBuffer = transition
                 });
 
                 cursor = end;
@@ -88,8 +90,8 @@ namespace Nailify.Capstone.Application.Services
             var allExisting = dbSegments.Concat(simulatedSegments).ToList();
 
             // 1. Kiểm tra Active Capacity (Tối đa 1 công việc chủ động đồng thời cho thợ đang xét)
-            var relevantNewSegments = newSegments.Where(x => 
-                (x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep)) && 
+            var relevantNewSegments = newSegments.Where(x =>
+                (x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep)) &&
                 x.ArtistBusyEnd > x.ArtistBusyStart);
 
             foreach (var newSegment in relevantNewSegments)
@@ -105,7 +107,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             // 2. Kiểm tra Total Capacity (Giới hạn ConcurrentCapacity của thợ đang xét)
-            var relevantTotalSegments = newSegments.Where(x => 
+            var relevantTotalSegments = newSegments.Where(x =>
                 x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep));
 
             foreach (var newSegment in relevantTotalSegments)
@@ -142,6 +144,7 @@ namespace Nailify.Capstone.Application.Services
                     var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
                     foreach (var np in activeNailProcedures)
                     {
+                        var passiveDuration = np.Procedure.PassiveDuration;
                         mockProcedures.Add(new BookingProcedure
                         {
                             BookingProcedureId = Guid.NewGuid(),
@@ -150,8 +153,9 @@ namespace Nailify.Capstone.Application.Services
                             StepOrder = tempStepOrder++,
                             Duration = np.Procedure.Duration ?? 0,
                             ActiveDuration = np.Procedure.ActiveDuration,
-                            PassiveDuration = np.Procedure.PassiveDuration,
-                            CanOverlap = np.Procedure.CanOverlap
+                            PassiveDuration = passiveDuration,
+                            CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
+                            TransitionBuffer = np.Procedure.TransitionBuffer > 0  ? np.Procedure.TransitionBuffer : 1
                         });
                     }
                 }
@@ -171,7 +175,8 @@ namespace Nailify.Capstone.Application.Services
                             Duration = service.Duration,
                             ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
                             PassiveDuration = 0,
-                            CanOverlap = false
+                            CanOverlap = false,
+                            TransitionBuffer = 1
                         });
                     }
                 }
@@ -202,7 +207,8 @@ namespace Nailify.Capstone.Application.Services
                         Duration = duration,
                         ActiveDuration = duration,
                         PassiveDuration = 0,
-                        CanOverlap = false
+                        CanOverlap = false,
+                        TransitionBuffer = 1
                     });
                 }
             }

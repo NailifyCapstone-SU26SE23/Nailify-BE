@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
@@ -26,5 +27,14 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<List<BookingProcedureResponseDTO>>> GetArtistActiveProceduresAsync(Guid artistId);
 
         Task<ApiResult<List<BookingProcedureResponseDTO>>> GetClaimableProceduresAsync(Guid salonId);
+        /// <summary>
+        /// Hàm này dùng để xem thợ có thể làm song song (đè ca hay không)
+        /// </summary>
+        /// <param name="bookingId"></param>
+        /// <returns></returns>
+        Task<ApiResult<InterleavingOpportunityResponseDTO>> EvaluateInterleavingOpportunityAsync(Guid bookingId);
+        Task<ApiResult<BookingProcedureResponseDTO>> AutoAssignSecondaryArtistForPrepAsync(Guid bookingId, Guid mainArtistId);
+        Task<ApiResult<OnsiteAddonSimulationResponseDTO>> SimulateOnsiteAddonAsync(SimulateOnsiteAddonRequestDTO request);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> ConfirmOnsiteAddonAsync(ConfirmOnsiteAddonRequestDTO request);
     }
 }
