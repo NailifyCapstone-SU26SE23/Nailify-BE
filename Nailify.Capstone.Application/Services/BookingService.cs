@@ -203,6 +203,12 @@ namespace Nailify.Capstone.Application.Services
             }
 
             // Tự động kiểm tra và cưỡng chế thợ khi đặt lịch mẫu custom
+            var customRequestError = await ResolveCustomerNailRequestIdsAsync(request.BookingItems, request.SalonId, request.NailArtistId);
+            if (!string.IsNullOrWhiteSpace(customRequestError))
+            {
+                return new ApiErrorResult<BookingResponseDTO>(customRequestError);
+            }
+
             var customNailItem = request.BookingItems.FirstOrDefault(x => x.CustomerNailRequestId.HasValue);
             if (customNailItem != null)
             {
@@ -253,7 +259,12 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Chi nhánh đóng cửa nghỉ lễ vào ngày này.");
             }
             var bookingId = Guid.NewGuid();
-            var calculation = await BuildBookingItemsAsync(request.BookingItems, bookingId, request.SalonId, request.NailArtistId);
+            var calculation = await BuildBookingItemsAsync(
+                request.BookingItems,
+                bookingId,
+                request.SalonId,
+                request.NailArtistId,
+                createMissingCustomerNailRequest: true);
             if (!calculation.IsSucceeded)
             {
                 return new ApiErrorResult<BookingResponseDTO>(calculation.ErrorMessage!);
@@ -1072,7 +1083,7 @@ namespace Nailify.Capstone.Application.Services
                 var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), booking.SalonId);
                 var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
                 var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                request.NailArtistId.Value, request.BookingDate, timeline, capacity);
+                request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
                 if (isConflict)
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ đã bận, xin chọn giờ khác.");
@@ -1451,12 +1462,26 @@ namespace Nailify.Capstone.Application.Services
             IEnumerable<BookingItemRequestDTO> requests,
             Guid bookingId,
             Guid? salonId,
-            Guid? customerPassedArtistId = null)
+            Guid? customerPassedArtistId = null,
+            bool createMissingCustomerNailRequest = false)
         {
             var requestItems = requests?.ToList() ?? new List<BookingItemRequestDTO>();
             if (!requestItems.Any())
             {
                 return BookingItemsCalculation.Failure("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
+            }
+
+            if (salonId.HasValue && salonId.Value != Guid.Empty)
+            {
+                var customRequestError = await ResolveCustomerNailRequestIdsAsync(
+                    requestItems,
+                    salonId.Value,
+                    customerPassedArtistId,
+                    createMissingCustomerNailRequest);
+                if (!string.IsNullOrWhiteSpace(customRequestError))
+                {
+                    return BookingItemsCalculation.Failure(customRequestError);
+                }
             }
 
             var items = _mapper.Map<List<BookingItem>>(requestItems);
@@ -1622,6 +1647,56 @@ namespace Nailify.Capstone.Application.Services
 
             public static BookingItemsCalculation Failure(string message)
                 => new(false, new List<BookingItem>(), 0, 0, message);
+        }
+
+        private async Task<string?> ResolveCustomerNailRequestIdsAsync(
+            IEnumerable<BookingItemRequestDTO> bookingItems,
+            Guid salonId,
+            Guid? staffId,
+            bool createMissingRequest = true)
+        {
+            foreach (var item in bookingItems)
+            {
+                if (!item.CustomerNailId.HasValue || item.CustomerNailRequestId.HasValue)
+                {
+                    continue;
+                }
+
+                var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(item.CustomerNailId.Value);
+                if (customerNail == null)
+                {
+                    return $"Không tìm thấy nail custom ID {item.CustomerNailId.Value}";
+                }
+
+                var customerNailRequest = await _unitOfWork.CustomerNailRequestRepository
+                    .GetByCustomerNailAndSalonAsync(item.CustomerNailId.Value, salonId);
+
+                if (customerNailRequest == null && !createMissingRequest)
+                {
+                    return $"Không tìm thấy nail custom ID {item.CustomerNailId.Value}.";
+                }
+
+                if (customerNailRequest == null)
+                {
+                    customerNailRequest = new CustomerNailRequest
+                    {
+                        CustomerNailRequestId = Guid.NewGuid(),
+                        CustomerNailId = item.CustomerNailId.Value,
+                        SalonId = salonId,
+                        Status = CustomerNailStatus.Quoted,
+                        ApprovedArtistId = staffId,
+                        Price = null,
+                        Duration = null,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.CustomerNailRequestRepository.CreateAsync(customerNailRequest);
+                }
+
+                item.CustomerNailRequestId = customerNailRequest.CustomerNailRequestId;
+            }
+
+            return null;
         }
 
         private sealed record DiscountedPriceCalculation(

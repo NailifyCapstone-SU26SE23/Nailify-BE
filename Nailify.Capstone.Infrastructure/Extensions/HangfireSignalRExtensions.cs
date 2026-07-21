@@ -35,6 +35,7 @@ namespace Nailify.Capstone.Infrastructure.Extensions
                 }, new PostgreSqlStorageOptions
                 {
                     QueuePollInterval = TimeSpan.FromSeconds(15),
+                    DistributedLockTimeout = TimeSpan.FromMinutes(5),
                     PrepareSchemaIfNecessary = true
                 }));
             // 3. Đăng ký Hangfire Server

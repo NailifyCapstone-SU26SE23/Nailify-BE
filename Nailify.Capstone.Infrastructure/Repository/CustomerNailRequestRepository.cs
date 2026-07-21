@@ -57,6 +57,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<CustomerNailRequest?> GetByCustomerNailAndSalonAsync(int customerNailId, Guid salonId)
+        {
+            return await FindByCondition(r =>
+                r.CustomerNailId == customerNailId &&
+                r.SalonId == salonId)
+                .OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<CustomerNailRequest?> GetApprovedRequestAsync(int customerNailId, Guid salonId)
         {
             return await FindByCondition(r =>

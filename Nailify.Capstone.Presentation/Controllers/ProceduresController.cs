@@ -123,15 +123,6 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
-        [HttpPost("customer-nail/{customerNailId}")]
-        [ProducesResponseType(typeof(ApiResult<NailProcedureResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> CreateCustomerNailProcedure(int customerNailId, [FromBody] CustomerNailProcedureRequestDTO request)
-        {
-            var result = await _procedureService.CreateCustomerNailProcedureAsync(customerNailId, request);
-            return result.IsSucceeded ? Ok(result) : BadRequest(result);
-        }
-
         [HttpPut("customer-nail/procedure/{nailProcedureId}")]
         [ProducesResponseType(typeof(ApiResult<NailProcedureResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
