@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
@@ -18,6 +19,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly IPaymentUrls _paymentUrls;
         private readonly IUnitOfWork _unitOfWork;
         private readonly PayOSHelper _payOSHelper;
+        private readonly ILogger<PayOSService> _logger;
         private const string PayOSBaseUrl = "https://api-merchant.payos.vn";
 
         public PayOSService(
@@ -25,13 +27,15 @@ namespace Nailify.Capstone.Infrastructure.Service
             IPayOSSettings paymentSettings,
             IPaymentUrls paymentUrls,
             IUnitOfWork unitOfWork,
-            PayOSHelper payOSHelper)
+            PayOSHelper payOSHelper,
+            ILogger<PayOSService> logger)
         {
             _httpClient = httpClientFactory.CreateClient();
             _paymentSettings = paymentSettings;
             _paymentUrls = paymentUrls;
             _unitOfWork = unitOfWork;
             _payOSHelper = payOSHelper;
+            _logger = logger;
         }
 
         public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkAsync(Guid bookingId)
@@ -142,6 +146,10 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 if (!VerifyWebhookSignature(webhookDto))
                 {
+                    _logger.LogWarning(
+                        "PayOS webhook rejected because signature is invalid. OrderCode: {OrderCode}, Payload: {@Payload}",
+                        ResolveOrderCode(webhookDto),
+                        webhookDto);
                     return (false, "Webhook signature khong hop le.");
                 }
 
@@ -150,6 +158,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                     trackChanges: true);
                 if (transaction == null)
                 {
+                    _logger.LogWarning(
+                        "PayOS webhook rejected because no local transaction was found. OrderCode: {OrderCode}, Payload: {@Payload}",
+                        ResolveOrderCode(webhookDto),
+                        webhookDto);
                     return (false, "Khong tim thay giao dich tuong ung.");
                 }
 
@@ -177,6 +189,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error while processing PayOS webhook. Payload: {@Payload}", webhookDto);
                 return (false, $"Loi khi xu ly webhook: {ex.Message}");
             }
         }
