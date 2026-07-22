@@ -31,6 +31,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public Task<PagedList<BookingRating>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters)
             => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.Booking.NailArtistId == nailArtistId), parameters), parameters.PageNumber, parameters.PageSize);
 
+        public Task<PagedList<BookingRating>> GetByNailVariantIdAsync(int nailVariantId, BookingRatingRequestParameters parameters)
+            => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.Booking.BookingItems.Any(i => i.NailVariantId == nailVariantId)), parameters), parameters.PageNumber, parameters.PageSize);
+
         public Task<PagedList<BookingRating>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters)
             => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.CustomerId == customerId), parameters), parameters.PageNumber, parameters.PageSize);
 
@@ -42,6 +45,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     .ThenInclude(x => x.Salon)
                 .Include(x => x.Booking)
                     .ThenInclude(x => x.NailArtist)
+                .Include(x => x.Booking)
+                    .ThenInclude(x => x.BookingItems)
                 .Include(x => x.Customer)
                     .ThenInclude(x => x.User);
 

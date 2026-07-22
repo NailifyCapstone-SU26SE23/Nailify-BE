@@ -43,6 +43,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         /// </summary>
         public string Status { get; set; }
 
+        public DateTime CreatedAt { get; set; }
+
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public UserRole Role { get; set; }
 

@@ -38,8 +38,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
             => _dbSet
                 .AsNoTracking()
                 .Include(f => f.NailDesign)
-                    .ThenInclude(d => d!.NailDesignImages)
-                .Include(f => f.NailDesign)
                     .ThenInclude(d => d!.NailCategories)
                         .ThenInclude(nc => nc.Category)
                             .ThenInclude(c => c.CategoryType)

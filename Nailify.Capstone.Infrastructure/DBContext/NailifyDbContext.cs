@@ -23,7 +23,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<Category> Categories { get; set; }
         public DbSet<NailDesign> NailDesigns { get; set; }
         public DbSet<NailCategory> NailCategories { get; set; }
-        public DbSet<NailDesignImage> NailDesignImages { get; set; }
         public DbSet<SalonOperatingHour> SalonOperatingHours { get; set; }
         public DbSet<Salon> Salons { get; set; }
         public DbSet<NailArtist> NailArtists { get; set; }
@@ -119,6 +118,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             modelBuilder.Entity<NailDesign>()
                 .Property(nd => nd.MaxPrice)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<NailDesign>()
+                .Property(nd => nd.ImageUrl)
+                .HasMaxLength(500);
 
             modelBuilder.Entity<Component>()
                 .HasKey(c => c.ComponentId);
@@ -527,15 +530,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .ToTable(table => table.HasCheckConstraint(
                     "CK_CustomerNailComponent_OneComponent",
                     "(\"ComponentId\" IS NOT NULL AND \"CustomerComponentId\" IS NULL) OR (\"ComponentId\" IS NULL AND \"CustomerComponentId\" IS NOT NULL)"));
-
-            modelBuilder.Entity<NailDesignImage>()
-                .HasKey(ndi => ndi.NailDesignImageId);
-
-            modelBuilder.Entity<NailDesignImage>()
-                .HasOne(ndi => ndi.NailDesign)
-                .WithMany(nd => nd.NailDesignImages)
-                .HasForeignKey(ndi => ndi.NailDesignId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Salon>()
                 .HasKey(s => s.SalonId);

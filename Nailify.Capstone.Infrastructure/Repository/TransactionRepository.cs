@@ -18,6 +18,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<Guid?> GetBookingIdByOrderCodeAsync(string orderCode)
+        {
+            return await FindByCondition(t => t.OrderCode == orderCode, false)
+                .Select(t => (Guid?)t.BookingId)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<Transaction?> GetDetailByIdAsync(int id, bool trackChanges = false)
         {
             return await BuildDetailQuery(trackChanges)

@@ -45,6 +45,9 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters)
             => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByNailArtistIdAsync(nailArtistId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
 
+        public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailVariantIdAsync(int nailVariantId, BookingRatingRequestParameters parameters)
+            => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByNailVariantIdAsync(nailVariantId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
+
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters)
             => SuccessPaged(await _unitOfWork.BookingRatingRepository.GetByCustomerIdAsync(customerId, parameters), parameters, "Lấy thông tin đánh giá thành công.");
 

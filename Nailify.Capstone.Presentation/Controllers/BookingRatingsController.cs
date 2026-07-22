@@ -54,6 +54,11 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetByNailArtistId(Guid nailArtistId, [FromQuery] BookingRatingRequestParameters parameters)
             => Ok(await _bookingRatingService.GetByNailArtistIdAsync(nailArtistId, parameters));
 
+        [HttpGet("by-nail-variant/{nailVariantId:int}")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<BookingRatingResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetByNailVariantId(int nailVariantId, [FromQuery] BookingRatingRequestParameters parameters)
+            => Ok(await _bookingRatingService.GetByNailVariantIdAsync(nailVariantId, parameters));
+
         [HttpGet("me")]
         [ProducesResponseType(typeof(ApiResult<PagedList<BookingRatingResponseDTO>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCustomerId([FromQuery] BookingRatingRequestParameters parameters)

@@ -1124,6 +1124,7 @@ namespace Nailify.Capstone.Application.Services
                 booking.Price = totalPrice;
                 booking.Discount = -priceResult.DiscountAmount;
                 booking.TotalPrice = priceResult.TotalPrice;
+                booking.AmountDue = Math.Max(0, priceResult.TotalPrice - (booking.AmountPaid ?? 0));
                 booking.TotalDuration = totalDuration;
                 booking.UpdatedAt = DateTime.UtcNow;
 
@@ -1373,6 +1374,14 @@ namespace Nailify.Capstone.Application.Services
             var bookings = await _unitOfWork.BookingRepository.GetBookingsByArtistAsync(artistId, pageNumber, pageSize, startDate, endDate, status, search);
             var response = MapPagedBookings(bookings, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<BookingResponseDTO>>(response, "Lấy danh sách đặt lịch của Thợ làm móng thành công.");
+        }
+
+        public async Task<ApiResult<BookingIdResponseDTO>> GetBookingIdByOrderCodeAsync(long orderCode)
+        {
+            var bookingId = await _unitOfWork.TransactionRepository.GetBookingIdByOrderCodeAsync(orderCode.ToString());
+            return bookingId.HasValue
+                ? new ApiSuccessResult<BookingIdResponseDTO>(new BookingIdResponseDTO { BookingId = bookingId.Value }, "Lấy mã lịch hẹn thành công.")
+                : new ApiErrorResult<BookingIdResponseDTO>("Không tìm thấy giao dịch.");
         }
 
         public async Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)

@@ -3,6 +3,7 @@ using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -43,7 +44,9 @@ namespace Nailify.Capstone.Infrastructure.Service
                     return (false, "Khong tim thay lich hen.", null);
                 }
 
-                var amountDue = booking.TotalPrice * 0.2m ?? 0m;
+                var amountDue = booking.Status == BookingStatus.ServiceCompleted
+                    ? booking.AmountDue ?? booking.TotalPrice ?? 0m
+                    : booking.TotalPrice * 0.2m ?? 0m;
                 if (amountDue <= 0)
                 {
                     return (false, $"So tien khong hop le: {amountDue}.", null);
@@ -161,6 +164,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     transaction.Booking.AmountPaid = transaction.Amount;
                     transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
+                }
+
+                if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
+                {
+                    transaction.Booking.CheckOut(Guid.Empty);
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -319,11 +327,13 @@ namespace Nailify.Capstone.Infrastructure.Service
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private static PaymentResponseDto ToResponse(Transaction transaction)
+        private PaymentResponseDto ToResponse(Transaction transaction)
         {
             return new PaymentResponseDto
             {
                 PaymentUrl = transaction.CheckoutUrl,
+                ReturnUrl = _paymentUrls.ReturnUrl,
+                CancelUrl = _paymentUrls.CancelUrl,
                 QrCode = transaction.QrCode,
                 OrderCode = long.Parse(transaction.OrderCode, CultureInfo.InvariantCulture),
                 Status = transaction.Status.ToString(),

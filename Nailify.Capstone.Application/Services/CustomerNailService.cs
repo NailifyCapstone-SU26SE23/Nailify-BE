@@ -192,21 +192,6 @@ namespace Nailify.Capstone.Application.Services
             return (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
-        private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId)
-        {
-            if (!nailShapeId.HasValue || await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) == null)
-            {
-                return "Không tìm thấy dáng móng.";
-            }
-
-            if (nailSurfaceId.HasValue && await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
-            {
-                return "Không tìm thấy bề mặt móng.";
-            }
-
-            return null;
-        }
-
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> SubmitReviewAsync(CustomerNailRequestCreateRequest requestDto, Guid customerId)
         {
             var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(requestDto.CustomerNailId);
@@ -262,7 +247,6 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chỉ định thợ cho mẫu móng ở chi nhánh khác.");
             }
-            //var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(request.StaffArtistId);
             var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.StaffArtistId);
             if (artist == null)
             {

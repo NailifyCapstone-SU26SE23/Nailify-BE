@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Application.Services
         {
             var pagedHistories = await _unitOfWork.BookingHistoryRepository.GetPagedBookingHistoriesAsync(pageNumber, pageSize, startDate, endDate);
             var response = MapPagedHistories(pagedHistories, pageNumber, pageSize);
-            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "L�?y th�ng tin li?ch s?? ???t li?ch tha?nh c�ng.");
+            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "Lấy lịch sử của lịch hẹn thành công.");
         }
 
         public async Task<ApiResult<BookingHistoryResponseDTO>> GetBookingHistoryByIdAsync(Guid bookingHistoryId)
@@ -30,32 +30,32 @@ namespace Nailify.Capstone.Application.Services
             var history = await _unitOfWork.BookingHistoryRepository.GetBookingHistoryDetailAsync(bookingHistoryId);
             if (history == null)
             {
-                return new ApiErrorResult<BookingHistoryResponseDTO>("Kh�ng ti?m th�?y th�ng tin ???t li?ch.");
+                return new ApiErrorResult<BookingHistoryResponseDTO>("Không tìm thấy lịch sử.");
             }
 
             var response = _mapper.Map<BookingHistoryResponseDTO>(history);
-            return new ApiSuccessResult<BookingHistoryResponseDTO>(response, "L�?y th�ng tin li?ch s?? ???t li?ch tha?nh c�ng.");
+            return new ApiSuccessResult<BookingHistoryResponseDTO>(response, "Lấy lịch sử của lịch hẹn thành công.");
         }
 
         public async Task<ApiResult<PagedList<BookingHistoryResponseDTO>>> GetPagedBookingHistoriesByBookingIdAsync(Guid bookingId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null)
         {
             var pagedHistories = await _unitOfWork.BookingHistoryRepository.GetPagedBookingHistoriesByBookingIdAsync(bookingId, pageNumber, pageSize, startDate, endDate);
             var response = MapPagedHistories(pagedHistories, pageNumber, pageSize);
-            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "L�?y th�ng tin li?ch s?? ???t li?ch tha?nh c�ng");
+            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "Lấy lịch sử của lịch hẹn thành công.");
         }
 
         public async Task<ApiResult<PagedList<BookingHistoryResponseDTO>>> GetPagedBookingHistoriesBySalonIdAsync(Guid salonId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null)
         {
             var pagedHistories = await _unitOfWork.BookingHistoryRepository.GetPagedBookingHistoriesBySalonIdAsync(salonId, pageNumber, pageSize, startDate, endDate);
             var response = MapPagedHistories(pagedHistories, pageNumber, pageSize);
-            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "L�?y th�ng tin li?ch s?? ???t li?ch tha?nh c�ng");
+            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "Lấy lịch sử của lịch hẹn thành công.");
         }
 
         public async Task<ApiResult<PagedList<BookingHistoryResponseDTO>>> GetPagedBookingHistoriesByArtistIdAsync(Guid artistId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null)
         {
             var pagedHistories = await _unitOfWork.BookingHistoryRepository.GetPagedBookingHistoriesByArtistIdAsync(artistId, pageNumber, pageSize, startDate, endDate);
             var response = MapPagedHistories(pagedHistories, pageNumber, pageSize);
-            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "L�?y th�ng tin li?ch s?? ???t li?ch tha?nh c�ng");
+            return new ApiSuccessResult<PagedList<BookingHistoryResponseDTO>>(response, "Lấy lịch sử của lịch hẹn thành công.");
         }
 
         private PagedList<BookingHistoryResponseDTO> MapPagedHistories(PagedList<BookingHistory> pagedHistories, int pageNumber, int pageSize)

@@ -132,6 +132,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IDashboardService, DashboardService>();
             services.AddScoped<ICategoryTypeService, CategoryTypeService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<INailCategoryService, NailCategoryService>();
@@ -202,6 +203,12 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                 ?? new RedisConfiguration { UseMemoryCache = true };
             services.AddSingleton<IRedisConfiguration>(redisSettings);
 
+            var nemotronSettings = configuration.GetSection("NemotronConfig")
+                                                .Get<NemotronConfiguration>()
+                                   ?? new NemotronConfiguration();
+           
+            services.AddSingleton<INemotronConfiguration>(nemotronSettings);
+
             if (redisSettings.UseMemoryCache)
             {
                 services.AddDistributedMemoryCache();
@@ -228,6 +235,14 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             var paymentUrls = configuration.GetSection("PaymentUrls")
                                   .Get<PaymentUrls>()
                     ?? new PaymentUrls();
+            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+            {
+                paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
+            }
+            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+            {
+                paymentUrls.CancelUrl = paymentSettings.CancelUrl;
+            }
             services.AddSingleton<IPaymentUrls>(paymentUrls);
 
             // Đăng ký FluentValidation từ tầng Application

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260718091428_TuePDG-FixUserNailDesignImage")]
+    partial class TuePDGFixUserNailDesignImage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -324,9 +327,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<int>("StepOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TransitionBuffer")
                         .HasColumnType("integer");
 
                     b.HasKey("BookingProcedureId");
@@ -1448,9 +1448,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasDefaultValue("Active");
-
-                    b.Property<int>("TransitionBuffer")
-                        .HasColumnType("integer");
 
                     b.HasKey("ProcedureId");
 
