@@ -23,7 +23,14 @@ namespace Nailify.Capstone.Application.Services
         private readonly IPromotionService _promotionService;
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly IBookingSchedulingService _bookingSchedulingService;
-        public BookingWaitlistService(IUnitOfWork unitOfWork, IMapper mapper, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, IBookingProcedureService bookingProcedureService, IBookingSchedulingService bookingSchedulingService)
+        public BookingWaitlistService(
+                                        IUnitOfWork unitOfWork,
+                                        IMapper mapper,
+                                        ILoyaltyTierService loyaltyTierService,
+                                        IPromotionService promotionService,
+                                        IBookingProcedureService bookingProcedureService,
+                                        IBookingSchedulingService bookingSchedulingService
+                                     )
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;

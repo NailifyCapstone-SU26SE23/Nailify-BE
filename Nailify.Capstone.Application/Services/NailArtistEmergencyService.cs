@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistRequestDTOs;
@@ -204,10 +204,16 @@ namespace Nailify.Capstone.Application.Services
                             x.NailArtistId = candidate.NailArtistId;
                             _unitOfWork.BookingRepository.Update(x);
 
-                            // Lúc này là khi thợ đặt 15h => nhưng mà không có thợ nào rảnh => hệ thống phải +/- 30-60 phút để đề xuất giờ khác thì CÓ THỂ TẶNG VOUCHER
-                            // Khách đặt 15h => 14h | 14h30  | 15h30 | 16h
-                            // có thợ rảnh trong khoảng này cho reschedule lại => có thể tặng voucher vì bị dời lịch so với dự kiến
-
+                            // HƯỚNG DẪN LUỒNG ĐỀ XUẤT GIỜ MỚI & TẶNG VOUCHER ĐỀN BÙ (BR-02.3) - Author: ThanhDT
+                            //  - Khách đặt lúc 15:00. Thợ ban đầu bận đột xuất (Emergency Off).
+                            //  - Không có thợ nào khác rảnh ĐÚNG 15:00.
+                            //  - Hệ thống tự động dùng thuật toán Nearest Slot Search quét khoảng lệch (+/- 30-60 phút):
+                            //    Ví dụ: Thử các mốc [15:30 -> 14:30 -> 16:00 -> 14:00].
+                            //  - Khi tìm thấy thợ rảnh tại slot 15:30 (hoặc 14:30/16:00):
+                            //    => Đề xuất khách dời lịch sang giờ này (`BookingStatus.RescheduleSuggested`).
+                            //    => VÌ KHÁCH BỊ ĐỜI LỊCH SO VỚI DỰ KIẾN, HỆ THỐNG CÓ THỂ TẶNG VOUCHER ĐỀN BÙ CHO KHÁCH HÀNG.
+                            // TuePDG
+                            // TODO: cấp Voucher đền bù dời lịch
                             response.RescheduleSuggestedCount++;
 
                             var detailDto = _mapper.Map<EmergencyBookingHandlingDetailDTO>(x);
@@ -235,11 +241,20 @@ namespace Nailify.Capstone.Application.Services
                     continue;
                 }
 
-                // Hủy đơn nếu không có thợ đạt trình độ
+                //  HƯỚNG DẪN LUỒNG HỦY ĐƠN & HOÀN CỌC + VOUCHER KHI KHÔNG CÓ THỢ NÀO THAY THẾ (Author: ThanhDT)
+                // Khi đã thử tất cả thợ và tất cả các khung giờ (+/- 60p) nhưng không có thợ nào đủ skill/rảnh.
+                // LUỒNG XỬ LÝ:
+                //   1. Hủy đơn hàng và đánh dấu Cancelled.
+                //   2. Hoàn lại 100% tiền đặt cọc (nếu đơn có thanh toán cọc trước) qua Payment Gateway/Ví.
+                //   3. Tặng Voucher đền bù đặc biệt (VD: Voucher 20% hoặc 100k) tạ lỗi vì Salon phải tự động hủy đơn của khách.
                 string cancelReason = $"[Tự động hủy] Sự cố thợ bận đột xuất ({request.Reason}) - Không có thợ/slot có kỹ năng phù hợp thay thế.";
                 x.Cancel(Guid.Empty, cancelReason);
                 _unitOfWork.BookingRepository.Update(x);
-                // Không có thợ nào đủ trình độ để làm thì có thể đền bù voucher và hoàn cọc (nếu có)
+
+
+                // TuePDG
+                // TODO: Bổ sung hoàn tiền cọc & cấp Voucher đền bù hủy đơn
+
                 response.CancelledAndRefundedCount++;
 
                 var cancelDetailDto = _mapper.Map<EmergencyBookingHandlingDetailDTO>(x);
