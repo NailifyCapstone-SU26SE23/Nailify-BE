@@ -272,10 +272,42 @@ namespace Nailify.Capstone.Infrastructure.Service
                 return false;
             }
 
-            var amount = data.Amount.ToString(CultureInfo.InvariantCulture);
-            var dataStr = $"amount={amount}&code={data.Code}&desc={data.Desc}&orderCode={data.OrderCode}";
+            var dataStr = CreateSignatureDataString(data);
             var calculatedSignature = CreateHmacSha256(dataStr);
             return string.Equals(calculatedSignature, webhookDto.Signature, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string CreateSignatureDataString(PaymentWebhookData data)
+        {
+            var values = data.GetType()
+                .GetProperties()
+                .OrderBy(property => GetJsonPropertyName(property.Name), StringComparer.Ordinal)
+                .Select(property =>
+                {
+                    var key = GetJsonPropertyName(property.Name);
+                    var value = property.GetValue(data);
+                    return $"{key}={FormatSignatureValue(value)}";
+                });
+
+            return string.Join("&", values);
+        }
+
+        private static string GetJsonPropertyName(string propertyName)
+        {
+            return char.ToLowerInvariant(propertyName[0]) + propertyName[1..];
+        }
+
+        private static string FormatSignatureValue(object? value)
+        {
+            return value switch
+            {
+                null => string.Empty,
+                decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture),
+                long longValue => longValue.ToString(CultureInfo.InvariantCulture),
+                int intValue => intValue.ToString(CultureInfo.InvariantCulture),
+                bool boolValue => boolValue.ToString().ToLowerInvariant(),
+                _ => value.ToString() ?? string.Empty
+            };
         }
 
         private string CreateHmacSha256(string data)
