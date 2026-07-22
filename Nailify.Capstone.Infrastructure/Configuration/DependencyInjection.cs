@@ -176,9 +176,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IQuizService, QuizService>();
             services.AddScoped<ISalonOffDateService, SalonOffDateService>();
             services.AddScoped<INailArtistBreakService, NailArtistBreakService>();
+            services.AddScoped<IBookingRescheduleService, BookingRescheduleService>();
             // Third Party
             services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IEmailService, SmtpEmailService>();
+            services.AddScoped<INailArtistEmergencyService, NailArtistEmergencyService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddHttpClient();
             services.AddScoped<PayOSHelper>();

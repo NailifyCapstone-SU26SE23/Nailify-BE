@@ -291,6 +291,10 @@ namespace Nailify.Capstone.Application.Services
             {
                 existbooking.CompletedAt = DateTime.UtcNow;
                 existbooking.ActualEndTime = DateTime.UtcNow;
+                if (!existbooking.ActualStartTime.HasValue)
+                {
+                    existbooking.ActualStartTime = DateTime.UtcNow;
+                }
                 existbooking.CompletedById = artistId;
                 try
                 {
@@ -334,7 +338,11 @@ namespace Nailify.Capstone.Application.Services
             else if (status == BookingProcedureStatus.InProgress)
             {
                 existbooking.CompletedAt = null;
-                existbooking.ActualStartTime = DateTime.UtcNow;
+                if (!existbooking.ActualStartTime.HasValue)
+                {
+                    existbooking.ActualStartTime = DateTime.UtcNow;
+                }
+                existbooking.ActualEndTime = null;
                 existbooking.AssignedArtistId = artistId;
                 existbooking.CompletedById = null;
             }
@@ -342,6 +350,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 existbooking.CompletedAt = null;
                 existbooking.ActualStartTime = null;
+                existbooking.ActualEndTime = null;
                 existbooking.AssignedArtistId = artistId;
                 existbooking.Status = BookingProcedureStatus.Pending;
                 existbooking.CompletedById = null;

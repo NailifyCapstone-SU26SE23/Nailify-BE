@@ -85,5 +85,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.NailArtistSkills)
                 .ToListAsync();
         }
+        public async Task<List<NailArtist>> GetActiveArtistsWithSchedulesAndSkillsBySalonAsync(Guid salonId, Guid excludingArtistId)
+        {
+            return await FindByCondition(x => x.Account.SalonId == salonId
+                                           && x.Status == "Open"
+                                           && x.NailArtistId != excludingArtistId)
+                .Include(x => x.Account)
+                .Include(x => x.Schedules)
+                .Include(x => x.NailArtistSkills)
+                .Include(x => x.NailArtistBreaks)
+                .ToListAsync();
+        }
+
     }
 }

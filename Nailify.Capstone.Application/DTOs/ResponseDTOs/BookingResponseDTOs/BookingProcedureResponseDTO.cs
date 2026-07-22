@@ -19,7 +19,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string? Description { get; set; }
         public int StepOrder { get; set; }
         public string Status { get; set; } = string.Empty;
-        public DateTime? CompletedAt { get; set; }
         public Guid? CompletedById { get; set; }
         public string? CompletedByName { get; set; }
         public bool IsRequired { get; set; }
@@ -29,6 +28,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string? AssignedArtistName { get; set; }
         public TimeSpan? EstimatedStartTime { get; set; }
         public TimeSpan? EstimatedEndTime { get; set; }
+        public TimeSpan? ActualStartTime { get; set; }
+        public TimeSpan? ActualEndTime { get; set; }
         public int Duration { get; set; }
         public int ActiveDuration { get; set; }
         public int PassiveDuration { get; set; }
@@ -39,13 +40,14 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public string? CustomerName { get; set; }
         public string? ChairName { get; set; }
         public DateTime? BookingDate { get; set; }
-        public TimeSpan? StartTime { get; set; }
 
         public void Mapping(Profile profile)
         {
             profile.CreateMap<BookingProcedure, BookingProcedureResponseDTO>()
                    .IgnoreAllNonExisting()
                    .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                   .ForMember(dest => dest.ActualStartTime, opt => opt.MapFrom(src => src.ActualStartTime.HasValue ? src.ActualStartTime.Value.TimeOfDay : (TimeSpan?)null))
+                   .ForMember(dest => dest.ActualEndTime, opt => opt.MapFrom(src => src.ActualEndTime.HasValue ? src.ActualEndTime.Value.TimeOfDay : (TimeSpan?)null))
                    .ForMember(dest => dest.CompletedByName, opt => opt.MapFrom(x =>
                         x.CompletedBy != null && x.CompletedBy.Account != null
                         ? $"{x.CompletedBy.Account.FirstName} {x.CompletedBy.Account.LastName}"
@@ -63,8 +65,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                        && src.BookingItem.Booking != null && src.BookingItem.Booking.Chair != null
                        ? src.BookingItem.Booking.Chair.ChairName
                        : null))
-                   .ForMember(dest => dest.BookingDate, opt => opt.MapFrom(src => src.BookingItem != null && src.BookingItem.Booking != null ? src.BookingItem.Booking.BookingDate : (DateTime?)null))
-                   .ForMember(dest => dest.StartTime, opt => opt.MapFrom(src => src.BookingItem != null && src.BookingItem.Booking != null ? src.BookingItem.Booking.StartTime : (TimeSpan?)null));
+                   .ForMember(dest => dest.BookingDate, opt => opt.MapFrom(src => src.BookingItem != null && src.BookingItem.Booking != null ? src.BookingItem.Booking.BookingDate : (DateTime?)null));
         }
     }
 }

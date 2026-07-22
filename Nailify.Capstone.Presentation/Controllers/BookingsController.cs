@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -23,11 +24,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
+        private readonly IBookingRescheduleService _bookingRescheduleService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService, IBookingRescheduleService bookingRescheduleService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
             _slotHoldService = slotHoldService;
+            _bookingRescheduleService = bookingRescheduleService;
         }
 
         /// <summary>
@@ -506,6 +509,78 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _bookingService.GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(bookingId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        // <summary>
+        /// Khách hàng chấp nhận khung giờ mới đề xuất từ Salon/Hệ thống
+        /// </summary>
+        [HttpPost("{id}/accept-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AcceptSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerAcceptSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Khách hàng từ chối khung giờ mới đề xuất từ Salon
+        /// </summary>
+        [HttpPost("{id}/decline-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> DeclineSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerDeclineSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Khách hàng yêu cầu dời lịch sang ngày/giờ khác
+        /// </summary>
+        [HttpPost("{id}/request-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> RequestReschedule(Guid id, [FromBody] CustomerRescheduleRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerRequestRescheduleAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Manager đề xuất khung giờ mới cho đơn hàng
+        /// </summary>
+        [HttpPost("{id}/manager-suggest-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerSuggestTime(Guid id, [FromBody] ManagerSuggestTimeRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerSuggestTimeAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Manager duyệt yêu cầu xin dời lịch của Khách hàng
+        /// </summary>
+        [HttpPost("{id}/manager-approve-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerApproveReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerApproveRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Manager từ chối yêu cầu xin dời lịch của Khách hàng
+        /// </summary>
+        [HttpPost("{id}/manager-reject-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ManagerRejectReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerRejectRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
         }
     }
 
