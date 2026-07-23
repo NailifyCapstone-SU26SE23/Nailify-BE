@@ -41,6 +41,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return procedures.Select(x =>
             {
                 var busyStart = x.EstimatedStartTime!.Value;
+                var transition = x.TransitionBuffer > 0 ? x.TransitionBuffer : 1;
 
                 return new ProcedureScheduleSegment
                 {
@@ -50,8 +51,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     StartTime = x.EstimatedStartTime.Value,
                     EndTime = x.EstimatedEndTime ?? x.EstimatedStartTime.Value.Add(TimeSpan.FromMinutes(x.Duration)),
                     ArtistBusyStart = busyStart,
-                    ArtistBusyEnd = busyStart.Add(TimeSpan.FromMinutes(x.ActiveDuration)),
-                    CanOverlap = x.CanOverlap
+                    ArtistBusyEnd = busyStart.Add(TimeSpan.FromMinutes(x.ActiveDuration + transition)),
+                    CanOverlap = x.CanOverlap,
+                    TransitionBuffer = transition,
                 };
             }).ToList();
         }

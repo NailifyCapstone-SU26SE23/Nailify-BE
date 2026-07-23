@@ -29,5 +29,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<int> CountServingBookingsAsync(Guid artistId, DateTime date);
         Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime);
         Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId);
+        Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date);
     }
 }

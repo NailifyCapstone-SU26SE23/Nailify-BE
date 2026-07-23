@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721171556_ThanhDT-addProcedure-BookingProcedure")]
+    partial class ThanhDTaddProcedureBookingProcedure
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -984,6 +987,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasKey("LoyaltyTierId");
 
+                    b.HasIndex("MinLifetimePoints")
+                        .IsUnique();
+
                     b.ToTable("LoyaltyTiers");
                 });
 
@@ -1193,11 +1199,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<decimal>("MaxPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1219,6 +1220,28 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasKey("NailDesignId");
 
                     b.ToTable("NailDesigns");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesignImage", b =>
+                {
+                    b.Property<int>("NailDesignImageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NailDesignImageId"));
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("NailDesignId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("NailDesignImageId");
+
+                    b.HasIndex("NailDesignId");
+
+                    b.ToTable("NailDesignImages");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailProcedure", b =>
@@ -1906,9 +1929,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2566,6 +2586,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailVariant");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesignImage", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
+                        .WithMany("NailDesignImages")
+                        .HasForeignKey("NailDesignId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NailDesign");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailProcedure", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNail", "CustomerNail")
@@ -2902,6 +2933,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailDesign", b =>
                 {
                     b.Navigation("NailCategories");
+
+                    b.Navigation("NailDesignImages");
 
                     b.Navigation("NailVariants");
 

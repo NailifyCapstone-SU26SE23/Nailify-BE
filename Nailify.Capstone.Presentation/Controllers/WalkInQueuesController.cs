@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalkInQueueResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using System;
@@ -123,5 +124,17 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
 
+        /// <summary>
+        /// Tự động khởi tạo Tài khoản khách hàng (nếu là khách vãng lai) và chuyển lượt chờ Walk-in sang đơn Booking chính thức.
+        /// </summary>
+        [HttpPost("{id}/convert-to-booking")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ConvertToBooking(Guid id)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _queueService.ConvertWalkInToBookingAsync(id, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
     }
 }

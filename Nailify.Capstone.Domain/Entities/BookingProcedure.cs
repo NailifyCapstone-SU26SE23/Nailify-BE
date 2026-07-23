@@ -1,4 +1,4 @@
-using Nailify.Capstone.Domain.Enums;
+﻿using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +21,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int ActiveDuration { get; set; }
         public int PassiveDuration { get; set; }
         public bool CanOverlap { get; set; }
+        public int TransitionBuffer { get; set; } = 1; // Thời gian đệm
         // New scheduling fields
         public TimeSpan? EstimatedStartTime { get; set; }
         public TimeSpan? EstimatedEndTime { get; set; }

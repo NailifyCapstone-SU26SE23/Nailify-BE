@@ -10,5 +10,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task SendNotificationToUserAsync(string userId, string messageType, object payload);
         Task SendNotificationToAllAsync(string messageType, object payload);
+        Task SendNotificationToGroupAsync(string groupName, string messageType, object payload);
+        Task SendNotificationToSalonStaffAsync(string salonId, string messageType, object payload);
+
     }
 }
