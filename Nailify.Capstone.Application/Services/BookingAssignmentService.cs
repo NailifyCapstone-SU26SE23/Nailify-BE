@@ -23,13 +23,15 @@ namespace Nailify.Capstone.Application.Services
         private readonly IBookingSchedulingService _bookingSchedulingService;
         private readonly ISlotHoldService _slotHoldService;
         private readonly INotificationService _notificationService;
+        private readonly IBookingSkillMatchingService _skillMatchingService;
         public BookingAssignmentService(
                                         IUnitOfWork unitOfWork,
                                         IMapper mapper,
                                         INailVariantService nailVariantService,
                                         IBookingSchedulingService bookingSchedulingService,
                                         ISlotHoldService slotHoldService,
-                                        INotificationService notificationService
+                                        INotificationService notificationService,
+                                        IBookingSkillMatchingService skillMatchingService
                                       )
         {
             _unitOfWork = unitOfWork;
@@ -38,6 +40,7 @@ namespace Nailify.Capstone.Application.Services
             _bookingSchedulingService = bookingSchedulingService;
             _slotHoldService = slotHoldService;
             _notificationService = notificationService;
+            _skillMatchingService = skillMatchingService;
         }
 
         public async Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request)
@@ -520,6 +523,7 @@ namespace Nailify.Capstone.Application.Services
                 var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, booking.BookingDate);
                 if (schedule == null) continue;
                 if (booking.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd) continue;
+                if (!await _skillMatchingService.HasRequiredSkillsAsync(artist, booking, booking.NailArtistId)) continue;
                 var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
                                          artist.NailArtistId,
                                          booking.BookingDate,

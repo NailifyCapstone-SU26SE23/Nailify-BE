@@ -38,7 +38,7 @@ namespace Nailify.Capstone.Application.Services
             var dto = new AdminDashboardDto();
 
             dto.TotalActiveSalons = await _unitOfWork.SalonRepository
-                .FindByCondition(s => s.Status == "Active")
+                .FindByCondition(s => s.Status == "Open")
                 .CountAsync();
 
             dto.TotalPlatformRevenue = await _unitOfWork.TransactionRepository

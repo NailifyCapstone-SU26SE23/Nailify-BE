@@ -28,6 +28,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null);
         Task<ApiResult<PromotionDto>> UpdateAsync(int id, PromotionRequest request, string? imageUrl = null);
         Task<ApiResult<bool>> DeleteAsync(int id);
+        Task<ApiResult<PromotionDto>> AddVoucherForRescheduleAsync(Guid bookingId);
+        Task<ApiResult<PromotionDto>> AddVoucherForCancelledAsync(Guid bookingId);
         Task<List<Promotion>> GetApplicablePromotionsAsync(Guid customerId, ICollection<BookingItem> items, IEnumerable<int>? selectedPromotionIds = null);
         Task<(decimal totalDiscount, List<BookingDiscount> appliedDiscounts)> CalculateDiscountsAsync(Booking booking, List<Promotion> applicablePromotions);
         Task UpdateUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts);
