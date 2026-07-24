@@ -8,7 +8,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
 {
     public class ArtistQuoteRequestDTO
     {
-        public decimal QuotedPrice { get; set; }
-        public int QuotedDuration { get; set; }
+        public decimal? QuotedPrice { get; set; }
+        public int? QuotedDuration { get; set; }
     }
 }

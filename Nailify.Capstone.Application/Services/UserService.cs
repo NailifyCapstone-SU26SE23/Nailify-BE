@@ -282,6 +282,22 @@ namespace Nailify.Capstone.Application.Services
             if (customer != null)
             {
                 _mapper.Map(customer, profileDto);
+                // Deserialize các chuỗi JSON từ Database
+                profileDto.PreferredColors = DeserializeList(customer.PreferredColorsJson);
+                profileDto.PreferredStyles = DeserializeList(customer.PreferredStylesJson);
+                profileDto.PreferredOccasions = DeserializeList(customer.PreferredOccasionsJson);
+
+                profileDto.SkinShade = customer.SkinShade;
+                profileDto.HandShape = customer.HandShape;
+                profileDto.PreferredComplexity = customer.PreferredComplexity;
+                profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
+
+                // Lấy tên dáng móng
+                if (customer.PreferredNailShapeId.HasValue)
+                {
+                    var shape = await _unitOfWork.NailShapeRepository.GetByIdAsync(customer.PreferredNailShapeId.Value);
+                    profileDto.PreferredNailShapeName = shape?.Name ?? string.Empty;
+                }
             }
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ khách hàng thành công.");
@@ -355,6 +371,18 @@ namespace Nailify.Capstone.Application.Services
                 var artists = await _unitOfWork.NailArtistRepository.GetPagedAsync(1, 1, x => x.AccountId == user.UserId);
                 var artist = artists.Items.FirstOrDefault();
                 response.StaffId = artist?.NailArtistId;
+            }
+        }
+        private List<string> DeserializeList(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return new List<string>();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
             }
         }
     }

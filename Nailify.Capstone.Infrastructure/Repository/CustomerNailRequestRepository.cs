@@ -42,6 +42,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(r => r.CustomerNailRequestId == requestId)
                 .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailShape)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailSurface)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.CustomerNailComponents)
+                        .ThenInclude(c => c.CustomerComponent)
+                .Include(r => r.CustomerNail)
                     .ThenInclude(cn => cn.CustomerNailComponents)
                         .ThenInclude(c => c.Component)
                 .Include(r => r.Salon)
@@ -50,12 +57,21 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<CustomerNailRequest?> GetByCustomerNailAndSalonAsync(int customerNailId, Guid salonId)
+        {
+            return await FindByCondition(r =>
+                r.CustomerNailId == customerNailId &&
+                r.SalonId == salonId)
+                .OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<CustomerNailRequest?> GetApprovedRequestAsync(int customerNailId, Guid salonId)
         {
             return await FindByCondition(r =>
                 r.CustomerNailId == customerNailId &&
                 r.SalonId == salonId &&
-                r.Status == CustomerNailStatus.Approved)
+                r.Status == CustomerNailStatus.Approved || r.Status == CustomerNailStatus.Quoted)
                 .FirstOrDefaultAsync();
         }
 

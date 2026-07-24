@@ -7,7 +7,9 @@ namespace Nailify.Capstone.Application.Validation.CustomerNailRequestDTOs
     {
         public CustomerNailUpdateRequestValidator()
         {
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+            RuleFor(x => x.Name)
+                .MaximumLength(200)
+                .When(x => !string.IsNullOrWhiteSpace(x.Name));
         }
     }
 }

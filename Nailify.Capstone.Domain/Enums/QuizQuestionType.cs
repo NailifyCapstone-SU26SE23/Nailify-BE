@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Nailify.Capstone.Application.Exceptions
+namespace Nailify.Capstone.Domain.Enums
 {
-    internal class Class1
+    public enum QuizQuestionType
     {
+        Single = 1,
+        Multiple = 2
     }
 }

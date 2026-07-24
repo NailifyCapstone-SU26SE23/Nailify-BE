@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Lấy thông tin mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, List<string>? imageUrls = null)
+        public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, string? imageUrl = null)
         {
             var invalidCategoryIds = await GetInvalidCategoryIdsAsync(request.CategoryIds);
             if (invalidCategoryIds.Any())
@@ -63,14 +63,10 @@ namespace Nailify.Capstone.Application.Services
 
             var design = _mapper.Map<NailDesign>(request);
             design.Status = "Active";
+            design.ImageUrl = imageUrl ?? string.Empty;
             design.NailCategories = request.CategoryIds
                 .Distinct()
                 .Select(categoryId => new NailCategory { CategoryId = categoryId })
-                .ToList();
-            design.NailDesignImages = (imageUrls ?? new List<string>())
-                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
-                .Distinct()
-                .Select(imageUrl => new NailDesignImage { ImageUrl = imageUrl })
                 .ToList();
 
             await _unitOfWork.NailDesignRepository.CreateAsync(design);
@@ -82,7 +78,7 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailDesignDto>(designDto, "Tạo mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, List<string>? newImageUrls = null)
+        public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, string? newImageUrl = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             if (existingDesign == null || existingDesign.Status == "InActive")
@@ -108,18 +104,9 @@ namespace Nailify.Capstone.Application.Services
                 });
             }
 
-            existingDesign.NailDesignImages.Clear();
-            foreach (var imageUrl in request.ExistingImageUrls
-                .Concat(newImageUrls ?? new List<string>())
-                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
-                .Distinct())
-            {
-                existingDesign.NailDesignImages.Add(new NailDesignImage
-                {
-                    NailDesignId = existingDesign.NailDesignId,
-                    ImageUrl = imageUrl
-                });
-            }
+            existingDesign.ImageUrl = !string.IsNullOrWhiteSpace(newImageUrl)
+                ? newImageUrl
+                : request.ExistingImageUrl ?? existingDesign.ImageUrl;
 
             _unitOfWork.NailDesignRepository.Update(existingDesign);
             await _unitOfWork.SaveChangesAsync();

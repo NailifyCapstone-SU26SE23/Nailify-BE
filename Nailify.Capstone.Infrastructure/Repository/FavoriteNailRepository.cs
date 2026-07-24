@@ -31,12 +31,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return new PagedList<FavoriteNail>(items, count, pageNumber, pageSize);
         }
+        public Task<List<FavoriteNail>> GetFavoritesWithDetailsAsync(Guid userId)
+            => BuildQuery().Where(f => f.UserId == userId).ToListAsync();
 
         private IQueryable<FavoriteNail> BuildQuery()
             => _dbSet
                 .AsNoTracking()
-                .Include(f => f.NailDesign)
-                    .ThenInclude(d => d!.NailDesignImages)
                 .Include(f => f.NailDesign)
                     .ThenInclude(d => d!.NailCategories)
                         .ThenInclude(nc => nc.Category)

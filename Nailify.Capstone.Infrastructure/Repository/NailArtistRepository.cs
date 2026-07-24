@@ -68,5 +68,34 @@ namespace Nailify.Capstone.Infrastructure.Repository
             }
             return suggestedArtists;
         }
+
+        public async Task<NailArtist?> GetArtistWithLockAsync(Guid artistId)
+        {
+            // Sử dụng Raw SQL SELECT FOR UPDATE của PostgreSQL để thực hiện khóa dòng
+            return await _context.NailArtists
+                .FromSqlRaw("SELECT * FROM \"NailArtists\" WHERE \"NailArtistId\" = {0} FOR UPDATE", artistId)
+                .Include(x => x.Account)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<NailArtist>> GetArtistsWithSkillsBySalonIdAsync(Guid salonId)
+        {
+            return await FindByCondition(x => x.Account.SalonId == salonId && x.Status == "Active", false)
+                .Include(x => x.Account)
+                .Include(x => x.NailArtistSkills)
+                .ToListAsync();
+        }
+        public async Task<List<NailArtist>> GetActiveArtistsWithSchedulesAndSkillsBySalonAsync(Guid salonId, Guid excludingArtistId)
+        {
+            return await FindByCondition(x => x.Account.SalonId == salonId
+                                           && x.Status == "Open"
+                                           && x.NailArtistId != excludingArtistId)
+                .Include(x => x.Account)
+                .Include(x => x.Schedules)
+                .Include(x => x.NailArtistSkills)
+                .Include(x => x.NailArtistBreaks)
+                .ToListAsync();
+        }
+
     }
 }

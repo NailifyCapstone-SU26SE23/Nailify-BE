@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
@@ -23,11 +24,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
+        private readonly IBookingRescheduleService _bookingRescheduleService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService, IBookingRescheduleService bookingRescheduleService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
             _slotHoldService = slotHoldService;
+            _bookingRescheduleService = bookingRescheduleService;
         }
 
         /// <summary>
@@ -99,7 +102,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var response = await _bookingService.CalculateBookingPriceAsync(
                 GetCurrentUserId(),
-                request.BookingItems);
+                request.BookingItems,
+                request.SelectedPromotionIds); 
+
             return response.IsSucceeded ? Ok(response) : BadRequest(response);
         }
 
@@ -312,6 +317,15 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Lấy thông tin chi tiết của một đơn đặt lịch hẹn cụ thể.
         /// </summary>
+        [HttpGet("by-order-code/{orderCode:long}/booking-id")]
+        [ProducesResponseType(typeof(ApiResult<BookingIdResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBookingIdByOrderCode(long orderCode)
+        {
+            var response = await _bookingService.GetBookingIdByOrderCodeAsync(orderCode);
+            return response.IsSucceeded ? Ok(response) : NotFound(response);
+        }
+
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
@@ -464,6 +478,123 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _bookingService.GetAvailableArtistsForBookingAsync(id);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
+        }
+
+        /// <summary>
+        /// Tiếp tân (hoặc Quản lý) chỉ định ghế cho đơn đặt lịch.
+        /// </summary>
+        [HttpPost("{id}/assign-chair/{chairId}")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> AssignChair(Guid id, Guid chairId)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var response = await _bookingService.AssignChairAsync(id, chairId, currentUserId);
+                if (!response.IsSucceeded) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return UnauthorizedResponse();
+            }
+        }
+        /// <summary>
+        /// Lấy đếm ngược ETA thời gian chờ 
+        /// </summary>
+        [HttpGet("{bookingId}/wait-eta")]
+        [ProducesResponseType(typeof(ApiResult<CustomerWaitEtaResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetWaitEtaAndCompensate(Guid bookingId)
+        {
+            var result = await _bookingService.GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        /// <summary>
+        /// Khách hàng chấp nhận khung giờ mới đề xuất từ Salon/Hệ thống.
+        /// </summary>
+        [HttpPost("{id}/accept-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AcceptSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerAcceptSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng từ chối khung giờ mới đề xuất từ Salon.
+        /// </summary>
+        [HttpPost("{id}/decline-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> DeclineSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerDeclineSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng yêu cầu dời lịch sang ngày/giờ khác.
+        /// </summary>
+        [HttpPost("{id}/request-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RequestReschedule(Guid id, [FromBody] CustomerRescheduleRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerRequestRescheduleAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager đề xuất khung giờ mới cho đơn hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-suggest-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerSuggestTime(Guid id, [FromBody] ManagerSuggestTimeRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerSuggestTimeAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager duyệt yêu cầu xin dời lịch của Khách hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-approve-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerApproveReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerApproveRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager từ chối yêu cầu xin dời lịch của Khách hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-reject-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerRejectReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerRejectRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
         }
     }
 

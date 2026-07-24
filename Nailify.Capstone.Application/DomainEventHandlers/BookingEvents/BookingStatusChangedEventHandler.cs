@@ -1,6 +1,7 @@
 using MediatR;
 using Nailify.Capstone.Application.Common.Models;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Common.Events.BookingEvents;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
@@ -15,7 +16,12 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
     public class BookingStatusChangedEventHandler : INotificationHandler<DomainEventNotification<BookingStatusChangedEvent>>
     {
         private readonly IUnitOfWork _unitOfWork;
-        public BookingStatusChangedEventHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+        private readonly IScheduledJobService _scheduledJobService;
+        public BookingStatusChangedEventHandler(IUnitOfWork unitOfWork, IScheduledJobService scheduledJobService)
+        {
+            _unitOfWork = unitOfWork;
+            _scheduledJobService = scheduledJobService;
+        }
         public async Task Handle(DomainEventNotification<BookingStatusChangedEvent> notification, CancellationToken cancellationToken)
         {
             var domainEvent = notification.DomainEvent;
@@ -24,7 +30,7 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                 BookingId = domainEvent.BookingId,
                 EventType = domainEvent.EventType,
                 Payload = domainEvent.Payload,
-                ActorId = domainEvent.ActorId,
+                ActorId = domainEvent.ActorId == Guid.Empty ? null : domainEvent.ActorId,
                 CreatedAt = DateTime.UtcNow
             };
             await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
@@ -70,6 +76,38 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                         LoyaltyTierIdAtTime = matchedTier?.LoyaltyTierId,
                         CreatedAt = DateTime.UtcNow
                     });
+                }
+            }
+            if (domainEvent.NewStatus == BookingStatus.Approved)
+            {
+                var booking = await _unitOfWork.BookingRepository.GetByIdAsync(domainEvent.BookingId);
+                if (booking != null)
+                {
+                    var localBookingDate = (booking.BookingDate.Kind == DateTimeKind.Utc 
+                        ? booking.BookingDate.AddHours(7) 
+                        : booking.BookingDate).Date;
+                    var appointmentTime = localBookingDate.Add(booking.StartTime);
+
+                    // Thời điểm gửi mail = Lịch hẹn - 15 phút
+                    var reminderTime = appointmentTime.AddMinutes(-15);
+
+                    var currentLocalTime = DateTime.UtcNow.AddHours(7);
+                    var delay = reminderTime - currentLocalTime;
+                    if (delay > TimeSpan.Zero)
+                    {
+                        // Trường hợp > 15 phút: Hẹn giờ đúng thời điểm (Schedule)
+                        _scheduledJobService.Schedule<IBookingJobExecutor>(
+                            x => x.SendBookingReminderEmailAsync(booking.BookingId),
+                            delay
+                        );
+                    }
+                    else
+                    {
+                        // Trường hợp <= 15 phút hoặc sát giờ: Gửi ngay lập tức (Enqueue)
+                        _scheduledJobService.Enqueue<IBookingJobExecutor>(
+                            x => x.SendBookingReminderEmailAsync(booking.BookingId)
+                        );
+                    }
                 }
             }
         }

@@ -20,5 +20,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.ProcedureResponseDTOs
         public string Status { get; set; } = string.Empty;
         public DateTime CreateAt { get; set; }
         public bool IsRequired { get; set; }
+        public bool IsMainStep { get; set; }
     }
 }

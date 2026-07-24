@@ -8,7 +8,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
 {
     public class ManagerApproveQuoteRequestDTO
     {
-        public decimal FinalPrice { get; set; }
-        public int FinalDuration { get; set; }
+        public decimal? FinalPrice { get; set; }
+        public int? FinalDuration { get; set; }
     }
 }

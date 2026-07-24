@@ -6,7 +6,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string Name { get; set; } = string.Empty;
         public int? NailShapeId { get; set; }
         public int? NailSurfaceId { get; set; }
-        public int NailDesignId { get; set; }
+        public int? NailDesignId { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
         public string ImageUrl { get; set; } = string.Empty;        
@@ -15,7 +15,7 @@ namespace Nailify.Capstone.Domain.Entities
 
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;
-        public virtual NailDesign NailDesign { get; set; } = null!;
+        public virtual NailDesign? NailDesign { get; set; }
         public virtual ICollection<NailComponent> NailComponents { get; set; } = new List<NailComponent>();
         public virtual ICollection<NailRequiredSkill> NailRequiredSkills { get; set; } = new List<NailRequiredSkill>();
         public virtual ICollection<NailProcedure> NailProcedures { get; set; } = new List<NailProcedure>();

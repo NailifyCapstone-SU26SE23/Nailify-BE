@@ -28,7 +28,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var query = _context.Salons
                 .Include(s => s.OperatingHours)
-                //.Where(s => s.Status == "Active")
+                .Where(s => s.Status == "Open")
                 .AsQueryable();
 
             // Lọc theo Tên

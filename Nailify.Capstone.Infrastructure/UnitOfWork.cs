@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
@@ -8,11 +9,13 @@ namespace Nailify.Capstone.Infrastructure
 {
     public class UnitOfWork : IUnitOfWork
     {
+        private IDbContextTransaction? _transaction;
         private readonly NailifyDbContext _context;
         private IUserRepository? _userRepository;
         private ICustomerRepository? _customerRepository;
         private ICategoryTypeRepository? _categoryTypeRepository;
         private ICategoryRepository? _categoryRepository;
+        private INailCategoryRepository? _nailCategoryRepository;
         private INailDesignRepository? _nailDesignRepository;
         private ISalonOperatingHourRepository? _salonOperatingHourRepository;
         private ISalonRepository? _salonRepository;
@@ -20,6 +23,7 @@ namespace Nailify.Capstone.Infrastructure
         private IScheduleRepository? _scheduleRepository;
         private IComponentRepository? _componentRepository;
         private INailShapeRepository? _nailShapeRepository;
+        private IShapeMethodConfigRepository? _shapeMethodConfigRepository;
         private INailSurfaceRepository? _nailSurfaceRepository;
         private INailVariantRepository? _nailVariantRepository;
         private INailComponentRepository? _nailComponentRepository;
@@ -40,6 +44,19 @@ namespace Nailify.Capstone.Infrastructure
         private ILoyaltyTierRepository? _loyaltyTierRepository;
         private ILoyaltyTransactionRepository? _loyaltyTransactionRepository;
         private ICustomerNailRequestRepository? _customerNailRequestRepository;
+        private IBookingRatingRepository? _bookingRatingRepository;
+        private IPromotionRepository? _promotionRepository;
+        private IBookingDiscountRepository? _bookingDiscountRepository;
+        private IUserPromotionUsageRepository? _userPromotionUsageRepository;
+        private IBookingWaitlistRepository? _bookingWaitlistRepository;
+        private IWalkInQueueRepository? _walkInQueueRepository;
+        private ITransactionRepository? _transactionRepository;
+        private IChairRepository? _chairRepository;
+        private INailArtistBreakRepository _nailArtistBreakRepository;
+        private IQuizQuestionRepository _quizQuestionRepository = null!;
+        private IQuizOptionRepository _quizOptionRepository = null!;
+        private ICustomerQuizAnswerRepository _customerQuizAnswerRepository = null!;
+        private ISalonOffDateRepository _salonOffDateRepository = null!;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -48,6 +65,7 @@ namespace Nailify.Capstone.Infrastructure
         public ICustomerRepository CustomerRepository => _customerRepository ??= new CustomerRepository(_context);
         public ICategoryTypeRepository CategoryTypeRepository => _categoryTypeRepository ??= new CategoryTypeRepository(_context);
         public ICategoryRepository CategoryRepository => _categoryRepository ??= new CategoryRepository(_context);
+        public INailCategoryRepository NailCategoryRepository => _nailCategoryRepository ??= new NailCategoryRepository(_context);
         public INailDesignRepository NailDesignRepository => _nailDesignRepository ??= new NailDesignRepository(_context);
 
         public ISalonOperatingHourRepository SalonOperatingHourRepository => _salonOperatingHourRepository ??= new SalonOperatingHourRepository(_context);
@@ -59,6 +77,7 @@ namespace Nailify.Capstone.Infrastructure
         public IScheduleRepository ScheduleRepository => _scheduleRepository ??= new ScheduleRepository(_context);
         public IComponentRepository ComponentRepository => _componentRepository ??= new ComponentRepository(_context);
         public INailShapeRepository NailShapeRepository => _nailShapeRepository ??= new NailShapeRepository(_context);
+        public IShapeMethodConfigRepository ShapeMethodConfigRepository => _shapeMethodConfigRepository ??= new ShapeMethodConfigRepository(_context);
         public INailSurfaceRepository NailSurfaceRepository => _nailSurfaceRepository ??= new NailSurfaceRepository(_context);
         public INailVariantRepository NailVariantRepository => _nailVariantRepository ??= new NailVariantRepository(_context);
         public INailComponentRepository NailComponentRepository => _nailComponentRepository ??= new NailComponentRepository(_context);
@@ -87,15 +106,71 @@ namespace Nailify.Capstone.Infrastructure
         public ILoyaltyTransactionRepository LoyaltyTransactionRepository => _loyaltyTransactionRepository ??= new LoyaltyTransactionRepository(_context);
 
         public ICustomerNailRequestRepository CustomerNailRequestRepository => _customerNailRequestRepository ??= new CustomerNailRequestRepository(_context);
+        public IBookingRatingRepository BookingRatingRepository => _bookingRatingRepository ??= new BookingRatingRepository(_context);
+        public IPromotionRepository PromotionRepository => _promotionRepository ??= new PromotionRepository(_context);
+        public IBookingDiscountRepository BookingDiscountRepository => _bookingDiscountRepository ??= new BookingDiscountRepository(_context);
+        public IUserPromotionUsageRepository UserPromotionUsageRepository => _userPromotionUsageRepository ??= new UserPromotionUsageRepository(_context);
+
+        public IBookingWaitlistRepository BookingWaitlistRepository => _bookingWaitlistRepository ??= new BookingWaitlistRepository(_context);
+
+        public IWalkInQueueRepository WalkInQueueRepository => _walkInQueueRepository ??= new WalkInQueueRepository(_context);
+        public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
+        public IChairRepository ChairRepository => _chairRepository ??= new ChairRepository(_context);
+
+        public INailArtistBreakRepository NailArtistBreakRepository =>
+         _nailArtistBreakRepository ??= new NailArtistBreakRepository(_context);
+
+        public IQuizQuestionRepository QuizQuestionRepository => _quizQuestionRepository ??= new QuizQuestionRepository(_context);
+
+        public IQuizOptionRepository QuizOptionRepository => _quizOptionRepository ??= new QuizOptionRepository(_context);
+
+        public ICustomerQuizAnswerRepository CustomerQuizAnswerRepository => _customerQuizAnswerRepository ??= new CustomerQuizAnswerRepository(_context);
+
+        public ISalonOffDateRepository SalonOffDateRepository => _salonOffDateRepository ??= new SalonOffDateRepository(_context);
+
         public async Task<int> SaveChangesAsync()
         {
-            return await _context.SaveChangesAsync();
+            try
+            {
+                return await _context.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+            {
+                throw new Nailify.Capstone.Application.Exceptions.ConcurrencyException("Dữ liệu đã bị thay đổi bởi một tác vụ khác. Vui lòng tải lại trang.", ex);
+            }
         }
 
         public void Dispose()
         {
             _context.Dispose();
             GC.SuppressFinalize(this);
+        }
+
+        public async Task BeginTransactionAsync()
+        {
+            if (_context.Database.CurrentTransaction != null)
+            {
+                return;
+            }
+            _transaction = await _context.Database.BeginTransactionAsync();
+        }
+        public async Task CommitTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.CommitAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
+        }
+        public async Task RollbackTransactionAsync()
+        {
+            if (_transaction != null)
+            {
+                await _transaction.RollbackAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
         }
     }
 }

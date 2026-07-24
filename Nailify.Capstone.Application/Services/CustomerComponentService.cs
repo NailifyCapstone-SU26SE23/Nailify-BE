@@ -45,7 +45,7 @@ namespace Nailify.Capstone.Application.Services
         {
             if (!userId.HasValue || userId.Value == Guid.Empty || await _unitOfWork.UserRepository.GetByIdAsync(userId.Value) == null)
             {
-                return new ApiErrorResult<CustomerComponentDto>("Khong tim thay nguoi dung.");
+                return new ApiErrorResult<CustomerComponentDto>("Không tìm thấy người dùng.");
             }
 
             var customerComponent = _mapper.Map<CustomerComponent>(request);

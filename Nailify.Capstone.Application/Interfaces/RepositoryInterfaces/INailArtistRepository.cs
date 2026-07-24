@@ -1,4 +1,4 @@
-using Nailify.Capstone.Domain.Entities;
+﻿using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,5 +13,14 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<NailArtist?> GetNailArtistWithProfileAsync(Guid artistId);
         Task<List<NailArtist>> GetSuggestedArtistsAsync(Guid salonId, List<int> nailVariantIds);
         Task<NailArtist?> GetNailArtistByAccountIdAsync(Guid accountId);
+        Task<NailArtist?> GetArtistWithLockAsync(Guid artistId);
+        Task<List<NailArtist>> GetArtistsWithSkillsBySalonIdAsync(Guid salonId);
+        /// <summary>
+        /// Lấy danh sách tất cả các Thợ ứng viên tiềm năng tại cùng Salon có thể thay thế cho thợ bị nghỉ đột xuất
+        /// </summary>
+        /// <param name="salonId"></param>
+        /// <param name="excludingArtistId"></param>
+        /// <returns></returns>
+        Task<List<NailArtist>> GetActiveArtistsWithSchedulesAndSkillsBySalonAsync(Guid salonId, Guid excludingArtistId);
     }
 }

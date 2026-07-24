@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
@@ -16,6 +16,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ProcedureRequestDTOs
         public string? Description { get; set; }
         public int? Duration { get; set; }
         public bool IsRequired { get; set; } = true;
+        public bool IsMainStep { get; set; } = true;
 
         public void Mapping(Profile profile)
         {
