@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
@@ -165,7 +165,7 @@ namespace Nailify.Capstone.Application.Services
                     Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
                     DiscountAmount = loyaltyDiscountAmount,
                     IsAutoApplied = true,
-                    AppliedDate = DateTime.UtcNow,
+                    AppliedDate = DateTime.UtcNow.AddHours(7),
                     LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
                 });
             }
@@ -193,7 +193,7 @@ namespace Nailify.Capstone.Application.Services
                     return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc chưa hoàn thành để bảo hành.");
                 }
                 var completedDate = oldBooking.UpdatedAt; // Ngày hoàn thành
-                if (completedDate.HasValue && DateTime.UtcNow.Date > completedDate.Value.Date.AddDays(7))
+                if (completedDate.HasValue && DateTime.UtcNow.AddHours(7).Date > completedDate.Value.Date.AddDays(7))
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Đơn hàng gốc đã quá hạn bảo hành (Hạn bảo hành là 7 ngày).");
                 }
@@ -412,7 +412,7 @@ namespace Nailify.Capstone.Application.Services
                         ApprovedArtistId = staffId,
                         Price = null,
                         Duration = null,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow.AddHours(7)
                     };
 
                     await _unitOfWork.CustomerNailRequestRepository.CreateAsync(customerNailRequest);

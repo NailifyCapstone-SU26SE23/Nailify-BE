@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.SalonRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
@@ -31,8 +31,8 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<SalonOffDateResponseDTO>("Không tìm thấy chi nhánh.");
             }
-            var startDate = request.StartDate.Date;
-            var endDate = request.EndDate?.Date ?? startDate;
+            var startDate = (request.StartDate.Kind == DateTimeKind.Utc ? request.StartDate.AddHours(7) : request.StartDate).Date;
+            var endDate = request.EndDate.HasValue ? (request.EndDate.Value.Kind == DateTimeKind.Utc ? request.EndDate.Value.AddHours(7) : request.EndDate.Value).Date : startDate;
             if (endDate < startDate)
             {
                 return new ApiErrorResult<SalonOffDateResponseDTO>("Ngày kết thúc không thể nhỏ hơn ngày bắt đầu.");

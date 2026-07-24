@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
@@ -435,7 +435,7 @@ namespace Nailify.Capstone.Application.Services
                         Status = CustomerNailStatus.Quoted,
                         Price = null,
                         Duration = null,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow.AddHours(7)
                     };
 
                     await _unitOfWork.CustomerNailRequestRepository.CreateAsync(createdCustomNailRequest);

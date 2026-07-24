@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using MediatR;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
@@ -21,15 +21,22 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IBookingSchedulingService _bookingSchedulingService;
-        public BookingRescheduleService(IUnitOfWork unitOfWork, IMapper mapper, IBookingSchedulingService bookingSchedulingService)
+        private readonly INotificationService _notificationService;
+
+        public BookingRescheduleService(
+            IUnitOfWork unitOfWork,
+            IMapper mapper,
+            IBookingSchedulingService bookingSchedulingService,
+            INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _bookingSchedulingService = bookingSchedulingService;
+            _notificationService = notificationService;
         }
+
         private async Task<ApiResult<bool>> ValidateRescheduleSlotAsync(Booking booking, DateTime newDate, TimeSpan newTime)
         {
-
             var localDate = (newDate.Kind == DateTimeKind.Utc ? newDate.AddHours(7) : newDate).Date;
             var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
                 x.SalonId == booking.SalonId
@@ -81,6 +88,7 @@ namespace Nailify.Capstone.Application.Services
             }
             return new ApiSuccessResult<bool>(true);
         }
+
         public async Task<ApiResult<BookingResponseDTO>> CustomerAcceptSuggestedTimeAsync(Guid bookingId, Guid customerId)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
@@ -121,6 +129,25 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Salon Manager / Staff
+            try
+            {
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                    booking.SalonId.ToString(),
+                    "BookingRescheduleAccepted",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        Message = $"Khách hàng đã đồng ý với giờ hẹn mới được đề xuất cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()}."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule accept notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Chấp nhận đề xuất giờ hẹn mới thành công.");
         }
@@ -143,6 +170,25 @@ namespace Nailify.Capstone.Application.Services
             booking.DeclineReschedule(customerId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Salon Manager / Staff
+            try
+            {
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                    booking.SalonId.ToString(),
+                    "BookingRescheduleDeclined",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        Message = $"Khách hàng đã từ chối giờ hẹn mới được đề xuất cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()}."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule decline notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối đề xuất giờ hẹn mới thành công.");
         }
@@ -170,6 +216,29 @@ namespace Nailify.Capstone.Application.Services
             booking.RequestReschedule(request.NewDate, request.NewTime, request.Reason, customerId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Salon Manager / Staff
+            try
+            {
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                    booking.SalonId.ToString(),
+                    "BookingRescheduleRequested",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        CustomerId = booking.CustomerId,
+                        NewDate = request.NewDate.ToString("yyyy-MM-dd"),
+                        NewTime = request.NewTime.ToString(@"hh\:mm"),
+                        Reason = request.Reason,
+                        Message = $"Khách hàng vừa gửi yêu cầu đổi lịch hẹn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} sang ngày {request.NewDate:dd/MM/yyyy} lúc {request.NewTime:hh\\:mm}."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule request notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Gửi yêu cầu đổi lịch hẹn thành công.");
         }
@@ -210,6 +279,25 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Khách hàng
+            try
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRescheduleApproved",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        Message = $"Yêu cầu đổi lịch cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} của bạn đã được Salon chấp nhận."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule approval notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Duyệt yêu cầu đổi lịch thành công.");
         }
@@ -228,6 +316,25 @@ namespace Nailify.Capstone.Application.Services
             booking.DeclineReschedule(managerId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Khách hàng
+            try
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRescheduleRejected",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        Message = $"Yêu cầu đổi lịch cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} không được Salon chấp nhận."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule rejection notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối yêu cầu đổi lịch thành công.");
         }
@@ -239,9 +346,14 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin lịch hẹn.");
             }
-            if (booking.Status != BookingStatus.ReschedulePending)
+            if (booking.Status == BookingStatus.Cancelled ||
+                booking.Status == BookingStatus.Rejected ||
+                booking.Status == BookingStatus.Completed ||
+                booking.Status == BookingStatus.ServiceCompleted ||
+                booking.Status == BookingStatus.CheckedIn ||
+                booking.Status == BookingStatus.InProgress)
             {
-                return new ApiErrorResult<BookingResponseDTO>("Đơn hàng không nằm trong trạng thái chờ đổi lịch.");
+                return new ApiErrorResult<BookingResponseDTO>("Không thể đề xuất giờ mới cho đơn hàng đã hoàn tất, đã check-in hoặc đã bị hủy.");
             }
             var validation = await ValidateRescheduleSlotAsync(booking, request.SuggestedDate, request.SuggestedTime);
             if (!validation.IsSucceeded)
@@ -251,6 +363,28 @@ namespace Nailify.Capstone.Application.Services
             booking.SuggestAlternativeTime(request.SuggestedDate, request.SuggestedTime, request.Reason, managerId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi thông báo SignalR cho Khách hàng
+            try
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRescheduleSuggested",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        SuggestedDate = request.SuggestedDate.ToString("yyyy-MM-dd"),
+                        SuggestedTime = request.SuggestedTime.ToString(@"hh\:mm"),
+                        Reason = request.Reason,
+                        Message = $"Salon vừa đề xuất đổi lịch hẹn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} sang ngày {request.SuggestedDate:dd/MM/yyyy} lúc {request.SuggestedTime:hh\\:mm}. Vui lòng kiểm tra và phản hồi."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send reschedule suggestion notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Đề xuất giờ hẹn thay thế thành công.");
         }
