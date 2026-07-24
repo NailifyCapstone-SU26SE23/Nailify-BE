@@ -112,7 +112,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date)
         {
-            var dateOnly = date.Date;
+            var dateOnly = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             return await FindByCondition(x => x.PreferredNailArtistId == artistId
                                          && x.RequestedDate.Date == dateOnly
                                          && x.Status == WaitlistStatus.Notified

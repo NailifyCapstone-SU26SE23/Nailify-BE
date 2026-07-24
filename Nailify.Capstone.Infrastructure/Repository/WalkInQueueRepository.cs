@@ -19,7 +19,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<int> GetNextPositionAsync(Guid salonId, Guid? assignedNailArtistId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var maxPos = await FindByCondition(x => x.SalonId == salonId 
                                                && x.ArrivalTime.Date == today
                                                && x.AssignedNailArtistId == assignedNailArtistId)
@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<int> GetNextPositionAsync(Guid salonId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var maxPos = await FindByCondition(x => x.SalonId == salonId 
                                                && x.ArrivalTime.Date == today)
                             .MaxAsync(x => (int?)x.QueuePosition) ?? 0;
@@ -38,7 +38,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<WalkInQueue>> GetTodayQueueAsync(Guid salonId, bool trackChanges = false)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             return await FindByCondition(x => x.SalonId == salonId 
                                          && x.ArrivalTime.Date == today,
                                          trackChanges)
@@ -48,7 +48,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         }
         public async Task<IEnumerable<WalkInQueue>> GetActiveWaitingEntriesAsync(Guid salonId, Guid? assignedNailArtistId,bool trackChanges = false)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             return await FindByCondition(x => x.SalonId == salonId
                                          && x.Status == QueueStatus.Waiting
                                          && x.ArrivalTime.Date == today
@@ -59,7 +59,7 @@ trackChanges)
 
         public async Task<int> CountServingWalkInsAsync(Guid artistId, DateTime date)
         {
-            var today = date.Date;
+            var today = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             return await FindByCondition(x => x.AssignedNailArtistId == artistId
                                            && x.ArrivalTime.Date == today
                                            && x.Status == QueueStatus.InService)

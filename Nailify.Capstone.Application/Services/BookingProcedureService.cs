@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
             var customerIsBusy = otherProcedures.Any(x =>
                 x.Status == BookingProcedureStatus.InProgress
                 && x.BookingProcedureId != bookingProcedureId
-                && (!x.ActualStartTime.HasValue || (DateTime.UtcNow - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
+                && (!x.ActualStartTime.HasValue || (DateTime.UtcNow.AddHours(7) - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
             );
             if (customerIsBusy)
             {
@@ -89,7 +89,7 @@ namespace Nailify.Capstone.Application.Services
                     {
                         if (x.Status == BookingProcedureStatus.InProgress && x.ActualStartTime.HasValue)
                         {
-                            var activeTime = DateTime.UtcNow - x.ActualStartTime.Value;
+                            var activeTime = DateTime.UtcNow.AddHours(7) - x.ActualStartTime.Value;
                             if (activeTime.TotalMinutes >= x.ActiveDuration)
                             {
                                 // Đã làm xong phần active, khách đang ngồi ngâm/chờ gel khô -> không block bước tiếp theo
@@ -105,7 +105,7 @@ namespace Nailify.Capstone.Application.Services
             procedure.Status = BookingProcedureStatus.InProgress;
             procedure.CompletedById = null;
             procedure.AssignedArtistId = artistId;
-            procedure.ActualStartTime = DateTime.UtcNow;
+            procedure.ActualStartTime = DateTime.UtcNow.AddHours(7);
             procedure.CompletedAt = null;
 
             try
@@ -258,7 +258,7 @@ namespace Nailify.Capstone.Application.Services
                 var customerIsBusy = otherProcedures.Any(x =>
                     x.Status == BookingProcedureStatus.InProgress
                     && x.BookingProcedureId != bookingProcedureId
-                    && (!x.ActualStartTime.HasValue || (DateTime.UtcNow - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
+                    && (!x.ActualStartTime.HasValue || (DateTime.UtcNow.AddHours(7) - x.ActualStartTime.Value).TotalMinutes < x.ActiveDuration)
                 );
                 if (customerIsBusy)
                 {
@@ -277,7 +277,7 @@ namespace Nailify.Capstone.Application.Services
                         {
                             if (x.Status == BookingProcedureStatus.InProgress && x.ActualStartTime.HasValue)
                             {
-                                var activeTime = DateTime.UtcNow - x.ActualStartTime.Value;
+                                var activeTime = DateTime.UtcNow.AddHours(7) - x.ActualStartTime.Value;
                                 if (activeTime.TotalMinutes >= x.ActiveDuration)
                                 {
                                     // Đã làm xong phần active, khách đang ngồi ngâm/chờ gel khô -> không block bước tiếp theo
@@ -294,11 +294,11 @@ namespace Nailify.Capstone.Application.Services
             existbooking.Status = status;
             if (status == BookingProcedureStatus.Completed)
             {
-                existbooking.CompletedAt = DateTime.UtcNow;
-                existbooking.ActualEndTime = DateTime.UtcNow;
+                existbooking.CompletedAt = DateTime.UtcNow.AddHours(7);
+                existbooking.ActualEndTime = DateTime.UtcNow.AddHours(7);
                 if (!existbooking.ActualStartTime.HasValue)
                 {
-                    existbooking.ActualStartTime = DateTime.UtcNow;
+                    existbooking.ActualStartTime = DateTime.UtcNow.AddHours(7);
                 }
                 existbooking.CompletedById = artistId;
                 try
@@ -345,7 +345,7 @@ namespace Nailify.Capstone.Application.Services
                 existbooking.CompletedAt = null;
                 if (!existbooking.ActualStartTime.HasValue)
                 {
-                    existbooking.ActualStartTime = DateTime.UtcNow;
+                    existbooking.ActualStartTime = DateTime.UtcNow.AddHours(7);
                 }
                 existbooking.ActualEndTime = null;
                 existbooking.AssignedArtistId = artistId;

@@ -83,8 +83,8 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
-            ActualCheckInTime = DateTime.UtcNow;
-            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
+            ActualCheckInTime = DateTime.UtcNow.AddHours(7);
+            IsLateArrival = DateTime.UtcNow.AddHours(7) > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -100,8 +100,8 @@ namespace Nailify.Capstone.Domain.Entities
             Status = BookingStatus.CheckedIn;
             CheckInImageUrl = imageUrl;
             UpdatedAt = DateTime.UtcNow;
-            ActualCheckInTime = DateTime.UtcNow;
-            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
+            ActualCheckInTime = DateTime.UtcNow.AddHours(7);
+            IsLateArrival = DateTime.UtcNow.AddHours(7) > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -116,8 +116,8 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.CheckedIn;
             UpdatedAt = DateTime.UtcNow;
-            ActualCheckInTime = DateTime.UtcNow;
-            IsLateArrival = DateTime.UtcNow > BookingDate.Date.Add(StartTime).AddMinutes(15);
+            ActualCheckInTime = DateTime.UtcNow.AddHours(7);
+            IsLateArrival = DateTime.UtcNow.AddHours(7) > BookingDate.Date.Add(StartTime).AddMinutes(15);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -217,7 +217,7 @@ namespace Nailify.Capstone.Domain.Entities
             var oldStatus = Status;
             Status = BookingStatus.InProgress;
             UpdatedAt = DateTime.UtcNow;
-            ActualStartTime = DateTime.UtcNow;
+            ActualStartTime = DateTime.UtcNow.AddHours(7);
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
