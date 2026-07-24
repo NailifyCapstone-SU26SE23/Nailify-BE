@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -18,7 +18,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<List<NailArtistBreak>> GetApprovedBreaksByArtistAndDateAsync(Guid artistId, DateTime date)
         {
-            var targetDate = date.Date;
+            var targetDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             return await FindByCondition(x => x.NailArtistId == artistId
                                          && x.BreakDate.Date == targetDate
                                          && x.Status == ArtistBreakStatus.Approved)

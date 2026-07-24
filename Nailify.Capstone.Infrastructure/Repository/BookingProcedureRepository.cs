@@ -23,7 +23,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                            DateTime bookingDate,
                                            Guid? excludingBookingId = null)
         {
-            var date = bookingDate.Date;
+            var date = (bookingDate.Kind == DateTimeKind.Utc ? bookingDate.AddHours(7) : bookingDate).Date;
 
             var procedures = await _context.BookingProcedures
                 .AsNoTracking()

@@ -187,7 +187,7 @@ namespace Nailify.Capstone.Application.Services
             var localNow = DateTime.UtcNow.AddHours(7).TimeOfDay;
             var minWaitTime = int.MaxValue;
 
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var queueList = await _unitOfWork.WalkInQueueRepository.GetTodayQueueAsync(salonId);
             var waitingQueue = queueList
                                        .Where(q => q.Status == QueueStatus.Waiting || q.Status == QueueStatus.Called)
@@ -195,7 +195,7 @@ namespace Nailify.Capstone.Application.Services
                                        .ToList();
             foreach (var artist in workingArtists)
             {
-                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, DateTime.Today);
+                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, today);
                 if (schedule == null)
                 {
                     continue;
@@ -322,14 +322,14 @@ namespace Nailify.Capstone.Application.Services
         }
         private (DateTime start, DateTime end) GetDateRangeUtc(DateTime date)
         {
-            var localDate = date.Date;
+            var localDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             var start = DateTime.SpecifyKind(localDate.AddHours(-7), DateTimeKind.Utc);
             var end = start.AddDays(1).AddTicks(-1);
             return (start, end);
         }
         public async Task RecalculateQueueWaitTimesAsync(Guid salonId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var queueList = await _unitOfWork.WalkInQueueRepository.GetTodayQueueAsync(salonId, trackChanges: true);
             var waitingQueue = queueList
                 .Where(q => q.Status == QueueStatus.Waiting || q.Status == QueueStatus.Called)
@@ -540,7 +540,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             // Lấy danh sách những người đang chờ khác cùng salon trong ngày hôm nay
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var waitingList = await _unitOfWork.WalkInQueueRepository.GetActiveWaitingEntriesAsync(walkIn.SalonId, walkIn.AssignedNailArtistId,trackChanges: true);
 
             // Đẩy lùi vị trí các khách hàng đang đứng trước khách hàng được ưu tiên

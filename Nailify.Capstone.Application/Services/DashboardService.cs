@@ -22,9 +22,9 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<AdminDashboardDto> GetAdminDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null)
         {
-            // Default to today if not provided
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+            // Default to today if not provided (GMT+7 Vietnam Time)
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
 
             string cacheKey = $"AdminDashboard_{start:yyyyMMdd}_{end:yyyyMMdd}";
 
@@ -194,9 +194,9 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<NailArtistDashboardDto> GetNailArtistDashboardDataAsync(Guid artistId, DateTime? startDate = null, DateTime? endDate = null)
         {
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
-            var now = DateTime.UtcNow;
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
+            var now = DateTime.UtcNow.AddHours(7);
 
             string cacheKey = $"NailArtistDashboard_{artistId}_{start:yyyyMMdd}_{end:yyyyMMdd}";
 
@@ -340,10 +340,10 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ReceptionistDashboardDto> GetReceptionistDashboardDataAsync(Guid salonId, DateTime? date = null)
         {
-            var targetDate = date ?? DateTime.UtcNow.Date;
+            var targetDate = date.HasValue ? (date.Value.Kind == DateTimeKind.Utc ? date.Value.AddHours(7) : date.Value).Date : DateTime.UtcNow.AddHours(7).Date;
             var startOfDay = targetDate;
             var endOfDay = targetDate.AddDays(1).AddTicks(-1);
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
 
             string cacheKey = $"ReceptionistDashboard_{salonId}_{targetDate:yyyyMMdd}";
 
@@ -528,8 +528,8 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<SalonManagerDashboardDto> GetSalonDashboardDataAsync(Guid salonId, DateTime? startDate = null, DateTime? endDate = null)
         {
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
 
             string cacheKey = $"SalonDashboard_{salonId}_{start:yyyyMMdd}_{end:yyyyMMdd}";
 

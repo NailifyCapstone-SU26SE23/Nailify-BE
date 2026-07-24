@@ -313,7 +313,7 @@ namespace Nailify.Capstone.Application.Services
             wailist.CustomerId = customerId;
             wailist.Position = position;
             wailist.Status = WaitlistStatus.Waiting;
-            wailist.CreatedAt = DateTime.UtcNow;
+            wailist.CreatedAt = DateTime.UtcNow.AddHours(7);
 
             // Calculate EstimatedDuration based on WaitlistItems
             int totalDuration = 0;

@@ -52,6 +52,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy toàn bộ lịch trình của các thợ làm móng thuộc một salon trong một khoảng thời gian.
+        /// </summary>
+        [HttpGet("salon/{salonId}")]
+        [ProducesResponseType(typeof(ApiResult<IEnumerable<ScheduleResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetSchedulesBySalonId(
+            Guid salonId, 
+            [FromQuery] DateTime? startDate = null, 
+            [FromQuery] DateTime? endDate = null)
+        {
+            var result = await _scheduleService.GetSchedulesBySalonIdAsync(salonId, startDate, endDate);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Tạo mới một ca làm việc (Schedule) cho thợ làm móng.
         /// </summary>
         [HttpPost]

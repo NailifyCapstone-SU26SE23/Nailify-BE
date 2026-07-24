@@ -32,7 +32,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<bool> ValidateHoldTokenAsync(string holdToken, Guid customerId, Guid artistId, DateTime date, TimeSpan startTime);
         // <summary>
         /// Xóa hold sau khi booking tạo thành công. Slot đã có booking rồi → không cần hold nữa.
-        /// </summary>
+        ///</summary>
         Task ConsumeHoldAsync(string holdToken);
           /// <summary>
          /// Giải phóng hold hết hạn (chạy từ Hangfire Job) và gửi thông báo SignalR cho các khách hàng đang chờ.
