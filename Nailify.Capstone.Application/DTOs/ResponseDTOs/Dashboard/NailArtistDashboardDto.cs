@@ -30,6 +30,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard
 
     public class ArtistScheduleItemDto
     {
+        public DateTime Date { get; set; }
         public TimeSpan StartTime { get; set; }
         public int DurationMinutes { get; set; }
         public string CustomerName { get; set; } = string.Empty;
