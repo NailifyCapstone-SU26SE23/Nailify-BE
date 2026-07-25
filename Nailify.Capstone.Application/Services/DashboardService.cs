@@ -275,6 +275,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 scheduleItems.Add(new ArtistScheduleItemDto
                 {
+                    Date = b.BookingDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = b.TotalDuration,
                     CustomerName = b.Customer?.User?.FirstName + " " + b.Customer?.User?.LastName,
@@ -286,6 +287,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 scheduleItems.Add(new ArtistScheduleItemDto
                 {
+                    Date = brk.BreakDate.Date,
                     StartTime = brk.StartTime,
                     DurationMinutes = (int)(brk.EndTime - brk.StartTime).TotalMinutes,
                     CustomerName = brk.Reason ?? "Break",
@@ -293,7 +295,7 @@ namespace Nailify.Capstone.Application.Services
                 });
             }
 
-            dto.MySchedule = scheduleItems.OrderBy(s => s.StartTime).ToList();
+            dto.MySchedule = scheduleItems.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ToList();
 
             // Next Customer Profile
             var nextBooking = periodBookings.FirstOrDefault(b => (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Approved) && b.BookingDate.Add(b.StartTime) >= now);
@@ -485,6 +487,7 @@ namespace Nailify.Capstone.Application.Services
                     CustomerName = b.Customer?.User != null
                         ? $"{b.Customer.User.FirstName} {b.Customer.User.LastName}"
                         : "Unknown Customer",
+                    Date = b.BookingDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = b.TotalDuration,
                     Type = "Booking",
@@ -497,12 +500,14 @@ namespace Nailify.Capstone.Application.Services
                         ? $"{b.NailArtist.Account.FirstName} {b.NailArtist.Account.LastName}"
                         : "Unknown Artist",
                     CustomerName = b.Reason ?? "Break",
+                    Date = b.BreakDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = (int)(b.EndTime - b.StartTime).TotalMinutes,
                     Type = "Break",
                     Status = b.Status.ToString()
                 }))
-                .OrderBy(s => s.StartTime)
+                .OrderBy(s => s.Date)
+                .ThenBy(s => s.StartTime)
                 .ToList();
 
             dto.MasterSalonSchedule = scheduleItems;
