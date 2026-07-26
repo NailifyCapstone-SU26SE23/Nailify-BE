@@ -22,9 +22,9 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<AdminDashboardDto> GetAdminDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null)
         {
-            // Default to today if not provided
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+            // Default to today if not provided (GMT+7 Vietnam Time)
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
 
             string cacheKey = $"AdminDashboard_{start:yyyyMMdd}_{end:yyyyMMdd}";
 
@@ -38,7 +38,7 @@ namespace Nailify.Capstone.Application.Services
             var dto = new AdminDashboardDto();
 
             dto.TotalActiveSalons = await _unitOfWork.SalonRepository
-                .FindByCondition(s => s.Status == "Active")
+                .FindByCondition(s => s.Status == "Open")
                 .CountAsync();
 
             dto.TotalPlatformRevenue = await _unitOfWork.TransactionRepository
@@ -194,9 +194,9 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<NailArtistDashboardDto> GetNailArtistDashboardDataAsync(Guid artistId, DateTime? startDate = null, DateTime? endDate = null)
         {
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
-            var now = DateTime.UtcNow;
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
+            var now = DateTime.UtcNow.AddHours(7);
 
             string cacheKey = $"NailArtistDashboard_{artistId}_{start:yyyyMMdd}_{end:yyyyMMdd}";
 
@@ -275,6 +275,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 scheduleItems.Add(new ArtistScheduleItemDto
                 {
+                    Date = b.BookingDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = b.TotalDuration,
                     CustomerName = b.Customer?.User?.FirstName + " " + b.Customer?.User?.LastName,
@@ -286,6 +287,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 scheduleItems.Add(new ArtistScheduleItemDto
                 {
+                    Date = brk.BreakDate.Date,
                     StartTime = brk.StartTime,
                     DurationMinutes = (int)(brk.EndTime - brk.StartTime).TotalMinutes,
                     CustomerName = brk.Reason ?? "Break",
@@ -293,7 +295,7 @@ namespace Nailify.Capstone.Application.Services
                 });
             }
 
-            dto.MySchedule = scheduleItems.OrderBy(s => s.StartTime).ToList();
+            dto.MySchedule = scheduleItems.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ToList();
 
             // Next Customer Profile
             var nextBooking = periodBookings.FirstOrDefault(b => (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Approved) && b.BookingDate.Add(b.StartTime) >= now);
@@ -340,10 +342,10 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ReceptionistDashboardDto> GetReceptionistDashboardDataAsync(Guid salonId, DateTime? date = null)
         {
-            var targetDate = date ?? DateTime.UtcNow.Date;
+            var targetDate = date.HasValue ? (date.Value.Kind == DateTimeKind.Utc ? date.Value.AddHours(7) : date.Value).Date : DateTime.UtcNow.AddHours(7).Date;
             var startOfDay = targetDate;
             var endOfDay = targetDate.AddDays(1).AddTicks(-1);
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
 
             string cacheKey = $"ReceptionistDashboard_{salonId}_{targetDate:yyyyMMdd}";
 
@@ -485,6 +487,7 @@ namespace Nailify.Capstone.Application.Services
                     CustomerName = b.Customer?.User != null
                         ? $"{b.Customer.User.FirstName} {b.Customer.User.LastName}"
                         : "Unknown Customer",
+                    Date = b.BookingDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = b.TotalDuration,
                     Type = "Booking",
@@ -497,12 +500,14 @@ namespace Nailify.Capstone.Application.Services
                         ? $"{b.NailArtist.Account.FirstName} {b.NailArtist.Account.LastName}"
                         : "Unknown Artist",
                     CustomerName = b.Reason ?? "Break",
+                    Date = b.BreakDate.Date,
                     StartTime = b.StartTime,
                     DurationMinutes = (int)(b.EndTime - b.StartTime).TotalMinutes,
                     Type = "Break",
                     Status = b.Status.ToString()
                 }))
-                .OrderBy(s => s.StartTime)
+                .OrderBy(s => s.Date)
+                .ThenBy(s => s.StartTime)
                 .ToList();
 
             dto.MasterSalonSchedule = scheduleItems;
@@ -528,8 +533,8 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<SalonManagerDashboardDto> GetSalonDashboardDataAsync(Guid salonId, DateTime? startDate = null, DateTime? endDate = null)
         {
-            var start = startDate ?? DateTime.UtcNow.Date;
-            var end = endDate ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+            var start = startDate.HasValue ? (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date : DateTime.UtcNow.AddHours(7).Date;
+            var end = endDate.HasValue ? (endDate.Value.Kind == DateTimeKind.Utc ? endDate.Value.AddHours(7) : endDate.Value).Date.AddDays(1).AddTicks(-1) : DateTime.UtcNow.AddHours(7).Date.AddDays(1).AddTicks(-1);
 
             string cacheKey = $"SalonDashboard_{salonId}_{start:yyyyMMdd}_{end:yyyyMMdd}";
 

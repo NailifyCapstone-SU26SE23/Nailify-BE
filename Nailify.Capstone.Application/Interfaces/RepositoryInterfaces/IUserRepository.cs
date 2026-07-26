@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         // Có thể bổ sung thêm các phương thức truy vấn tùy chỉnh dành riêng cho User tại đây
         Task<User?> GetUserByEmailAsync(string email);
+        Task<User?> GetUserByPhoneAsync(string phone);
     }
 }

@@ -502,19 +502,23 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
         /// <summary>
-        /// BR-01.4: Lấy đếm ngược ETA thời gian chờ & Tự động cộng đền bù nếu chờ quá 10 phút
+        /// Lấy đếm ngược ETA thời gian chờ 
         /// </summary>
         [HttpGet("{bookingId}/wait-eta")]
+        [ProducesResponseType(typeof(ApiResult<CustomerWaitEtaResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetWaitEtaAndCompensate(Guid bookingId)
         {
             var result = await _bookingService.GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(bookingId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
-        // <summary>
-        /// Khách hàng chấp nhận khung giờ mới đề xuất từ Salon/Hệ thống
+
+        /// <summary>
+        /// Khách hàng chấp nhận khung giờ mới đề xuất từ Salon/Hệ thống.
         /// </summary>
         [HttpPost("{id}/accept-suggested-time")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AcceptSuggestedTime(Guid id)
         {
             var currentUserId = GetCurrentUserId();
@@ -522,11 +526,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+
         /// <summary>
-        /// Khách hàng từ chối khung giờ mới đề xuất từ Salon
+        /// Khách hàng từ chối khung giờ mới đề xuất từ Salon.
         /// </summary>
         [HttpPost("{id}/decline-suggested-time")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> DeclineSuggestedTime(Guid id)
         {
             var currentUserId = GetCurrentUserId();
@@ -534,11 +540,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+
         /// <summary>
-        /// Khách hàng yêu cầu dời lịch sang ngày/giờ khác
+        /// Khách hàng yêu cầu dời lịch sang ngày/giờ khác.
         /// </summary>
         [HttpPost("{id}/request-reschedule")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RequestReschedule(Guid id, [FromBody] CustomerRescheduleRequestDTO request)
         {
             var currentUserId = GetCurrentUserId();
@@ -546,11 +554,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+
         /// <summary>
-        /// Manager đề xuất khung giờ mới cho đơn hàng
+        /// Manager đề xuất khung giờ mới cho đơn hàng.
         /// </summary>
         [HttpPost("{id}/manager-suggest-time")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> ManagerSuggestTime(Guid id, [FromBody] ManagerSuggestTimeRequestDTO request)
         {
             var currentUserId = GetCurrentUserId();
@@ -558,11 +568,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+
         /// <summary>
-        /// Manager duyệt yêu cầu xin dời lịch của Khách hàng
+        /// Manager duyệt yêu cầu xin dời lịch của Khách hàng.
         /// </summary>
         [HttpPost("{id}/manager-approve-reschedule")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> ManagerApproveReschedule(Guid id)
         {
             var currentUserId = GetCurrentUserId();
@@ -570,11 +582,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+
         /// <summary>
-        /// Manager từ chối yêu cầu xin dời lịch của Khách hàng
+        /// Manager từ chối yêu cầu xin dời lịch của Khách hàng.
         /// </summary>
         [HttpPost("{id}/manager-reject-reschedule")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> ManagerRejectReschedule(Guid id)
         {
             var currentUserId = GetCurrentUserId();

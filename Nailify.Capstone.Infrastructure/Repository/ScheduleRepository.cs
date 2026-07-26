@@ -42,5 +42,22 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ThenBy(s => s.ShiftStart)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Schedule>> GetSchedulesBySalonIdAsync(Guid salonId, DateTime? startDate, DateTime? endDate)
+        {
+            var query = FindByCondition(x => x.NailArtist.Account.SalonId == salonId
+                && (x.Status == "Available" || x.Status == "Active"));
+
+            if (startDate.HasValue)
+                query = query.Where(x => x.WorkDate >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(x => x.WorkDate <= endDate.Value);
+
+            return await query
+                .OrderBy(x => x.WorkDate)
+                .ThenBy(x => x.ShiftStart)
+                .ToListAsync();
+        }
     }
 }

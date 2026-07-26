@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ScheduleRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.ScheduleResponseDTOs;
@@ -75,6 +75,13 @@ namespace Nailify.Capstone.Application.Services
             var schedules = await _unitOfWork.ScheduleRepository.GetSchedulesByArtistIdAsync(artistId, startDate, endDate);
             var response = _mapper.Map<IEnumerable<ScheduleResponseDTO>>(schedules);
             return new ApiSuccessResult<IEnumerable<ScheduleResponseDTO>>(response, "Lấy lịch ca trực thành công.");
+        }
+
+        public async Task<ApiResult<IEnumerable<ScheduleResponseDTO>>> GetSchedulesBySalonIdAsync(Guid salonId, DateTime? startDate, DateTime? endDate)
+        {
+            var schedules = await _unitOfWork.ScheduleRepository.GetSchedulesBySalonIdAsync(salonId, startDate, endDate);
+            var response = _mapper.Map<IEnumerable<ScheduleResponseDTO>>(schedules);
+            return new ApiSuccessResult<IEnumerable<ScheduleResponseDTO>>(response, "Lấy lịch ca trực theo salon thành công.");
         }
 
         public async Task<ApiResult<ScheduleResponseDTO>> PatchScheduleAsync(Guid scheduleId, SchedulePatchRequest request)

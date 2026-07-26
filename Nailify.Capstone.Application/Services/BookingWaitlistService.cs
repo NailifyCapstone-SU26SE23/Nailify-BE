@@ -23,7 +23,14 @@ namespace Nailify.Capstone.Application.Services
         private readonly IPromotionService _promotionService;
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly IBookingSchedulingService _bookingSchedulingService;
-        public BookingWaitlistService(IUnitOfWork unitOfWork, IMapper mapper, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, IBookingProcedureService bookingProcedureService, IBookingSchedulingService bookingSchedulingService)
+        public BookingWaitlistService(
+                                        IUnitOfWork unitOfWork,
+                                        IMapper mapper,
+                                        ILoyaltyTierService loyaltyTierService,
+                                        IPromotionService promotionService,
+                                        IBookingProcedureService bookingProcedureService,
+                                        IBookingSchedulingService bookingSchedulingService
+                                     )
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -306,7 +313,7 @@ namespace Nailify.Capstone.Application.Services
             wailist.CustomerId = customerId;
             wailist.Position = position;
             wailist.Status = WaitlistStatus.Waiting;
-            wailist.CreatedAt = DateTime.UtcNow;
+            wailist.CreatedAt = DateTime.UtcNow.AddHours(7);
 
             // Calculate EstimatedDuration based on WaitlistItems
             int totalDuration = 0;

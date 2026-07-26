@@ -24,6 +24,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public int CurrentUsageCount { get; set; }
         public int? UserLimit { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
+        public string Situation { get; set; } = string.Empty;
+        public int? RemainingCount { get; set; }
 
         public void Mapping(Profile profile) => profile.CreateMap<Promotion, PromotionDto>();
     }
