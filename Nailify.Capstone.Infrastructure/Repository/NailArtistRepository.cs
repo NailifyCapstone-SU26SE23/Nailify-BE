@@ -96,6 +96,5 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.NailArtistBreaks)
                 .ToListAsync();
         }
-
     }
 }

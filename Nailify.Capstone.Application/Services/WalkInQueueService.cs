@@ -41,6 +41,19 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<WalkInQueueResponseDTO>> AddToQueueAsync(Guid actorId, AddToQueueRequestDTO request)
         {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+            var workingArtistCount = await _unitOfWork.ScheduleRepository.GetWorkingArtistCountByDateAsync(request.SalonId, today);
+            if (workingArtistCount == 0)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Salon hôm nay không có thợ làm việc.");
+            }
+            int maxWalkInCapacity = Math.Max(2, (int)Math.Ceiling(workingArtistCount * 2 * 0.3));
+            var activeWaitingCount = await _unitOfWork.WalkInQueueRepository.GetActiveWaitingCountAsync(request.SalonId);
+            if (activeWaitingCount >= maxWalkInCapacity)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Hàng chờ tại sảnh đã đạt giới hạn tối đa ({activeWaitingCount}/{maxWalkInCapacity} khách). Salon tạm dừng nhận thêm khách vãng lai.");
+            }
             var nextPost = await _unitOfWork.WalkInQueueRepository.GetNextPositionAsync(request.SalonId);
             var queue = _mapper.Map<WalkInQueue>(request);
             queue.QueuePosition = nextPost;

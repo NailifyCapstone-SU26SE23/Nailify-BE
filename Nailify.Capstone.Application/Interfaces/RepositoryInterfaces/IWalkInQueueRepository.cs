@@ -28,5 +28,11 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         // Lấy số thứ tự tiếp theo của thợ đó tại salon trong ngày hôm nay
         Task<int> GetNextPositionAsync(Guid salonId, Guid? assignedNailArtistId);
         Task<int> CountServingWalkInsAsync(Guid artistId, DateTime date);
+        /// <summary>
+        /// Đếm số lượng khách vãng lai đang chờ tại salon
+        /// </summary>
+        /// <param name="salonId"></param>
+        /// <returns></returns>
+        Task<int> GetActiveWaitingCountAsync(Guid salonId);
     }
 }
