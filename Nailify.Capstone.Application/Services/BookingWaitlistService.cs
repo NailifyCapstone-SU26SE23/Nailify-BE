@@ -303,6 +303,33 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Bạn đã ở trong hàng chờ của khung giờ này rồi.");
             }
+            // kiem tra xem co bao nhieu tho dang lam viec trong ngay do
+            var workingArtistCount = await _unitOfWork.ScheduleRepository.GetWorkingArtistCountByDateAsync(request.SalonId, request.RequestedDate);
+
+            if(workingArtistCount == 0)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>("Salon không có thợ làm việc vào ngày này.");
+            }
+            //  Tinh dung luong hang cho toi da cho khung gio
+            int maxWailistCapcity = Math.Max(1, (int)Math.Ceiling(workingArtistCount * 0.3));
+
+            // Dem luot cho dang co cho khung gio
+            var activeWailistCount = await _unitOfWork.BookingWaitlistRepository.GetActiveWailistCountAsync(request.SalonId, request.RequestedDate, request.RequestedStartTime);
+
+            if(activeWailistCount >= maxWailistCapcity)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>(
+                                $"Hàng chờ cho khung giờ {request.RequestedStartTime:hh\\:mm} đã đạt giới hạn tối đa ({maxWailistCapcity} lượt). Vui lòng chọn khung giờ hoặc chi nhánh khác.");
+            }
+
+            int accumulatedWaitTime = activeWailistCount * 30;
+            if(accumulatedWaitTime >= 60)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>(
+                             $"Thời gian chờ dự kiến cho khung giờ này quá dài (~{accumulatedWaitTime} phút). Salon hiện tạm dừng nhận thêm lượt chờ.");
+            }
+
+            // Đếm số lượng lượt chờ hiện đang có cho khung giờ
             var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(
                 request.SalonId, 
                 request.RequestedDate, 

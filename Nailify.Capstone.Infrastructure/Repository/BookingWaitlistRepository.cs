@@ -130,5 +130,18 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.WaitlistItems)
                 .FirstOrDefaultAsync();
         }
+
+        public async Task<int> GetActiveWailistCountAsync(Guid salonId, DateTime date, TimeSpan startTime)
+        {
+            var dateOnly = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
+            return await FindByCondition(x => x.SalonId == salonId
+                                         && x.RequestedDate.Date == dateOnly
+                                         && x.RequestedStartTime == startTime
+                                         && (
+                                         x.Status == WaitlistStatus.Waiting 
+                                         || x.Status == WaitlistStatus.Notified
+                                         ), false)
+                .CountAsync();
+        }
     }
 }

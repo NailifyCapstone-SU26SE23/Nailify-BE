@@ -59,5 +59,22 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ThenBy(x => x.ShiftStart)
                 .ToListAsync();
         }
+
+        public async Task<int> GetWorkingArtistCountByDateAsync(Guid salonId, DateTime date)
+        {
+            var localDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
+            var startOfDayUtc = DateTime.SpecifyKind(localDate.AddHours(-7), DateTimeKind.Utc);
+            var endOfDayUtc = startOfDayUtc.AddDays(1).AddTicks(-1);
+
+            return await FindByCondition(x => x.NailArtist.Account.SalonId == salonId
+                                         && x.NailArtist.Status == "Active"
+                                         && x.WorkDate >= startOfDayUtc 
+                                         && x.WorkDate <= endOfDayUtc
+                                         && (x.Status == "Available" || x.Status == "Active"), false)
+                        .Select(x => x.NailArtistId)
+                        .Distinct()
+                        .CountAsync();
+                
+        }
     }
 }
