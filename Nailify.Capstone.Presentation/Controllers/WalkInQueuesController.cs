@@ -136,5 +136,22 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _queueService.ConvertWalkInToBookingAsync(id, actorId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
+        /// <summary>
+        /// Lễ tân phân ghế cho khách đang đợi trong hàng chờ Walk-in.
+        /// Chỉ được phân khi lượt chờ đang ở trạng thái Waiting hoặc Called.
+        /// </summary>
+        /// <param name="id">ID của lượt chờ cần phân ghế.</param>
+        /// <param name="request">Chứa ChairId cần gán.</param>
+        /// <returns>Thông tin hàng chờ sau khi gán ghế thành công (bao gồm ChairId và ChairName).</returns>
+        [HttpPost("{id}/assign-chair")]
+        [ProducesResponseType(typeof(ApiResult<WalkInQueueResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AssignChair(Guid id, [FromBody] AssignQueueChairRequestDTO request)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _queueService.AssignChairToQueueAsync(id, request, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
     }
 }
