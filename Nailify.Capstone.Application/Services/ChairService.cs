@@ -164,5 +164,58 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<List<ChairResponseDTO>>(availableChairs);
             return new ApiSuccessResult<List<ChairResponseDTO>>(response, "Lấy danh sách ghế trống thành công.");
         }
+
+        /// <summary>
+        /// Lấy tất cả ghế của salon kèm trạng thái bận/trống tại thời điểm hiện tại (hoặc thời điểm chỉ định).
+        /// Ghế bận sẽ hiển thị tên khách hàng đang ngồi và BookingId tương ứng.
+        /// </summary>
+        public async Task<ApiResult<List<ChairResponseDTO>>> GetChairStatusBySalonAsync(Guid salonId, DateTime atDate, TimeSpan atTime)
+        {
+            var salon = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
+            if (salon == null)
+            {
+                return new ApiErrorResult<List<ChairResponseDTO>>("Không tìm thấy chi nhánh Salon.");
+            }
+
+            // 1. Lấy tất cả ghế Active của salon
+            var allChairs = await _unitOfWork.ChairRepository.GetActiveChairsBySalonAsync(salonId);
+
+            // 2. Lấy các booking đang chiếm ghế tại thời điểm atTime (StartTime <= atTime < StartTime + Duration)
+            var occupyingBookings = await _unitOfWork.BookingRepository.GetChairOccupancyBySalonAsync(salonId, atDate, atTime);
+
+            // 3. Build lookup: ChairId -> Booking (để tra nhanh)
+            var chairOccupancy = occupyingBookings
+                .Where(b => b.ChairId.HasValue)
+                .GroupBy(b => b.ChairId!.Value)
+                .ToDictionary(g => g.Key, g => g.First()); // mỗi ghế tối đa 1 booking tại 1 thời điểm
+
+            // 4. Map ghế + gắn thông tin chiếm chỗ
+            var result = new List<ChairResponseDTO>();
+            foreach (var chair in allChairs)
+            {
+                var dto = _mapper.Map<ChairResponseDTO>(chair);
+                dto.SalonName = salon.Name;
+
+                if (chairOccupancy.TryGetValue(chair.ChairId, out var booking))
+                {
+                    dto.IsOccupied = true;
+                    dto.OccupiedByBookingId = booking.BookingId;
+                    dto.OccupiedByCustomerId = booking.CustomerId;
+
+                    var user = booking.Customer?.User;
+                    dto.OccupiedByCustomerName = user != null
+                        ? $"{user.FirstName} {user.LastName}".Trim()
+                        : "Khách vãng lai";
+                }
+                else
+                {
+                    dto.IsOccupied = false;
+                }
+
+                result.Add(dto);
+            }
+
+            return new ApiSuccessResult<List<ChairResponseDTO>>(result, "Lấy trạng thái ghế thành công.");
+        }
     }
 }

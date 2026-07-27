@@ -84,6 +84,32 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                      .ToListAsync();
         }
 
+        public async Task<IEnumerable<Booking>> GetChairOccupancyBySalonAsync(Guid salonId, DateTime date, TimeSpan atTime)
+        {
+            var range = GetDateRangeUtc(date);
+            // Lấy tất cả booking trong ngày, đã gán ghế, chưa hủy/từ chối
+            var bookings = await FindByCondition(x =>
+                                         x.SalonId == salonId
+                                         && x.BookingDate >= range.start
+                                         && x.BookingDate <= range.end
+                                         && x.ChairId != null
+                                         && x.Status != BookingStatus.Cancelled
+                                         && x.Status != BookingStatus.Rejected)
+                                     .Include(x => x.Customer)
+                                         .ThenInclude(c => c.User)
+                                     .ToListAsync();
+
+            // Lọc những booking đang chiếm ghế TẠI thời điểm atTime
+            // (booking bắt đầu <= atTime < booking kết thúc)
+            return bookings.Where(b =>
+            {
+                var bStart = b.StartTime;
+                var bEnd   = b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration > 0 ? b.TotalDuration : 60));
+                return bStart <= atTime && atTime < bEnd;
+            });
+        }
+
+
         public async Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null)
         {
             var query = BuildBookingQuery()

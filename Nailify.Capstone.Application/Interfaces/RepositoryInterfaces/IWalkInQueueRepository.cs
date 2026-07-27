@@ -34,5 +34,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// <param name="salonId"></param>
         /// <returns></returns>
         Task<int> GetActiveWaitingCountAsync(Guid salonId);
+        Task<WalkInQueue?> GetWithChairAsync(Guid queueId);
     }
 }

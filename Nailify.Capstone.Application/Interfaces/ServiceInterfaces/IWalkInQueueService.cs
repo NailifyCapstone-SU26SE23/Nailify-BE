@@ -22,5 +22,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<WalkInQueueResponseDTO>> PrioritizeQueueEntryAsync(Guid queueId, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> ConvertWalkInToBookingAsync(Guid queueId, Guid actorId);
         Task<int> CalculateEstimatedWaitTimeAsync(Guid salonId, List<BookingItemRequestDTO> requestedItems);
+        Task<ApiResult<WalkInQueueResponseDTO>> AssignChairToQueueAsync(Guid queueId, AssignQueueChairRequestDTO request, Guid actorId);
     }
 }
