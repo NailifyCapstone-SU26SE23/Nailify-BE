@@ -15,5 +15,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<ChairResponseDTO>> UpdateChairAsync(Guid id, ChairUpdateRequest request);
         Task<ApiResult<bool>> DeleteChairAsync(Guid id);
         Task<ApiResult<List<ChairResponseDTO>>> GetAvailableChairsAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes);
+        Task<ApiResult<List<ChairResponseDTO>>> GetChairStatusBySalonAsync(Guid salonId, DateTime atDate, TimeSpan atTime);
     }
 }

@@ -41,6 +41,19 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<WalkInQueueResponseDTO>> AddToQueueAsync(Guid actorId, AddToQueueRequestDTO request)
         {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+            var workingArtistCount = await _unitOfWork.ScheduleRepository.GetWorkingArtistCountByDateAsync(request.SalonId, today);
+            if (workingArtistCount == 0)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Salon hôm nay không có thợ làm việc.");
+            }
+            int maxWalkInCapacity = Math.Max(2, (int)Math.Ceiling(workingArtistCount * 2 * 0.3));
+            var activeWaitingCount = await _unitOfWork.WalkInQueueRepository.GetActiveWaitingCountAsync(request.SalonId);
+            if (activeWaitingCount >= maxWalkInCapacity)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Hàng chờ tại sảnh đã đạt giới hạn tối đa ({activeWaitingCount}/{maxWalkInCapacity} khách). Salon tạm dừng nhận thêm khách vãng lai.");
+            }
             var nextPost = await _unitOfWork.WalkInQueueRepository.GetNextPositionAsync(request.SalonId);
             var queue = _mapper.Map<WalkInQueue>(request);
             queue.QueuePosition = nextPost;
@@ -463,6 +476,7 @@ namespace Nailify.Capstone.Application.Services
                 BookingId = Guid.NewGuid(),
                 CustomerId = queue.CustomerId.Value,
                 SalonId = queue.SalonId,
+                ChairId = queue.ChairId,
                 NailArtistId = queue.AssignedNailArtistId,
                 BookingDate = localNow.Date,
                 StartTime = localNow.TimeOfDay,
@@ -561,6 +575,48 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<WalkInQueueResponseDTO>(walkIn);
             return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã ưu tiên khách hàng lên đầu hàng chờ tại sảnh.");
         }
-
+        public async Task<ApiResult<WalkInQueueResponseDTO>> AssignChairToQueueAsync(Guid queueId, AssignQueueChairRequestDTO request, Guid actorId)
+        {
+            var queue = await _unitOfWork.WalkInQueueRepository.GetByIdAsync(queueId);
+            if (queue == null)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Không tìm thấy lượt hàng chờ.");
+            }
+            if (queue.Status != QueueStatus.Waiting && queue.Status != QueueStatus.Called)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Không thể phân ghế khi trạng thái là '{queue.Status}'. Chỉ được phân khi Waiting hoặc Called.");
+            }
+            var chair = await _unitOfWork.ChairRepository.GetByIdAsync(request.ChairId);
+            if (chair == null)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Không tìm thấy ghế.");
+            }
+            if (chair.SalonId != queue.SalonId)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Ghế không thuộc salon của lượt chờ này.");
+            }
+            if (chair.Status != "Active")
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Ghế '{chair.ChairName}' hiện không khả dụng (trạng thái: {chair.Status}).");
+            }
+            // 4. Kiểm tra ghế có đang bị booking khác chiếm tại thời điểm hiện tại không
+            var localNow = DateTime.UtcNow.AddHours(7);
+            var occupying = await _unitOfWork.BookingRepository.GetChairOccupancyBySalonAsync(queue.SalonId, localNow.Date, localNow.TimeOfDay);
+            bool isChairBusy = occupying.Any(b => b.ChairId == request.ChairId);
+            if (isChairBusy)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Ghế '{chair.ChairName}' đang có khách ngồi. Vui lòng chọn ghế khác.");
+            }
+            queue.ChairId = request.ChairId;
+            _unitOfWork.WalkInQueueRepository.Update(queue);
+            await _unitOfWork.SaveChangesAsync();
+            var refreshed = await _unitOfWork.WalkInQueueRepository.GetWithChairAsync(queueId);
+            var response = _mapper.Map<WalkInQueueResponseDTO>(refreshed);
+            return new ApiSuccessResult<WalkInQueueResponseDTO>(response,
+                $"Phân ghế '{chair.ChairName}' cho khách thành công.");
+        }
     }
 }

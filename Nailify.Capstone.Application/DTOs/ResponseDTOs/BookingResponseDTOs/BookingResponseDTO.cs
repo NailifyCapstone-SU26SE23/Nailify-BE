@@ -38,6 +38,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public decimal? AmountDue { get; set; }
         public decimal? AmountPaid { get; set; }
         public bool IsRefunded { get; set; }
+        public DateTime? ProposedBookingDate { get; set; }
+        public TimeSpan? ProposedStartTime { get; set; }
+        public string? ProposedBy { get; set; }
+        public string? RescheduleReason { get; set; }
         public List<BookingItemResponseDTO> BookingItems { get; set; } = new();
         public List<SimpleDiscountDto> Discounts { get; set; } = new();
         public void Mapping(Profile profile)

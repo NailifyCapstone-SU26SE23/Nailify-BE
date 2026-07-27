@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid SalonId { get; set; }
         public Guid? CustomerId { get; set; } // null nếu khách vãng lai
         public Guid? OriginalBookingId { get; set; } // nếu là late arrival có booking
+        public Guid? ChairId { get; set; }
         public string? GuestName { get; set; } // khách vãng lai không có account
         public string? GuestPhone { get; set; }
         public int QueuePosition { get; set; } // số thứ tự tại quầy
@@ -27,5 +28,6 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual Customer? Customer { get; set; }
         public virtual Booking? OriginalBooking { get; set; }
         public virtual NailArtist? AssignedNailArtist { get; set; }
+        public virtual Chair? Chair { get; set; }
     }
 }

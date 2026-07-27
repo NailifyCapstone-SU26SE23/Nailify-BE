@@ -113,9 +113,9 @@ namespace Nailify.Capstone.Application.Services
                 {
                     SalonId = salonId,
                     DayOfWeek = x.DayOfWeek,
-                    OpenTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.OpenTime),
-                    CloseTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.CloseTime),
-                    IsClosed = x.IsClosed
+                    OpenTime = !x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.OpenTime),
+                    CloseTime = !x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.CloseTime),
+                    IsClosed = !x.IsClosed
                 };
 
                 salon.OperatingHours.Add(y);

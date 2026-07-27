@@ -58,6 +58,14 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<BookingWaitlist>> GetActiveWaitlistsByCustomerAsync(Guid customerId);
         Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date);
         Task<BookingWaitlist?> GetWaitlistWithItemsAsync(Guid waitlistId);
+        /// <summary>
+        /// Đếm số lượng chờ đang waiting cho một khung giờ tại salon
+        /// </summary>
+        /// <param name="salonId"></param>
+        /// <param name="date"></param>
+        /// <param name="startTime"></param>
+        /// <returns></returns>
+        Task<int> GetActiveWailistCountAsync(Guid salonId, DateTime date, TimeSpan startTime);
 
     }
 }
