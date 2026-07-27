@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727134534_ThanhDT-AddChairIdToWalkInQueue")]
+    partial class ThanhDTAddChairIdToWalkInQueue
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1509,10 +1512,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("Situation")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp without time zone");
 
@@ -1964,9 +1963,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("PromotionId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ReceivedCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("UsageCount")

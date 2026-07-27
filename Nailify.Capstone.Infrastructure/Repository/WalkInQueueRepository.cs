@@ -75,5 +75,12 @@ trackChanges)
                                          || x.Status == QueueStatus.Called), false)
                          .CountAsync();
         }
+        public async Task<WalkInQueue?> GetWithChairAsync(Guid queueId)
+             => await FindByCondition(x => x.QueueId == queueId)
+                      .Include(x => x.Chair)
+                      .Include(x => x.AssignedNailArtist)
+                        .ThenInclude(a => a.Account)
+                      .FirstOrDefaultAsync();
+
     }
 }

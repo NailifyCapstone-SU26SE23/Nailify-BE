@@ -15,6 +15,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.WalkInQueueResponseDTOs
         public Guid QueueId { get; set; }
         public Guid SalonId { get; set; }
         public Guid? CustomerId { get; set; }
+        public Guid? ChairId { get; set; }
+        public string? ChairName { get; set; }
         public Guid? OriginalBookingId { get; set; }
         public string? GuestName { get; set; }
         public string? GuestPhone { get; set; }
@@ -37,7 +39,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.WalkInQueueResponseDTOs
                    .ForMember(x => x.AssignedNailArtistName, opt => opt.MapFrom(src =>
                              src.AssignedNailArtist != null && src.AssignedNailArtist.Account != null
                                 ? $"{src.AssignedNailArtist.Account.FirstName} {src.AssignedNailArtist.Account.LastName}"
-                                : null));
+                                : null))
+                   .ForMember(x => x.ChairName, opt => opt.MapFrom(src =>
+                                src.Chair != null ? src.Chair.ChairName : null));
         }
     }
 }
