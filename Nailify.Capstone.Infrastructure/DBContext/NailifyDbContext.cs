@@ -65,7 +65,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<QuizOption> QuizOptions { get; set; }
         public DbSet<CustomerQuizAnswer> CustomerQuizAnswers { get; set; }
         public DbSet<SalonOffDate> SalonOffDates { get; set; }
-
+        public DbSet<StaffTransfer> StaffTransfers { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -860,6 +860,27 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasForeignKey(b => b.WarrantyForBookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<StaffTransfer>(entity =>
+            {
+                entity.HasKey(st => st.StaffTransferId);
+                entity.HasIndex(st => new { st.NailArtistId, st.StartDate, st.EndDate });
+                entity.Property(st => st.Reason).HasMaxLength(500);
+
+                entity.HasOne(st => st.NailArtist)
+                    .WithMany()
+                    .HasForeignKey(st => st.NailArtistId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(st => st.FromSalon)
+                    .WithMany()
+                    .HasForeignKey(st => st.FromSalonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(st => st.ToSalon)
+                    .WithMany()
+                    .HasForeignKey(st => st.ToSalonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
             ConfigureStatusDefaults(modelBuilder);
         }
 

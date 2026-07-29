@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
@@ -595,6 +596,32 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _bookingRescheduleService.ManagerRejectRescheduleAsync(id, currentUserId);
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
+        }
+        /// <summary>
+        /// Lấy chi tiết đơn đặt lịch kèm thông tin bảo hành
+        /// (đơn này đã được bảo hành chưa? đơn bảo hành là đơn nào?).
+        /// </summary>
+        [HttpGet("{id}/warranty-info")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetWarrantyInfo(Guid id)
+        {
+            var response = await _bookingService.GetBookingDetailWithWarrantyAsync(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Lấy các khung giờ có thợ rảnh trong salon (dùng khi khách hàng không chọn thợ cụ thể).
+        /// Mỗi slot 15 phút trả về IsAvailable = true nếu có ít nhất 1 thợ đủ skill đang rảnh, kèm số lượng thợ rảnh (FE ko cần hiện số lượng thợ rảnh nhé!).
+        /// </summary>
+        [HttpPost("salon-available-slots")]
+        [ProducesResponseType(typeof(ApiResult<SalonAvailabilityResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetSalonAvailableSlots([FromBody] GetSalonAvailableSlotsRequestDTO request)
+        {
+            var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
         }
     }
 
