@@ -46,6 +46,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard
         public Guid? ArtistId { get; set; }
         public string ArtistName { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
         public TimeSpan StartTime { get; set; }
         public int DurationMinutes { get; set; }
         public string Type { get; set; } = string.Empty;

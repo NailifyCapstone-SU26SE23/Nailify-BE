@@ -21,18 +21,21 @@ namespace Nailify.Capstone.Application.Services
         private readonly IBookingSchedulingService _schedulingService;
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
+        private readonly IBookingSkillMatchingService _skillMatchingService;
         public NailArtistEmergencyService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IBookingSchedulingService schedulingService,
             INotificationService notificationService,
-            IEmailService emailService)
+            IEmailService emailService,
+            IBookingSkillMatchingService skillMatchingService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _schedulingService = schedulingService;
             _notificationService = notificationService;
             _emailService = emailService;
+            _skillMatchingService = skillMatchingService;
         }
         public async Task<ApiResult<EmergencyOffResultDTO>> SetArtistOffDutyAsync(Guid artistId,EmergencyOffRequestDTO request)
         {
@@ -109,7 +112,7 @@ namespace Nailify.Capstone.Application.Services
                         continue;
                     }
                     // Kiem tra skill theo nail va customize
-                    bool hasRequriedSkills = await CheckSkillMatrixAndCustomNailLevelAsync(candidate, x, artistId);
+                    bool hasRequriedSkills = await _skillMatchingService.HasRequiredSkillsAsync(candidate, x, artistId);
                     if (!hasRequriedSkills)
                     {
                         continue;
@@ -180,7 +183,7 @@ namespace Nailify.Capstone.Application.Services
                             continue;
                         }
 
-                        bool hasRequiredSkill = await CheckSkillMatrixAndCustomNailLevelAsync(candidate, x, artistId);
+                        bool hasRequiredSkill = await _skillMatchingService.HasRequiredSkillsAsync(candidate, x, artistId);
                         if (!hasRequiredSkill)
                         {
                             continue;
@@ -268,38 +271,6 @@ namespace Nailify.Capstone.Application.Services
             }
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<EmergencyOffResultDTO>(response, "Xử lý lịch nghỉ khẩn cấp cho thợ thành công.");
-        }
-        // Check trình độ của thợ để xem thợ có phù hợp mẫu nail đó không / nếu là customize thì kiếm thợ có trình độ tương đương thợ nghỉ hoặc cao hơn
-        private async Task<bool> CheckSkillMatrixAndCustomNailLevelAsync(NailArtist candidate, Booking booking, Guid originalArtistId)
-        {
-            var candidateSkills = candidate.NailArtistSkills?.ToDictionary(x => x.SkillTypeId, x => x.Level)
-                                 ?? new Dictionary<Guid, int>();
-            foreach (var x in booking.BookingItems)
-            {
-                if (x.NailVariantId.HasValue)
-                {
-                    var reqSkills = await _unitOfWork.NailRequiredSkillRepository.GetSkillsByDesignIdAsync(x.NailVariantId.Value);
-                    foreach (var req in reqSkills)
-                    {
-                        if (!candidateSkills.TryGetValue(req.SkillTypeId, out int candidateLevel) || candidateLevel < req.RequiredLevel)
-                        {
-                            return false;
-                        }
-                    }
-                }
-                if (x.CustomerNailRequestId.HasValue)
-                {
-                    var originalArtistSkills = await _unitOfWork.NailArtistSkillRepository.GetSkillsByArtistIdAsync(originalArtistId);
-                    foreach (var origSkill in originalArtistSkills)
-                    {
-                        if (!candidateSkills.TryGetValue(origSkill.SkillTypeId, out int candidateLevel) || candidateLevel < origSkill.Level)
-                        {
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
         }
     }
 }
