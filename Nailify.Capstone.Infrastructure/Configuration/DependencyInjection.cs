@@ -181,6 +181,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
             services.AddScoped<IBookingAssignmentService, BookingAssignmentService>();
             services.AddScoped<IBookingQueryService, BookingQueryService>();
+            services.AddScoped<IBookingSkillMatchingService, BookingSkillMatchingService>();
             // Third Party
             services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IEmailService, SmtpEmailService>();

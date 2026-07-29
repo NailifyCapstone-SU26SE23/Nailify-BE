@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
@@ -18,6 +19,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly IPaymentUrls _paymentUrls;
         private readonly IUnitOfWork _unitOfWork;
         private readonly PayOSHelper _payOSHelper;
+        private readonly ILogger<PayOSService> _logger;
         private const string PayOSBaseUrl = "https://api-merchant.payos.vn";
 
         public PayOSService(
@@ -25,13 +27,15 @@ namespace Nailify.Capstone.Infrastructure.Service
             IPayOSSettings paymentSettings,
             IPaymentUrls paymentUrls,
             IUnitOfWork unitOfWork,
-            PayOSHelper payOSHelper)
+            PayOSHelper payOSHelper,
+            ILogger<PayOSService> logger)
         {
             _httpClient = httpClientFactory.CreateClient();
             _paymentSettings = paymentSettings;
             _paymentUrls = paymentUrls;
             _unitOfWork = unitOfWork;
             _payOSHelper = payOSHelper;
+            _logger = logger;
         }
 
         public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkAsync(Guid bookingId)
@@ -142,6 +146,10 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 if (!VerifyWebhookSignature(webhookDto))
                 {
+                    _logger.LogWarning(
+                        "PayOS webhook rejected because signature is invalid. OrderCode: {OrderCode}, Payload: {@Payload}",
+                        ResolveOrderCode(webhookDto),
+                        webhookDto);
                     return (false, "Webhook signature khong hop le.");
                 }
 
@@ -150,6 +158,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                     trackChanges: true);
                 if (transaction == null)
                 {
+                    _logger.LogWarning(
+                        "PayOS webhook rejected because no local transaction was found. OrderCode: {OrderCode}, Payload: {@Payload}",
+                        ResolveOrderCode(webhookDto),
+                        webhookDto);
                     return (false, "Khong tim thay giao dich tuong ung.");
                 }
 
@@ -177,6 +189,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error while processing PayOS webhook. Payload: {@Payload}", webhookDto);
                 return (false, $"Loi khi xu ly webhook: {ex.Message}");
             }
         }
@@ -259,10 +272,42 @@ namespace Nailify.Capstone.Infrastructure.Service
                 return false;
             }
 
-            var amount = data.Amount.ToString(CultureInfo.InvariantCulture);
-            var dataStr = $"amount={amount}&code={data.Code}&desc={data.Desc}&orderCode={data.OrderCode}";
+            var dataStr = CreateSignatureDataString(data);
             var calculatedSignature = CreateHmacSha256(dataStr);
             return string.Equals(calculatedSignature, webhookDto.Signature, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string CreateSignatureDataString(PaymentWebhookData data)
+        {
+            var values = data.GetType()
+                .GetProperties()
+                .OrderBy(property => GetJsonPropertyName(property.Name), StringComparer.Ordinal)
+                .Select(property =>
+                {
+                    var key = GetJsonPropertyName(property.Name);
+                    var value = property.GetValue(data);
+                    return $"{key}={FormatSignatureValue(value)}";
+                });
+
+            return string.Join("&", values);
+        }
+
+        private static string GetJsonPropertyName(string propertyName)
+        {
+            return char.ToLowerInvariant(propertyName[0]) + propertyName[1..];
+        }
+
+        private static string FormatSignatureValue(object? value)
+        {
+            return value switch
+            {
+                null => string.Empty,
+                decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture),
+                long longValue => longValue.ToString(CultureInfo.InvariantCulture),
+                int intValue => intValue.ToString(CultureInfo.InvariantCulture),
+                bool boolValue => boolValue.ToString().ToLowerInvariant(),
+                _ => value.ToString() ?? string.Empty
+            };
         }
 
         private string CreateHmacSha256(string data)

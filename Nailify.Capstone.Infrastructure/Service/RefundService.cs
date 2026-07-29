@@ -36,7 +36,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
         }
 
-        public async Task<PayoutResult> CreateSinglePayoutByBookingAsync(Guid bookingId, BankAccountInfo bankInfo, string? reason = null)
+        public async Task<PayoutResult> CreateSinglePayoutByBookingAsync(Guid bookingId, BankAccountInfo bankInfo, string? reason = null, bool forceFullRefund = false)
         {
             try
             {
@@ -59,7 +59,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     };
                 }
 
-                return await CreateSinglePayoutAsync(transaction, bankInfo, reason);
+                return await CreateSinglePayoutAsync(transaction, bankInfo, reason, forceFullRefund);
             }
             catch (Exception ex)
             {
@@ -71,7 +71,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
         }
 
-        private async Task<PayoutResult> CreateSinglePayoutAsync(Transaction paidTransaction, BankAccountInfo bankInfo, string? reason)
+        private async Task<PayoutResult> CreateSinglePayoutAsync(Transaction paidTransaction, BankAccountInfo bankInfo, string? reason, bool forceFullRefund)
         {
             if (paidTransaction.Booking.IsRefunded)
             {
@@ -95,7 +95,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 };
             }
 
-            var refundPolicy = CalculateRefundPolicy(paidTransaction.Booking, paidTransaction.Amount);
+            var refundPolicy = CalculateRefundPolicy(paidTransaction.Booking, paidTransaction.Amount, forceFullRefund);
             var referenceId = $"transaction_{paidTransaction.TransactionId}_{DateTime.UtcNow:yyyyMMddHHmmss}";
             var payoutRequest = new
             {
@@ -176,8 +176,15 @@ namespace Nailify.Capstone.Infrastructure.Service
             return decimal.Parse(balanceResponse.Data.Balance);
         }
 
-        private static RefundPolicy CalculateRefundPolicy(Booking booking, decimal originalAmount)
+        private static RefundPolicy CalculateRefundPolicy(Booking booking, decimal originalAmount, bool forceFullRefund)
         {
+            if (forceFullRefund)
+            {
+                return new RefundPolicy(
+                    originalAmount,
+                    "Full refund because no replacement artist is available.");
+            }
+
             var localBookingDate = booking.BookingDate.Kind == DateTimeKind.Utc
                 ? booking.BookingDate.AddHours(7).Date
                 : booking.BookingDate.Date;
