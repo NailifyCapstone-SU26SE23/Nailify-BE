@@ -1,4 +1,4 @@
-using Nailify.Capstone.Application.Common.Models.Scheduling;
+﻿using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -24,5 +24,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             List<ProcedureScheduleSegment> simulatedSegments,
             int capacity,
             Guid? excludingBookingId = null);
+        // Tối ưu hiệu năng ko query MxN
+        bool HasCapacityConflictInMemory(Guid artistId,
+                                         List<ProcedureScheduleSegment> existingSegments,
+                                         List<ProcedureScheduleSegment> newSegments,
+                                         int capacity);
     }
 }

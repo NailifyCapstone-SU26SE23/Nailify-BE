@@ -538,6 +538,17 @@ namespace Nailify.Capstone.Infrastructure.Service
                 await _cache.RemoveAsync(waitersKey);
             }
         }
+        /// <summary>
+        /// Lấy toàn bộ khoảng thời gian đang bị giữ chỗ của thợ trong ngày (đọc Redis 1 lần để check nhiều slot).
+        /// </summary>
+        public async Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date)
+        {
+            var redisListKey = BuildSlotKey(artistId, date);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+            return activeHolds
+                .Select(x => (Start: x.StartTime, End: x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes))))
+                .ToList();
+        }
 
         /// <summary>
         /// Cấu trúc dữ liệu chi tiết của một slot giữ chỗ (dùng để lưu xuống Redis dưới dạng JSON).

@@ -1,8 +1,10 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -718,6 +720,178 @@ namespace Nailify.Capstone.Application.Services
             result.StatusMessage = "Tính toán ETA thời gian chờ thành công.";
             result.DisplayMessage = displayMsg;
             return new ApiSuccessResult<CustomerWaitEtaResponseDTO>(result);
+        }
+
+        public async Task<ApiResult<SalonAvailabilityResponseDTO>> GetSalonAvailableSlotsAsync(GetSalonAvailableSlotsRequestDTO request)
+        {
+            if (request.BookingItems == null || !request.BookingItems.Any())
+            {
+                return new ApiErrorResult<SalonAvailabilityResponseDTO>("Vui lòng chọn dịch vụ hoặc mẫu nail trước khi xem khung giờ trống.");
+            }
+            var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
+            if (bookingItems.Any(item =>
+                                        !item.NailVariantId.HasValue
+                                        && !item.ServiceId.HasValue
+                                        && !item.CustomerNailRequestId.HasValue))
+            {
+                return new ApiErrorResult<SalonAvailabilityResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
+            }
+
+            var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(request.SalonId);
+            if (salon == null)
+            {
+                return new ApiErrorResult<SalonAvailabilityResponseDTO>("Không tìm thấy thông tin salon.");
+            }
+
+            var localDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
+                                                                                     x.SalonId == request.SalonId
+                                                                                     && x.StartDate.Date <= localDate
+                                                                                     && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiSuccessResult<SalonAvailabilityResponseDTO>(new SalonAvailabilityResponseDTO
+                {
+                    SalonId = request.SalonId,
+                    TimeSlots = new List<SalonTimeSlotResponseDTO>()
+                }, "Salon đóng cửa nghỉ lễ vào ngày này.");
+            }
+
+            // Gio hoat dong cua salon trong ngay
+            var dayOfWeek = (int)localDate.DayOfWeek;
+            var operatingHours = salon.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
+            if (!operatingHours.Any() || operatingHours.Any(x => x.IsClosed))
+            {
+                return new ApiSuccessResult<SalonAvailabilityResponseDTO>(new SalonAvailabilityResponseDTO
+                {
+                    SalonId = request.SalonId,
+                    TimeSlots = new List<SalonTimeSlotResponseDTO>()
+                }, "Salon không hoạt động vào ngày này.");
+            }
+
+            var salonOpenTime = operatingHours.Min(x => x.OpenTime);
+            var salonCloseTime = operatingHours.Max(x => x.CloseTime);
+
+            // Giả lập procedures để tính tổng thời lượng chính xác
+            var mockProcedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), request.SalonId);
+            if (!mockProcedures.Any())
+            {
+                return new ApiErrorResult<SalonAvailabilityResponseDTO>("Không xác định được thời lượng dịch vụ từ các mục đã chọn.");
+            }
+            int totalDuration = mockProcedures.Sum(x => x.Duration);
+
+            // Lọc danh sách thợ đủ điều kiện
+            IEnumerable<NailArtist> qualifiedArtists;
+            var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailRequestId.HasValue);
+            if (customNailItem != null)
+            {
+                // Mẫu custom: chỉ thợ đã duyệt báo giá mẫu này được nhận
+                var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(customNailItem.CustomerNailRequestId!.Value);
+                if (customNailRequest != null
+                   && customNailRequest.SalonId == request.SalonId
+                   && (
+                        customNailRequest.Status == CustomerNailStatus.Approved
+                        || customNailRequest.Status == CustomerNailStatus.Quoted
+                      ) && customNailRequest.ApprovedArtistId.HasValue)
+                {
+                    var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
+                    qualifiedArtists = (approvedArtist != null && approvedArtist.Status == "Active") ? new List<NailArtist> { approvedArtist }
+                    : new List<NailArtist>();
+                }
+                else
+                {
+                    qualifiedArtists = new List<NailArtist>();
+                }
+            }
+            else
+            {
+                var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
+                if (variantIds.Any())
+                {
+                    qualifiedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+                }
+                else
+                {
+                    var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(request.SalonId);
+                    qualifiedArtists = activeArtists.Where(x => x.Status == "Active");
+                }
+            }
+            // Pre-load dữ liệu 1 lần cho mỗi thợ (tránh N×M query trong vòng lặp slot)
+            var artistContexts = new List<(NailArtist Artist, Schedule Schedule, List<NailArtistBreak> Breaks, List<ProcedureScheduleSegment> BusySegments, List<(TimeSpan Start, TimeSpan End)> HoldRanges)>();
+            foreach (var artist in qualifiedArtists)
+            {
+                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
+                if (schedule == null)
+                {
+                    continue; // Thợ không có ca làm trong ngày này
+                }
+                var breaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
+                var busySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsByDateAsync(artist.NailArtistId, request.BookingDate);
+                var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(artist.NailArtistId, request.BookingDate);
+
+                artistContexts.Add((artist, schedule, breaks, busySegments, holdRanges));
+            }
+
+            // Duyệt từng slot 15 phút trong giờ hoạt động salon, đếm số thợ rảnh mỗi slot
+            var timeSlots = new List<SalonTimeSlotResponseDTO>();
+            var interval = TimeSpan.FromMinutes(15);
+            var candidateStart = salonOpenTime;
+            while (candidateStart.Add(TimeSpan.FromMinutes(totalDuration)) <= salonCloseTime)
+            {
+                var targetEndTime = candidateStart.Add(TimeSpan.FromMinutes(totalDuration));
+                int availableCount = 0;
+
+                if (operatingHours.IsWithinOperatingHours(candidateStart, targetEndTime))
+                {
+                    // Timeline giả lập tại slot này dùng chung cho mọi thợ
+                    var timeLine = _bookingSchedulingService.BuildProcedureTimeline(mockProcedures, candidateStart);
+
+                    foreach (var ctx in artistContexts)
+                    {
+                        // Slot phải nằm trọn trong ca làm của thợ
+                        if (candidateStart < ctx.Schedule.ShiftStart
+                           || targetEndTime > ctx.Schedule.ShiftEnd)
+                        {
+                            continue;
+                        }
+                        // Không trùng giờ nghỉ đã duyệt của thợ
+                        if (ctx.Breaks.Any(x => candidateStart < x.EndTime && targetEndTime > x.StartTime))
+                        {
+                            continue;
+                        }
+                        // Không conflict với lịch bận hiện có (check in-memory trên dữ liệu pre-load)
+                        var conflict = _bookingSchedulingService.HasCapacityConflictInMemory(ctx.Artist.NailArtistId, ctx.BusySegments, timeLine, ctx.Artist.ConcurrentCapacity);
+                        if (conflict)
+                        {
+                            continue;
+                        }
+
+                        // Không bị giữ chỗ tạm thời (Redis Hold)
+                        if (ctx.HoldRanges.Any(x => x.Start < targetEndTime && x.End > candidateStart))
+                        {
+                            continue;
+                        }
+
+                        availableCount++;
+                    }
+                }
+                timeSlots.Add(new SalonTimeSlotResponseDTO
+                {
+                    StartTime = candidateStart,
+                    EndTime = candidateStart.Add(interval),
+                    IsAvailable = availableCount > 0,
+
+                });
+                candidateStart = candidateStart.Add(interval);
+            }
+            var response = new SalonAvailabilityResponseDTO
+            {
+                SalonId = request.SalonId,
+                SalonOpenTime = salonOpenTime,
+                SalonCloseTime = salonCloseTime,
+                TimeSlots = timeSlots
+            };
+            return new ApiSuccessResult<SalonAvailabilityResponseDTO>(response, "Lấy khung giờ trống của salon thành công.");
         }
     }
 }

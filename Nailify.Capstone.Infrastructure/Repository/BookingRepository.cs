@@ -265,5 +265,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     .ThenInclude(x => x.Service)
                 .ToListAsync();
         }
+        public async Task<Booking?> GetWarrantyBookingAsync(Guid originalBookingId)
+                => await FindByCondition(x =>
+                                             x.WarrantyForBookingId == originalBookingId
+                                             && x.Status != BookingStatus.Cancelled
+                                             && x.Status != BookingStatus.Rejected)
+                        .FirstOrDefaultAsync();
     }
 }

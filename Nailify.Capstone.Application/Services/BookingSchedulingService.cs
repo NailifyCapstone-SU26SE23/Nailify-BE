@@ -88,45 +88,7 @@ namespace Nailify.Capstone.Application.Services
                 .GetArtistBusySegmentsByDateAsync(artistId, date, excludingBookingId);
 
             var allExisting = dbSegments.Concat(simulatedSegments).ToList();
-
-            // 1. Kiểm tra Active Capacity (Tối đa 1 công việc chủ động đồng thời cho thợ đang xét)
-            var relevantNewSegments = newSegments.Where(x =>
-                (x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep)) &&
-                x.ArtistBusyEnd > x.ArtistBusyStart);
-
-            foreach (var newSegment in relevantNewSegments)
-            {
-                var activeOverlapCount = allExisting.Count(existing =>
-                    existing.ArtistBusyEnd > existing.ArtistBusyStart &&
-                    existing.ArtistBusyStart < newSegment.ArtistBusyEnd &&
-                    existing.ArtistBusyEnd > newSegment.ArtistBusyStart);
-                if (activeOverlapCount >= 1)
-                {
-                    return true; // Thợ bị trùng lịch làm việc chủ động
-                }
-            }
-
-            // 2. Kiểm tra Total Capacity (Giới hạn ConcurrentCapacity của thợ đang xét)
-            var relevantTotalSegments = newSegments.Where(x =>
-                x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep));
-
-            foreach (var newSegment in relevantTotalSegments)
-            {
-                var conflictingTotals = allExisting.Where(existing =>
-                    existing.StartTime < newSegment.EndTime &&
-                    existing.EndTime > newSegment.StartTime).ToList();
-
-                var totalOverlapCount = conflictingTotals
-                    .GroupBy(existing => existing.BookingId ?? existing.BookingItemId ?? Guid.NewGuid())
-                    .Count();
-
-                if (totalOverlapCount >= capacity)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return HasCapacityConflictInMemory(artistId, allExisting, newSegments, capacity);
         }
         public async Task<List<BookingProcedure>> GenerateMockBookingProceduresAsync(List<BookingItemRequestDTO> items, Guid salonId)
         {
@@ -213,6 +175,48 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
             return mockProcedures;
+        }
+
+        public bool HasCapacityConflictInMemory(Guid artistId, List<ProcedureScheduleSegment> existingSegments, List<ProcedureScheduleSegment> newSegments, int capacity)
+        {
+            // 1. Kiểm tra Active Capacity (Tối đa 1 công việc chủ động đồng thời cho thợ đang xét)
+            var relevantNewSegments = newSegments.Where(x =>
+                (x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep)) &&
+                x.ArtistBusyEnd > x.ArtistBusyStart);
+
+            foreach (var newSegment in relevantNewSegments)
+            {
+                var activeOverlapCount = existingSegments.Count(existing =>
+                    existing.ArtistBusyEnd > existing.ArtistBusyStart &&
+                    existing.ArtistBusyStart < newSegment.ArtistBusyEnd &&
+                    existing.ArtistBusyEnd > newSegment.ArtistBusyStart);
+                if (activeOverlapCount >= 1)
+                {
+                    return true; // Thợ bị trùng lịch làm việc chủ động
+                }
+            }
+
+            // 2. Kiểm tra Total Capacity (Giới hạn ConcurrentCapacity của thợ đang xét)
+            var relevantTotalSegments = newSegments.Where(x =>
+                x.AssignedArtistId == artistId || (!x.AssignedArtistId.HasValue && x.IsMainStep));
+
+            foreach (var newSegment in relevantTotalSegments)
+            {
+                var conflictingTotals = existingSegments.Where(existing =>
+                    existing.StartTime < newSegment.EndTime &&
+                    existing.EndTime > newSegment.StartTime).ToList();
+
+                var totalOverlapCount = conflictingTotals
+                    .GroupBy(existing => existing.BookingId ?? existing.BookingItemId ?? Guid.NewGuid())
+                    .Count();
+
+                if (totalOverlapCount >= capacity)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

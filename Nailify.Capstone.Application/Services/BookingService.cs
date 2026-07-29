@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.Common.Helpers;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -79,6 +80,9 @@ namespace Nailify.Capstone.Application.Services
             => _bookingQueryService.GetBookingIdByOrderCodeAsync(orderCode);
         public Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)
             => _bookingQueryService.GetBookingByIdAsync(bookingId);
-
+        public Task<ApiResult<BookingResponseDTO>> GetBookingDetailWithWarrantyAsync(Guid bookingId)
+           => _bookingQueryService.GetBookingDetailWithWarrantyAsync(bookingId);
+        public Task<ApiResult<SalonAvailabilityResponseDTO>> GetSalonAvailableSlotsAsync(GetSalonAvailableSlotsRequestDTO request)
+           => _bookingAssignmentService.GetSalonAvailableSlotsAsync(request);
     }
 }

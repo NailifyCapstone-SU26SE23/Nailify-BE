@@ -35,5 +35,10 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// bao gồm thông tin Customer để hiển thị trên dashboard ghế.
         /// </summary>
         Task<IEnumerable<Booking>> GetChairOccupancyBySalonAsync(Guid salonId, DateTime date, TimeSpan atTime);
+        /// <summary>
+        /// Tìm đơn bảo hành (warranty booking) của một đơn gốc.
+        /// Trả về null nếu chưa có đơn bảo hành active.
+        /// </summary>
+        Task<Booking?> GetWarrantyBookingAsync(Guid originalBookingId);
     }
 }
