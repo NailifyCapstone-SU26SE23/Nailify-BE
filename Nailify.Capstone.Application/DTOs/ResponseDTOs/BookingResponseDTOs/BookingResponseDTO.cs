@@ -66,8 +66,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                     })))
                 .ForMember(dest => dest.WarrantyForBookingId, opt => opt.MapFrom(src => src.WarrantyForBookingId))
                 .ForMember(dest => dest.IsWarrantied, opt => opt.Ignore())
-                .ForMember(dest => dest.WarrantyBookingId, opt => opt.Ignore())
-                .IgnoreAllNonExisting();
+                .ForMember(dest => dest.WarrantyBookingId, opt => opt.Ignore());
         }
     }
 }
