@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Google.Apis.Auth;
 using System.Threading.Tasks;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
@@ -62,6 +63,49 @@ namespace Nailify.Capstone.Presentation.Controllers
                     token = result.Token,
                 }
             });
+        }
+
+        [HttpPost("google")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            try
+            {
+                var result = await _authService.GoogleLoginAsync(request);
+                if (result == null)
+                {
+                    return Unauthorized(new
+                    {
+                        isSucceeded = false,
+                        message = "Google token khÃ´ng há»£p lá»‡."
+                    });
+                }
+
+                return Ok(new
+                {
+                    isSucceeded = true,
+                    message = "ÄÄƒng nháº­p Google thÃ nh cÃ´ng.",
+                    data = new
+                    {
+                        token = result.Token,
+                    }
+                });
+            }
+            catch (InvalidJwtException)
+            {
+                return Unauthorized(new
+                {
+                    isSucceeded = false,
+                    message = "Google token khÃ´ng há»£p lá»‡."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    isSucceeded = false,
+                    message = ex.Message
+                });
+            }
         }
 
         [HttpPost("forgot-password")]

@@ -1,13 +1,16 @@
 using AutoMapper;
+using Google.Apis.Auth;
 using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.MailRequestDTO;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,6 +26,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly IDistributedCache _cache;
         private readonly IEmailService _emailService;
         private readonly IEmailTemplateService _emailTemplateService;
+        private readonly IGoogleConfiguration _googleConfiguration;
         private readonly IMapper _mapper;
         private const string ResetPasswordCachePrefix = "forgot-password";
         private const string ResetPasswordCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -36,6 +40,7 @@ namespace Nailify.Capstone.Application.Services
             IDistributedCache cache,
             IEmailService emailService,
             IEmailTemplateService emailTemplateService,
+            IGoogleConfiguration googleConfiguration,
             IMapper mapper)
         {
             _unitOfWork = unitOfWork;
@@ -44,6 +49,7 @@ namespace Nailify.Capstone.Application.Services
             _cache = cache;
             _emailService = emailService;
             _emailTemplateService = emailTemplateService;
+            _googleConfiguration = googleConfiguration;
             _mapper = mapper;
         }
 
@@ -60,6 +66,57 @@ namespace Nailify.Capstone.Application.Services
             return new AuthResponse
             {
                 Token = token,
+            };
+        }
+
+        public async Task<AuthResponse?> GoogleLoginAsync(GoogleLoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(_googleConfiguration.ClientId))
+            {
+                throw new InvalidOperationException("Google ClientId is not configured.");
+            }
+
+            var payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.IdToken,
+                new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { _googleConfiguration.ClientId }
+                });
+
+            var email = payload.Email?.Trim().ToLower();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return null;
+            }
+
+            var user = await _unitOfWork.UserRepository.GetUserByEmailAsync(email);
+            if (user == null)
+            {
+                var (firstName, lastName) = SplitGoogleName(payload.Name, payload.GivenName, payload.FamilyName);
+                user = new User
+                {
+                    Email = email,
+                    Password = _passwordHasher.HashPassword(Guid.NewGuid().ToString("N")),
+                    FirstName = firstName,
+                    LastName = lastName,
+                    AvatarUrl = payload.Picture,
+                    Role = UserRole.Customer,
+                    Status = "Active"
+                };
+
+                await _unitOfWork.UserRepository.CreateAsync(user);
+                await _unitOfWork.CustomerRepository.CreateAsync(new Customer
+                {
+                    User = user,
+                    LoyaltyPoint = 0
+                });
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            var token = _jwtProvider.GenerateToken(user);
+            return new AuthResponse
+            {
+                Token = token
             };
         }
 
@@ -201,6 +258,30 @@ namespace Nailify.Capstone.Application.Services
         private static string GetResetPasswordCacheKey(string tokenHash)
         {
             return $"{ResetPasswordCachePrefix}:{tokenHash}";
+        }
+
+        private static (string FirstName, string LastName) SplitGoogleName(string? name, string? givenName, string? familyName)
+        {
+            var firstName = !string.IsNullOrWhiteSpace(givenName) ? givenName.Trim() : string.Empty;
+            var lastName = !string.IsNullOrWhiteSpace(familyName) ? familyName.Trim() : string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(firstName) || !string.IsNullOrWhiteSpace(lastName))
+            {
+                return (string.IsNullOrWhiteSpace(firstName) ? "Google" : firstName, lastName);
+            }
+
+            var parts = (name ?? string.Empty).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return ("Google", "User");
+            }
+
+            if (parts.Length == 1)
+            {
+                return (parts[0], string.Empty);
+            }
+
+            return (parts[0], string.Join(' ', parts.Skip(1)));
         }
     }
 }
