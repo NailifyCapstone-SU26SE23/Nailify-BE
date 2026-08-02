@@ -10,5 +10,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<AuthResponse?> LoginAsync(LoginRequest request);
         Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request);
+        Task<ApiResult<bool>> ForgotPasswordAsync(ForgotPasswordRequest request);
+        Task<ApiResult<bool>> CheckResetPasswordTokenAsync(CheckResetPasswordTokenRequest request);
+        Task<ApiResult<bool>> ResetPasswordAsync(ResetPasswordRequest request);
     }
 }

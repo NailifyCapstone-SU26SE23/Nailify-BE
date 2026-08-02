@@ -1,12 +1,16 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.MailRequestDTO;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using System;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Application.Services
@@ -16,17 +20,30 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IJwtProvider _jwtProvider;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly IDistributedCache _cache;
+        private readonly IEmailService _emailService;
+        private readonly IEmailTemplateService _emailTemplateService;
         private readonly IMapper _mapper;
+        private const string ResetPasswordCachePrefix = "forgot-password";
+        private const string ResetPasswordCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        private const int ResetPasswordCodeLength = 6;
+        private static readonly TimeSpan ResetPasswordTokenTtl = TimeSpan.FromMinutes(15);
 
         public AuthService(
             IUnitOfWork unitOfWork, 
             IJwtProvider jwtProvider, 
             IPasswordHasher passwordHasher, 
+            IDistributedCache cache,
+            IEmailService emailService,
+            IEmailTemplateService emailTemplateService,
             IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _jwtProvider = jwtProvider;       
             _passwordHasher = passwordHasher;
+            _cache = cache;
+            _emailService = emailService;
+            _emailTemplateService = emailTemplateService;
             _mapper = mapper;
         }
 
@@ -70,6 +87,120 @@ namespace Nailify.Capstone.Application.Services
 
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<UserDto>(_mapper.Map<UserDto>(user), "Đăng ký tài khoản thành công.");
+        }
+
+        public async Task<ApiResult<bool>> ForgotPasswordAsync(ForgotPasswordRequest request)
+        {
+            const string responseMessage = "Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.";
+            var normalizedEmail = request.Email.Trim().ToLower();
+            var user = await _unitOfWork.UserRepository.GetUserByEmailAsync(normalizedEmail);
+
+            if (user == null || user.Status != "Active")
+            {
+                return new ApiSuccessResult<bool>(true, responseMessage);
+            }
+
+            var token = GenerateResetToken();
+            var tokenHash = HashToken(token);
+            var cacheKey = GetResetPasswordCacheKey(tokenHash);
+
+            await _cache.SetStringAsync(
+                cacheKey,
+                user.UserId.ToString(),
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = ResetPasswordTokenTtl
+                });
+
+            await _emailService.SendEmailAsync(new MailRequest
+            {
+                ToAddress = user.Email,
+                Subject = "Nailify - mã đặt lại mật khẩu",
+                Body = _emailTemplateService.GenerateForgotPasswordEmail($"{user.FirstName} {user.LastName}".Trim(), token)
+            });
+
+            return new ApiSuccessResult<bool>(true, responseMessage);
+        }
+
+        public async Task<ApiResult<bool>> CheckResetPasswordTokenAsync(CheckResetPasswordTokenRequest request)
+        {
+            var tokenHash = HashToken(NormalizeResetCode(request.Token));
+            var cacheKey = GetResetPasswordCacheKey(tokenHash);
+            var userIdValue = await _cache.GetStringAsync(cacheKey);
+
+            if (string.IsNullOrWhiteSpace(userIdValue) || !Guid.TryParse(userIdValue, out var userId))
+            {
+                return new ApiResult<bool>(false, "Mã đặt lại không hợp lệ hoặc đã hết hạn.");
+            }
+
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active")
+            {
+                await _cache.RemoveAsync(cacheKey);
+                return new ApiResult<bool>(false, "Mã đặt lại không hợp lệ hoặc đã hết hạn.");
+            }
+
+            return new ApiSuccessResult<bool>(true, "Mã đặt lại hợp lệ.");
+        }
+
+        public async Task<ApiResult<bool>> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                return new ApiResult<bool>(false, "Xác nhận mật khẩu không khớp.");
+            }
+
+            var tokenHash = HashToken(NormalizeResetCode(request.Token));
+            var cacheKey = GetResetPasswordCacheKey(tokenHash);
+            var userIdValue = await _cache.GetStringAsync(cacheKey);
+
+            if (string.IsNullOrWhiteSpace(userIdValue) || !Guid.TryParse(userIdValue, out var userId))
+            {
+                return new ApiResult<bool>(false, "Mã đặt lại không hợp lệ hoặc đã hết hạn.");
+            }
+
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active")
+            {
+                await _cache.RemoveAsync(cacheKey);
+                return new ApiResult<bool>(false, "Mã đặt lại không hợp lệ hoặc đã hết hạn.");
+            }
+
+            user.Password = _passwordHasher.HashPassword(request.NewPassword);
+
+            _unitOfWork.UserRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cache.RemoveAsync(cacheKey);
+
+            return new ApiSuccessResult<bool>(true, "Đặt lại mật khẩu thành công.");
+        }
+
+        private static string GenerateResetToken()
+        {
+            Span<char> code = stackalloc char[ResetPasswordCodeLength];
+            for (var i = 0; i < code.Length; i++)
+            {
+                var index = RandomNumberGenerator.GetInt32(ResetPasswordCodeAlphabet.Length);
+                code[i] = ResetPasswordCodeAlphabet[index];
+            }
+
+            return new string(code);
+        }
+
+        private static string NormalizeResetCode(string token)
+        {
+            return token.Trim().Replace(" ", string.Empty).ToUpperInvariant();
+        }
+
+        private static string HashToken(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes).ToLower();
+        }
+
+        private static string GetResetPasswordCacheKey(string tokenHash)
+        {
+            return $"{ResetPasswordCachePrefix}:{tokenHash}";
         }
     }
 }
