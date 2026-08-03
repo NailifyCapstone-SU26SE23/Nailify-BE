@@ -10,7 +10,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public int? NailShapeId { get; set; }
         public int? NailSurfaceId { get; set; }
         public int? NailDesignId { get; set; }
-        public string ImageUrl { get; set; } = string.Empty;        
         public string ColorJson { get; set; } = string.Empty;
 
         public void Mapping(Profile profile)

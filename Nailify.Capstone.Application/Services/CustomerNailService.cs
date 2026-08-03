@@ -23,9 +23,9 @@ namespace Nailify.Capstone.Application.Services
         }
         #endregion Constructor
         #region CRUD Operations
-        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
+        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null)
         {
-            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name, isPublic);
+            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name);
             var mappedItems = _mapper.Map<List<CustomerNailDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<CustomerNailDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
@@ -94,12 +94,6 @@ namespace Nailify.Capstone.Application.Services
             if (!string.IsNullOrWhiteSpace(request.CustomColor))
             {
                 customerNail.CustomColor = request.CustomColor;
-                hasChanges = true;
-            }
-
-            if (request.IsPublic.HasValue)
-            {
-                customerNail.IsPublic = request.IsPublic.Value;
                 hasChanges = true;
             }
 
@@ -379,11 +373,6 @@ namespace Nailify.Capstone.Application.Services
             if (nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy yêu cầu duyệt.");
-            }
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(nailRequest.CustomerNailId);
-            if (customerNail == null || customerNail.UserId != customerId)
-            {
-                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền phản hồi mẫu nail này.");
             }
             if (nailRequest.Status != CustomerNailStatus.Quoted)
             {

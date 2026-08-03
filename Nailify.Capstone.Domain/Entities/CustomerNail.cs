@@ -14,7 +14,6 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CustomColor { get; set; }
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsPublic { get; set; } = false;
         public string Status { get; set; } = "Active";
         public virtual User User { get; set; } = null!;
         public virtual NailShape NailShape { get; set; } = null!;

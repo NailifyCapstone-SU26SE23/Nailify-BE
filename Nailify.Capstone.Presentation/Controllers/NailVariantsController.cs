@@ -108,7 +108,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailVariantDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update(int id, [FromForm] NailVariantUpdateRequest request, IFormFile? image)
+        public async Task<IActionResult> Update(int id, [FromForm] NailVariantUpdateRequest request, IFormFile? imageUrl)
         {
             var validationResult = await _updateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -125,12 +125,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var uploadedImageUrl = string.Empty;
             try
             {
-                uploadedImageUrl = await UploadImageAsync(image);
-                request.ImageUrl = string.IsNullOrWhiteSpace(uploadedImageUrl)
-                    ? existingResult.Data.ImageUrl
-                    : uploadedImageUrl;
+                uploadedImageUrl = await UploadImageAsync(imageUrl);
 
-                var result = await _nailVariantService.UpdateNailVariantAsync(id, request);
+                var result = await _nailVariantService.UpdateNailVariantAsync(id, request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImageAsync(uploadedImageUrl);

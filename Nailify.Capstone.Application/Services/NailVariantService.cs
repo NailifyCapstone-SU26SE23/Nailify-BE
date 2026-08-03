@@ -33,10 +33,10 @@ namespace Nailify.Capstone.Application.Services
             var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
             if (variant == null)
             {
-                return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể mong.");
+                return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
 
-            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(variant), "Lấy thông tin biến thể mong thành công.");
+            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(variant), "Lấy thông tin biến thể thành công.");
         }
 
         public async Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null)
@@ -56,15 +56,15 @@ namespace Nailify.Capstone.Application.Services
             await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
 
             var createdVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(variant.NailVariantId);
-            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(createdVariant), "Tạo biến thể móng thành công.");
+            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(createdVariant), "Tạo biến thể thành công.");
         }
 
-        public async Task<ApiResult<NailVariantDto>> UpdateNailVariantAsync(int id, NailVariantUpdateRequest request)
+        public async Task<ApiResult<NailVariantDto>> UpdateNailVariantAsync(int id, NailVariantUpdateRequest request, string? imageUrl = null)
         {
             var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(id);
             if (variant == null)
             {
-                return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể móng.");
+                return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
 
             var previousNailDesignId = variant.NailDesignId;
@@ -75,6 +75,11 @@ namespace Nailify.Capstone.Application.Services
             }
 
             _mapper.Map(request, variant);
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                variant.ImageUrl = imageUrl;
+            }
+
             variant.Price = await CalculateNailVariantPriceAsync(request.NailShapeId, request.NailSurfaceId, id);
             variant.Duration = await CalculateNailVariantDurationAsync(request.NailShapeId, request.NailSurfaceId, id);
             _unitOfWork.NailVariantRepository.Update(variant);
@@ -86,7 +91,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var updatedVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
-            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(updatedVariant), "Cập nhật biến thể móng thành công.");
+            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(updatedVariant), "Cập nhật biến thể thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteNailVariantAsync(int id)
@@ -94,7 +99,7 @@ namespace Nailify.Capstone.Application.Services
             var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(id);
             if (variant == null)
             {
-                return new ApiErrorResult<bool>("Không tìm thấy biến thể móng.");
+                return new ApiErrorResult<bool>("Không tìm thấy biến thể.");
             }
 
             var nailDesignId = variant.NailDesignId;
@@ -102,7 +107,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             await UpdateNailDesignPriceRangeAsync(nailDesignId);
 
-            return new ApiSuccessResult<bool>(true, "Xóa biến thể móng thành công.");
+            return new ApiSuccessResult<bool>(true, "Xóa biến thể móng thành.");
         }
 
         private async Task<decimal> CalculateNailVariantPriceAsync(int? nailShapeId, int? nailSurfaceId, int? nailVariantId = null)
