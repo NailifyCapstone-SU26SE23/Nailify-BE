@@ -216,6 +216,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
            
             services.AddSingleton<INemotronConfiguration>(nemotronSettings);
 
+            var googleSettings = configuration.GetSection("Google")
+                                              .Get<GoogleConfiguration>()
+                                 ?? new GoogleConfiguration();
+            services.AddSingleton<IGoogleConfiguration>(googleSettings);
+
             if (redisSettings.UseMemoryCache)
             {
                 services.AddDistributedMemoryCache();

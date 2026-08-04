@@ -44,14 +44,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string? name = null,
-            [FromQuery] Guid? userId = null,
-            [FromQuery] bool? isPublic = null
+            [FromQuery] Guid? userId = null
             )
         {
             try
             {
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, userId, name, isPublic);
+                    pageNumber, pageSize, userId, name);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -68,14 +67,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetMyCustomerNail(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? name = null,
-            [FromQuery] bool? isPublic = null)
+            [FromQuery] string? name = null)
         {
             try
             {
                 var currentUserId = GetCurrentUserId();
                 var result = await _customerNailService.GetPagedCustomerNailsAsync(
-                    pageNumber, pageSize, currentUserId, name, isPublic);
+                    pageNumber, pageSize, currentUserId, name);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException)
@@ -93,27 +91,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             var result = await _customerNailService.GetCustomerNailByIdAsync(id);
-
-            if (result.IsSucceeded && result.Data != null)
-            {
-                try
-                {
-                    var currentUserId = GetCurrentUserId();
-                    if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
-                        if (!result.Data.IsPublic && result.Data.UserId != currentUserId)
-                        {
-                            return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
-                        }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    if (!result.Data.IsPublic)
-                    {
-                        return ErrorResponse(StatusCodes.Status403Forbidden, "Mẫu móng này đang ở chế độ riêng tư bạn không thể xem nếu không phải là người tạo ra mẫu nail này.");
-                    }
-                }
-            }
-
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 

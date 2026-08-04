@@ -17,7 +17,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string CustomColor { get; set; } = string.Empty;
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsPublic { get; set; }
         public NailShapeDto? NailShape { get; set; }
         public NailSurfaceDto? NailSurface { get; set; }
         public List<CustomerNailComponentDto> CustomerNailComponents { get; set; } = new List<CustomerNailComponentDto>();
