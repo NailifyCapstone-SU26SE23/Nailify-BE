@@ -9,6 +9,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface IAuthService
     {
         Task<AuthResponse?> LoginAsync(LoginRequest request);
+        Task<AuthResponse?> GoogleLoginAsync(GoogleLoginRequest request);
         Task<ApiResult<UserDto>> RegisterAsync(UserRegisterRequest request);
+        Task<ApiResult<bool>> ForgotPasswordAsync(ForgotPasswordRequest request);
+        Task<ApiResult<bool>> CheckResetPasswordTokenAsync(CheckResetPasswordTokenRequest request);
+        Task<ApiResult<bool>> ResetPasswordAsync(ResetPasswordRequest request);
     }
 }
