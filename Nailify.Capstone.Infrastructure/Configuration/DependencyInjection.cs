@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
@@ -23,7 +24,8 @@ namespace Nailify.Capstone.Infrastructure.Configuration
     {
         public static IServiceCollection AddInfrastructureToApplication(
           this IServiceCollection services,
-          IConfiguration configuration)
+          IConfiguration configuration,
+          IHostEnvironment hostEnvironment)
         {
             // cấu hình JWT Authentication
             var jwtSection = configuration.GetSection("Jwt");
@@ -184,7 +186,14 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IBookingSkillMatchingService, BookingSkillMatchingService>();
             // Third Party
             services.AddScoped<IRecommendationService, RecommendationService>();
-            services.AddScoped<IEmailService, SmtpEmailService>();
+            if (hostEnvironment.IsDevelopment())
+            {
+                services.AddScoped<IEmailService, SmtpEmailService>();
+            }
+            else
+            {
+                services.AddScoped<IEmailService, SendGridEmailService>();
+            }
             services.AddScoped<INailArtistEmergencyService, NailArtistEmergencyService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddHttpClient();
@@ -238,6 +247,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                   .Get<SmtpEmailConfiguration>()
                     ?? new SmtpEmailConfiguration();
             services.AddSingleton<IEmailConfiguration>(emailSettings);
+
+            var sendGridSettings = configuration.GetSection("SendGrid")
+                                  .Get<SendGridEmailConfiguration>()
+                    ?? new SendGridEmailConfiguration();
+            services.AddSingleton(sendGridSettings);
 
             var paymentSettings = configuration.GetSection("PayOSSettings")
                                   .Get<PayOSSettings>()
