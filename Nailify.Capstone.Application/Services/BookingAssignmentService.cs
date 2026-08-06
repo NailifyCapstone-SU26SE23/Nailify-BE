@@ -26,6 +26,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly ISlotHoldService _slotHoldService;
         private readonly INotificationService _notificationService;
         private readonly IBookingSkillMatchingService _skillMatchingService;
+        private readonly IBookingProcedureService _bookingProcedureService;
         public BookingAssignmentService(
                                         IUnitOfWork unitOfWork,
                                         IMapper mapper,
@@ -33,7 +34,8 @@ namespace Nailify.Capstone.Application.Services
                                         IBookingSchedulingService bookingSchedulingService,
                                         ISlotHoldService slotHoldService,
                                         INotificationService notificationService,
-                                        IBookingSkillMatchingService skillMatchingService
+                                        IBookingSkillMatchingService skillMatchingService,
+                                        IBookingProcedureService bookingProcedureService
                                       )
         {
             _unitOfWork = unitOfWork;
@@ -43,6 +45,7 @@ namespace Nailify.Capstone.Application.Services
             _slotHoldService = slotHoldService;
             _notificationService = notificationService;
             _skillMatchingService = skillMatchingService;
+            _bookingProcedureService = bookingProcedureService;
         }
 
         public async Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request)
@@ -892,6 +895,200 @@ namespace Nailify.Capstone.Application.Services
                 TimeSlots = timeSlots
             };
             return new ApiSuccessResult<SalonAvailabilityResponseDTO>(response, "Lấy khung giờ trống của salon thành công.");
+        }
+
+        public async Task<ApiResult<TransferPreviewResponseDTO>> PreviewTransferSalonAsync(Guid bookingId, Guid targetSalonId, Guid actorId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+            if(booking == null)
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>("Không tìm thấy thông tin đặt lịch.");
+            }
+            if(booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>($"Chỉ cho phép chuyển khi Pending hoặc Approved. Trạng thái hiện tại: '{booking.Status}'.");
+
+            }
+            if(booking.SalonId == targetSalonId)
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>("Chi nhánh đích trùng với chi nhánh hiện tại.");
+            }
+            var targetSalon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(targetSalonId);
+            if(targetSalon == null)
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>("Không tìm thấy chi nhánh đích.");
+            }
+
+            var localDate = (booking.BookingDate.Kind == DateTimeKind.Utc
+                             ? booking.BookingDate.AddHours(7)
+                             : booking.BookingDate).Date;
+
+            var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x => x.SalonId == targetSalonId
+                                                                                     && x.StartDate.Date <= localDate
+                                                                                     && x.EndDate.Date >= localDate);
+            if (isOffDay)
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>("Chi nhánh đích đang trong ngày nghỉ lễ.");
+            }
+            var dayOfWeek = (int)localDate.DayOfWeek;
+            var operatingHours = targetSalon.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
+            var targetEnd = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
+
+            if(!operatingHours.IsWithinOperatingHours(booking.StartTime, targetEnd))
+            {
+                return new ApiErrorResult<TransferPreviewResponseDTO>("Khung giờ đặt lịch không nằm trong giờ hoạt động của chi nhánh đích.");
+            }
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId);
+            var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+            var allArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(targetSalonId);
+            var availableArtists = new List<NailArtist>();
+            foreach (var artist in allArtists.Where(x => x.Status == "Active"))
+            {
+                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, booking.BookingDate);
+                if(schedule == null)
+                {
+                    continue;
+                }
+                if(booking.StartTime < schedule.ShiftStart || targetEnd > schedule.ShiftEnd)
+                {
+                    continue;
+                }
+                var requiredSkill = await _skillMatchingService.HasRequiredSkillsAsync(artist, booking, null);
+                if(!requiredSkill)
+                {
+                    continue;
+                }
+                var hasConflict = await _bookingSchedulingService.HasCapacityConflictAsync(artist.NailArtistId, booking.BookingDate, timeline, artist.ConcurrentCapacity);
+                if(!hasConflict)
+                {
+                    availableArtists.Add(artist);
+                }
+            }
+            var originalSalon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(booking.SalonId);
+
+            var response = new TransferPreviewResponseDTO
+            {
+                BookingId = bookingId,
+                OriginalSalonId = booking.SalonId,
+                OriginalSalonName = originalSalon?.Name ?? booking.SalonId.ToString(),
+                TargetSalonId = targetSalonId,
+                TargetSalonName = targetSalon.Name,
+                TotalPrice = booking.TotalPrice ?? 0,
+                AvailableArtists = _mapper.Map<List<SuggestedArtistResponseDTO>>(availableArtists),
+                CanTransfer = true,
+                WarningMessage = !availableArtists.Any()
+                                                         ? "Không có thợ rảnh tại chi nhánh đích trong khung giờ này. Vẫn có thể chuyển và gán thợ sau."
+                                                         : null
+            };
+            return new ApiSuccessResult<TransferPreviewResponseDTO>(response, "Xem trước chuyển chi nhánh thành công.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(Guid bookingId, TransferSalonRequestDTO request, Guid actorId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
+            if(booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
+            }
+            if(booking.Status !=  BookingStatus.Pending && booking.Status != BookingStatus.Approved)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ cho phép chuyển khi Pending hoặc Approved. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+            if(booking.SalonId == request.TargetSalonId)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Chi nhánh đích trùng với chi nhánh hiện tại.");
+            }
+            var targetSalon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(request.TargetSalonId);
+            if(targetSalon == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy chi nhánh đích.");
+            }
+            if (request.NewNailArtistId.HasValue)
+            {
+                var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.NewNailArtistId.Value);
+
+                if(artist == null || artist.Status != "Active")
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Thợ được chọn không tồn tại hoặc không hoạt động.");
+                }
+                if(artist.Account.SalonId != request.TargetSalonId)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Thợ được chọn không thuộc chi nhánh đích.");
+                }
+
+                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId);
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+
+                var hasConflict = await _bookingSchedulingService.HasCapacityConflictAsync(request.NewNailArtistId.Value, booking.BookingDate, timeline, artist.ConcurrentCapacity);
+                if (hasConflict)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>("Thợ được chọn đã bận trong khung giờ này tại chi nhánh đích.");
+                }
+            }
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                booking.TransferToSalon(request.TargetSalonId, request.NewNailArtistId, actorId, request.Reason);
+                _unitOfWork.BookingRepository.Update(booking);
+
+                var oldProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+                foreach(var proc in oldProcedures)
+                {
+                    _unitOfWork.BookingProcedureRepository.Delete(proc);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                var bookingItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
+                foreach(var item in bookingItems)
+                {
+                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
+                }
+                await _unitOfWork.SaveChangesAsync();
+
+                if (booking.NailArtistId.HasValue)
+                {
+                    var newProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+                    if (newProcedures.Any())
+                    {
+                        var newTimeline = _bookingSchedulingService.BuildProcedureTimeline(newProcedures, booking.StartTime);
+                        foreach (var segment in newTimeline)
+                        {
+                            var proc = newProcedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                            proc.EstimatedStartTime = segment.StartTime;
+                            proc.EstimatedEndTime = segment.EndTime;
+                            if (proc.ActiveDuration > 0 && proc.IsMainStep)
+                            { 
+                                proc.AssignedArtistId = booking.NailArtistId.Value;
+                            }
+                            _unitOfWork.BookingProcedureRepository.Update(proc);
+                        }
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                }
+                await _unitOfWork.CommitTransactionAsync();
+
+                _ = _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingTransferred",
+                    new
+                    {
+                        BookingId = bookingId,
+                        NewSalonName = targetSalon.Name,
+                        Message = $"Lịch hẹn của bạn đã được chuyển sang chi nhánh '{targetSalon.Name}'. " +
+                      "Vui lòng đến đúng địa điểm mới."
+                    });
+                var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
+                var response = _mapper.Map<BookingResponseDTO>(savedBooking);
+                return new ApiSuccessResult<BookingResponseDTO>(response, "Chuyển chi nhánh thành công.");
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return new ApiErrorResult<BookingResponseDTO>(
+                    "Có lỗi hệ thống khi chuyển chi nhánh. Vui lòng thử lại.");
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
@@ -622,6 +623,34 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
+        }
+        /// <summary>
+        /// Xem trước việc chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpGet("{bookingId:guid}/transfer-preview")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> PreviewTransferSalon(
+            Guid bookingId,
+            [FromQuery] Guid targetSalonId)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .PreviewTransferSalonAsync(bookingId, targetSalonId, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Thực hiện chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpPost("{bookingId:guid}/transfer-salon")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> TransferSalon(
+            Guid bookingId,
+            [FromBody] TransferSalonRequestDTO request)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .TransferSalonAsync(bookingId, request, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
     }
 

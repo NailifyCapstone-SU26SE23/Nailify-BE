@@ -168,6 +168,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ILoyaltyTierService, LoyaltyTierService>();
             services.AddScoped<ILoyaltyTransactionService, LoyaltyTransactionService>();
             services.AddScoped<IBookingRatingService, BookingRatingService>();
+            services.AddHttpClient<ISentimentAnalysisService, SentimentAnalysisService>();
             services.AddScoped<IPromotionService, PromotionService>();
             services.AddScoped<IBookingDiscountService, BookingDiscountService>();
             services.AddScoped<ISlotHoldService, SlotHoldService>();
@@ -224,6 +225,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                    ?? new NemotronConfiguration();
            
             services.AddSingleton<INemotronConfiguration>(nemotronSettings);
+
+            services.AddScoped<IGoogleAuthService, GoogleAuthService>();
+
 
             var googleSettings = configuration.GetSection("Google")
                                               .Get<GoogleConfiguration>()
