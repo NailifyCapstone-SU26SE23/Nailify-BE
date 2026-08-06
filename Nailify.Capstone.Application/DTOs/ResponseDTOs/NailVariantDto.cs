@@ -15,6 +15,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public int? Duration { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
         public string ColorJson { get; set; } = string.Empty;
+        public bool IsFavorited { get; set; }
+        public int? FavoriteNailId { get; set; }
         public NailShapeDto? NailShape { get; set; }
         public NailSurfaceDto? NailSurface { get; set; }
         public List<NailComponentDto> NailComponents { get; set; } = new List<NailComponentDto>();

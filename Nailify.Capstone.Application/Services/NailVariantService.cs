@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -19,16 +20,17 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null)
+        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null)
         {
             var pagedResult = await _unitOfWork.NailVariantRepository.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name);
             var mappedItems = _mapper.Map<List<NailVariantDto>>(pagedResult.Items);
+            await PopulateFavoriteStatusAsync(mappedItems, userId);
             var resultPagedList = new PagedList<NailVariantDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
             return new ApiSuccessResult<PagedList<NailVariantDto>>(resultPagedList, "Lấy danh sách biến thể thành công");
         }
 
-        public async Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id)
+        public async Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id, Guid? userId = null)
         {
             var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
             if (variant == null)
@@ -36,7 +38,9 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
 
-            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(variant), "Lấy thông tin biến thể thành công.");
+            var variantDto = _mapper.Map<NailVariantDto>(variant);
+            await PopulateFavoriteStatusAsync(new[] { variantDto }, userId);
+            return new ApiSuccessResult<NailVariantDto>(variantDto, "Lấy thông tin biến thể thành công.");
         }
 
         public async Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null)
@@ -192,7 +196,7 @@ namespace Nailify.Capstone.Application.Services
             return null;
         }
 
-        public async Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId)
+        public async Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId, Guid? userId = null)
         {
             var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(artistId);
             if (artist == null)
@@ -202,8 +206,43 @@ namespace Nailify.Capstone.Application.Services
 
             var capableVariants = await _unitOfWork.NailVariantRepository.GetNailVariantsCapableByArtistAsync(artistId);
             var response = _mapper.Map<List<NailVariantDto>>(capableVariants);
+            await PopulateFavoriteStatusAsync(response, userId);
 
             return new ApiSuccessResult<List<NailVariantDto>>(response, "Lấy danh sách mẫu móng thợ có thể thực hiện thành công.");
+        }
+        private async Task PopulateFavoriteStatusAsync(IEnumerable<NailVariantDto> variants, Guid? userId)
+        {
+            if (userId == null)
+            {
+                return;
+            }
+
+            var variantList = variants.ToList();
+            var variantIds = variantList.Select(variant => variant.NailVariantId).ToHashSet();
+            if (!variantIds.Any())
+            {
+                return;
+            }
+
+            var favorites = await _unitOfWork.FavoriteNailRepository
+                .FindByCondition(f =>
+                    f.UserId == userId.Value &&
+                    f.NailVariantId != null &&
+                    variantIds.Contains(f.NailVariantId.Value))
+                .ToListAsync();
+
+            var favoriteByVariantId = favorites
+                .GroupBy(favorite => favorite.NailVariantId!.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            foreach (var variant in variantList)
+            {
+                if (favoriteByVariantId.TryGetValue(variant.NailVariantId, out var favorite))
+                {
+                    variant.IsFavorited = true;
+                    variant.FavoriteNailId = favorite.FavoriteNailId;
+                }
+            }
         }
     }
 }

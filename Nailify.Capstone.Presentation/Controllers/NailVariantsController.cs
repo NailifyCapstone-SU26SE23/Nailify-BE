@@ -6,6 +6,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
+using System.Security.Claims;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -44,7 +45,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int? nailDesignId = null,
             [FromQuery] string? name = null)
         {
-            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name);
+            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name, GetCurrentUserIdOrNull());
             return Ok(result);
         }
 
@@ -56,7 +57,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _nailVariantService.GetNailVariantByIdAsync(id);
+            var result = await _nailVariantService.GetNailVariantByIdAsync(id, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
@@ -180,12 +181,18 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetCapableNailVariants(Guid artistId)
         {
-            var result = await _nailVariantService.GetCapableNailVariantsAsync(artistId);
+            var result = await _nailVariantService.GetCapableNailVariantsAsync(artistId, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);
             }
             return Ok(result);
+        }
+
+        private Guid? GetCurrentUserIdOrNull()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
 
         private async Task<string> UploadImageAsync(IFormFile? image)
