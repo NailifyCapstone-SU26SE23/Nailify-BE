@@ -84,5 +84,9 @@ namespace Nailify.Capstone.Application.Services
            => _bookingQueryService.GetBookingDetailWithWarrantyAsync(bookingId);
         public Task<ApiResult<SalonAvailabilityResponseDTO>> GetSalonAvailableSlotsAsync(GetSalonAvailableSlotsRequestDTO request)
            => _bookingAssignmentService.GetSalonAvailableSlotsAsync(request);
+        public Task<ApiResult<TransferPreviewResponseDTO>> PreviewTransferSalonAsync(Guid bookingId, Guid targetSalonId, Guid actorId)
+            => _bookingAssignmentService.PreviewTransferSalonAsync(bookingId, targetSalonId, actorId);
+        public Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(Guid bookingId, TransferSalonRequestDTO request, Guid actorId)
+            => _bookingAssignmentService.TransferSalonAsync(bookingId, request, actorId);
     }
 }

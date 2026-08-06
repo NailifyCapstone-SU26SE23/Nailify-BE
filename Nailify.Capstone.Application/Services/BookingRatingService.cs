@@ -13,11 +13,19 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly ISentimentAnalysisService _sentimentAnalysisService;
+        private readonly INotificationService _notificationService;
 
-        public BookingRatingService(IUnitOfWork unitOfWork, IMapper mapper)
+        public BookingRatingService(
+            IUnitOfWork unitOfWork, 
+            IMapper mapper,
+            ISentimentAnalysisService sentimentAnalysisService,
+            INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _sentimentAnalysisService = sentimentAnalysisService;
+            _notificationService = notificationService;
         }
 
         public async Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetAllAsync(BookingRatingRequestParameters parameters)
@@ -86,7 +94,35 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             var created = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(rating.BookingRatingId);
-            return new ApiSuccessResult<BookingRatingResponseDTO>(_mapper.Map<BookingRatingResponseDTO>(created), "Tạo đánh giá thành công.");
+
+            var dto = _mapper.Map<BookingRatingResponseDTO>(created);
+
+            // Gọi Python AI Microservice phân tích cảm xúc nhận xét
+            if (!string.IsNullOrWhiteSpace(request.Comment))
+            {
+                bool isNegative = await _sentimentAnalysisService.IsNegativeReviewAsync(request.Comment);
+                dto.IsNegativeReview = isNegative;
+                dto.SentimentScore = isNegative ? "NEGATIVE (Tiêu cực)" : "POSITIVE (Tích cực)";
+
+                if (isNegative || request.OverallScore <= 2)
+                {
+                    // Bắn cảnh báo SignalR cho Salon Manager về đánh giá tiêu cực
+                    await _notificationService.SendNotificationToSalonStaffAsync(
+                        booking.SalonId.ToString(),
+                        "NegativeReviewAlert",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            CustomerId = customerId,
+                            Stars = request.OverallScore,
+                            Comment = request.Comment,
+                            Message = $"CẢNH BÁO: Đánh giá tiêu cực vừa được gửi từ khách hàng cho đơn #{booking.BookingId}!"
+                        }
+                    );
+                }
+            }
+
+            return new ApiSuccessResult<BookingRatingResponseDTO>(dto, "Tạo đánh giá thành công.");
         }
 
         public async Task<ApiResult<BookingRatingResponseDTO>> UpdateAsync(Guid customerId, Guid id, BookingRatingUpdateRequest request, string? imageUrl)

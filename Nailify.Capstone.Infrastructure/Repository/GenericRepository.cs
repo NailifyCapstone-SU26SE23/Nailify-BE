@@ -50,7 +50,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
                 if (propertyType == typeof(string))
                 {
-                    statusProperty.SetValue(entity, "InActive");
+                    statusProperty.SetValue(entity, "Inactive");
                     _dbSet.Update(entity);
                 }
                 else if (propertyType == typeof(bool))

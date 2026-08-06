@@ -1,5 +1,4 @@
 using AutoMapper;
-using Google.Apis.Auth;
 using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
@@ -32,6 +31,7 @@ namespace Nailify.Capstone.Application.Services
         private const string ResetPasswordCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         private const int ResetPasswordCodeLength = 6;
         private static readonly TimeSpan ResetPasswordTokenTtl = TimeSpan.FromMinutes(15);
+        private readonly IGoogleAuthService _googleAuthService;
 
         public AuthService(
             IUnitOfWork unitOfWork, 
@@ -41,7 +41,8 @@ namespace Nailify.Capstone.Application.Services
             IEmailService emailService,
             IEmailTemplateService emailTemplateService,
             IGoogleConfiguration googleConfiguration,
-            IMapper mapper)
+            IMapper mapper,
+            IGoogleAuthService googleAuthService)
         {
             _unitOfWork = unitOfWork;
             _jwtProvider = jwtProvider;       
@@ -51,6 +52,7 @@ namespace Nailify.Capstone.Application.Services
             _emailTemplateService = emailTemplateService;
             _googleConfiguration = googleConfiguration;
             _mapper = mapper;
+            _googleAuthService = googleAuthService;
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -71,19 +73,25 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<AuthResponse?> GoogleLoginAsync(GoogleLoginRequest request)
         {
-            if (string.IsNullOrWhiteSpace(_googleConfiguration.ClientId))
+            var googleUser = await _googleAuthService.VerifyTokenAsync(request.IdToken);
+            if (googleUser == null || string.IsNullOrWhiteSpace(googleUser.Email))
             {
-                throw new InvalidOperationException("Google ClientId is not configured.");
+                return null;
             }
+            /*
+             if (string.IsNullOrWhiteSpace(_googleConfiguration.ClientId))
+             {
+                 throw new InvalidOperationException("Google ClientId is not configured.");
+             }
 
-            var payload = await GoogleJsonWebSignature.ValidateAsync(
-                request.IdToken,
-                new GoogleJsonWebSignature.ValidationSettings
-                {
-                    Audience = new[] { _googleConfiguration.ClientId }
-                });
-
-            var email = payload.Email?.Trim().ToLower();
+             var payload = await GoogleJsonWebSignature.ValidateAsync(
+                 request.IdToken,
+                 new GoogleJsonWebSignature.ValidationSettings
+                 {
+                     Audience = new[] { _googleConfiguration.ClientId }
+                 });
+             */
+            var email = googleUser.Email?.Trim().ToLower();
             if (string.IsNullOrWhiteSpace(email))
             {
                 return null;
@@ -92,14 +100,14 @@ namespace Nailify.Capstone.Application.Services
             var user = await _unitOfWork.UserRepository.GetUserByEmailAsync(email);
             if (user == null)
             {
-                var (firstName, lastName) = SplitGoogleName(payload.Name, payload.GivenName, payload.FamilyName);
+                var (firstName, lastName) = SplitGoogleName(googleUser.Name, googleUser.GivenName, googleUser.FamilyName);
                 user = new User
                 {
                     Email = email,
                     Password = _passwordHasher.HashPassword(Guid.NewGuid().ToString("N")),
                     FirstName = firstName,
                     LastName = lastName,
-                    AvatarUrl = payload.Picture,
+                    AvatarUrl = googleUser.Picture,
                     Role = UserRole.Customer,
                     Status = "Active"
                 };

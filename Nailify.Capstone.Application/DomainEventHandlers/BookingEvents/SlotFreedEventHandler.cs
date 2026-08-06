@@ -33,8 +33,57 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
         public async Task Handle(DomainEventNotification<SlotFreedEvent> notification, CancellationToken cancellationToken)
         {
             var e = notification.DomainEvent;
+            
+            int freedDuration = e.Duration > 0 ? e.Duration : 60;
+            int continuousWindow = freedDuration;
+            if (e.NailArtistId.HasValue)
+            {
+                var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(e.NailArtistId.Value);
+                if(artist != null)
+                {
+                    var futureBookings = await _unitOfWork.BookingRepository.GetApprovedBookingsWithDetailsByArtistAndDateAsync(e.NailArtistId.Value, e.BookingDate);
 
-            var nextEntry = await _unitOfWork.BookingWaitlistRepository.GetNextWaitingEntryAsync(e.SalonId, e.BookingDate, e.StartTime, e.NailArtistId);
+                    var nextBooking = futureBookings
+                                                    .Where(x => x.StartTime > e.StartTime)
+                                                    .OrderBy(x => x.StartTime)
+                                                    .FirstOrDefault();
+                    if (nextBooking != null)
+                    {
+                        continuousWindow = (int)(nextBooking.StartTime - e.StartTime).TotalMinutes;
+                    }
+                    else
+                    {
+                        TimeSpan endOfShift = new TimeSpan(21, 0, 0);
+                        
+                        var artistSchedule = await _unitOfWork.ScheduleRepository
+                                                              .GetScheduleByArtistAndDateAsync(e.NailArtistId.Value, e.BookingDate);
+                        if(artistSchedule != null)
+                        {
+                            endOfShift = artistSchedule.ShiftEnd;
+                        }
+                        else
+                        {
+                            var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(e.SalonId);
+                            var dayOfWeek = (int)e.BookingDate.DayOfWeek;
+                            var opHour = salon?.OperatingHours?.FirstOrDefault(x => x.DayOfWeek == dayOfWeek);
+                            if(opHour != null)
+                            {
+                                endOfShift = opHour.CloseTime;
+                            }
+                        }
+
+                        if (endOfShift > e.StartTime)
+                        {
+                            continuousWindow = (int)(endOfShift - e.StartTime).TotalMinutes;
+                        }
+                        else
+                        {
+                            continuousWindow = freedDuration;
+                        }
+                    }
+                }
+            }
+            var nextEntry = await _unitOfWork.BookingWaitlistRepository.GetSmartNextWaitingEntryAsync(e.SalonId, e.BookingDate, e.StartTime, e.NailArtistId, freedDuration, continuousWindow);
             if(nextEntry == null)
             {
                 return;

@@ -15,7 +15,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid ToSalonId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public StaffTransferStatus Status { get; set; } = StaffTransferStatus.Scheduled;
+        public NailArtistTransferStatus Status { get; set; } = NailArtistTransferStatus.Scheduled;
         public string? Reason { get; set; }
         public Guid? CreatedBy { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

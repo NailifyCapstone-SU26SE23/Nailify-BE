@@ -26,7 +26,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly ILoyaltyTierService _loyaltyTierService;
         private readonly ILogger<BookingService> _logger;
         private readonly IBookingProcedureService _bookingProcedureService;
-
+        private readonly INotificationService _notificationService;
         public BookingLifecycleService(
                                         IUnitOfWork unitOfWork,
                                         IMapper mapper,
@@ -34,7 +34,8 @@ namespace Nailify.Capstone.Application.Services
                                         IBookingSchedulingService bookingSchedulingService,
                                         ILoyaltyTierService loyaltyTierService,
                                         ILogger<BookingService> logger,
-                                        IBookingProcedureService bookingProcedureService)
+                                        IBookingProcedureService bookingProcedureService,
+                                        INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -43,6 +44,7 @@ namespace Nailify.Capstone.Application.Services
             _loyaltyTierService = loyaltyTierService;
             _logger = logger;
             _bookingProcedureService = bookingProcedureService;
+            _notificationService = notificationService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -317,6 +319,23 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể xác nhận đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
+            var activeChairs = await _unitOfWork.ChairRepository.GetActiveChairsBySalonAsync(booking.SalonId);
+            var activeChairCount = activeChairs.Count();
+            if(activeChairCount > 0)
+            {
+                var approvedOverlapCount = await _unitOfWork.BookingRepository.CountApprovedOverlappingAsync(
+                    booking.SalonId,
+                    booking.BookingDate,
+                    booking.StartTime,
+                    booking.TotalDuration,
+                    excludeBookingId: bookingId);
+                if(approvedOverlapCount >= activeChairCount)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>(
+                         $"Không thể duyệt: Salon đã có {approvedOverlapCount}/{activeChairCount} " +
+                         $"ghế được đặt trong khung giờ này.");
+                }
+            }
             booking.Confirm(actorId);
             _unitOfWork.BookingRepository.Update(booking);
             var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
@@ -341,6 +360,21 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
             await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingConfirmed",
+                    new
+                    {
+                        BookingId = bookingId,
+                        Message = "Đơn đặt lịch của bạn đã được Salon xác nhận."
+                    });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send booking confirmed notification: {ex.Message}");
+            }
             /*
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             */
@@ -385,6 +419,23 @@ namespace Nailify.Capstone.Application.Services
             booking.Cancel(customerId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRejected",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        Reason = request.Reason,
+                        Message = $"Đơn đặt lịch của bạn đã bị Salon từ chối. Lý do: {request.Reason}"
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send booking rejected notification: {ex.Message}");
+            }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
         }

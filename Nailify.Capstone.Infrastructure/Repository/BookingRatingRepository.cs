@@ -72,6 +72,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 query = query.Where(x => x.OverallScore == parameters.Stars.Value);
             }
 
+            if (parameters.IsNegativeOnly.HasValue && parameters.IsNegativeOnly.Value)
+            {
+                // Đánh giá tiêu cực: 1-2 sao hoặc có điểm số chi tiết thấp
+                query = query.Where(x => x.OverallScore <= 2 || (x.ServiceQuality.HasValue && x.ServiceQuality.Value <= 2));
+            }
+
             return query;
         }
 
