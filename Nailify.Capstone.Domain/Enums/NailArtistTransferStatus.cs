@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Domain.Enums
 {
-    public enum StaffTransferStatus
+    public enum NailArtistTransferStatus
     {
         Scheduled, // Đã lên lịch / đang hiệu lực (theo ngày)
         Completed, // Đã qua EndDate (job hoặc set khi query)

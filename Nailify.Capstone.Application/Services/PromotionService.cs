@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;

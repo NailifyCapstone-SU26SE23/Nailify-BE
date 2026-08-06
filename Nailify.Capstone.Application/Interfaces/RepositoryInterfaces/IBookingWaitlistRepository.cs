@@ -66,6 +66,17 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// <param name="startTime"></param>
         /// <returns></returns>
         Task<int> GetActiveWailistCountAsync(Guid salonId, DateTime date, TimeSpan startTime);
-
+        /// <summary>
+        /// Lấy ứng viên Wailist phù hợp nhất bằng thuật toán Smart Scoring
+        /// dựa trên Continuous Availability Window, Duration Fit và Position.
+        /// </summary>
+        Task<BookingWaitlist?> GetSmartNextWaitingEntryAsync(
+                   Guid salonId,
+                   DateTime date,
+                   TimeSpan startTime,
+                   Guid? preferredNailArtistId,
+                   int freedDurationMinutes,
+                   int continuousWindowMinutes
+                   );
     }
 }

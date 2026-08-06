@@ -40,5 +40,11 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// Trả về null nếu chưa có đơn bảo hành active.
         /// </summary>
         Task<Booking?> GetWarrantyBookingAsync(Guid originalBookingId);
+        /// <summary>
+        /// Đếm số booking có Status = Approved của một salon
+        /// mà thời gian thực hiện bị overlap với booking chỉ định,
+        /// loại trừ chính booking đó.
+        /// </summary>
+        Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null);
     }
 }

@@ -271,5 +271,21 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                              && x.Status != BookingStatus.Cancelled
                                              && x.Status != BookingStatus.Rejected)
                         .FirstOrDefaultAsync();
+
+        public async Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null)
+        {
+            var range = GetDateRangeUtc(bookingDate);
+            var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
+
+            return await FindByCondition(x =>
+                                             x.SalonId == salonId
+                                             && x.BookingDate >= range.start
+                                             && x.BookingDate <= range.end
+                                             && x.Status == BookingStatus.Approved
+                                             && x.BookingId != excludeBookingId
+                                             && x.StartTime < endTime
+                                             && startTime < x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)))
+                        .CountAsync();
+        }
     }
 }

@@ -11,5 +11,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface INailArtistEmergencyService
     {
         Task<ApiResult<EmergencyOffResultDTO>> SetArtistOffDutyAsync(Guid artistId, EmergencyOffRequestDTO request);
+        Task<EmergencyOffResultDTO> ProcessAffectedBookingsForDateAsync(Guid artistId, DateTime targetDate, string reason);
     }
 }

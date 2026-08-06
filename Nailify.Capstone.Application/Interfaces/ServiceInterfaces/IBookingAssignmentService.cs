@@ -20,5 +20,13 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> AssignChairAsync(Guid bookingId, Guid chairId, Guid actorId);
         Task<ApiResult<CustomerWaitEtaResponseDTO>> GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(Guid bookingId);
         Task<ApiResult<SalonAvailabilityResponseDTO>> GetSalonAvailableSlotsAsync(GetSalonAvailableSlotsRequestDTO request);
+        Task<ApiResult<TransferPreviewResponseDTO>> PreviewTransferSalonAsync(
+                                                                              Guid bookingId,
+                                                                              Guid targetSalonId,
+                                                                              Guid actorId);
+        Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(
+                                                                Guid bookingId,
+                                                                TransferSalonRequestDTO request,
+                                                                Guid actorId);
     }
 }
