@@ -277,15 +277,18 @@ namespace Nailify.Capstone.Infrastructure.Repository
             var range = GetDateRangeUtc(bookingDate);
             var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
 
-            return await FindByCondition(x =>
+            var approvedBookings =  await FindByCondition(x =>
                                              x.SalonId == salonId
                                              && x.BookingDate >= range.start
                                              && x.BookingDate <= range.end
                                              && x.Status == BookingStatus.Approved
-                                             && x.BookingId != excludeBookingId
-                                             && x.StartTime < endTime
-                                             && startTime < x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)))
-                        .CountAsync();
+                                             && (!excludeBookingId.HasValue || x.BookingId != excludeBookingId.Value))     
+                        .ToListAsync();
+
+            return approvedBookings.Count(b =>
+                                                b.StartTime < endTime &&
+                                                startTime < b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration))
+            );
         }
     }
 }
