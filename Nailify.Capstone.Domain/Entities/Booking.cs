@@ -373,5 +373,21 @@ namespace Nailify.Capstone.Domain.Entities
 
             AddDomainEvent(new SlotFreedEvent(oldSalonId, oldArtistId, BookingDate, StartTime, TotalDuration));
         }
+        public void ReopenAndCheckInLate(Guid actorId)
+        {
+            var oldStatus = Status;
+            Status = BookingStatus.CheckedIn;
+            IsLateArrival = true;
+            ActualCheckInTime = DateTime.UtcNow.AddHours(7);
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                oldStatus,
+                BookingStatus.CheckedIn,
+                "LateCheckIn",
+                "Lễ tân đã tiếp đón & khôi phục đơn đặt lịch trễ quá 15 phút.",
+                actorId
+            ));
+        }
     }
 }
