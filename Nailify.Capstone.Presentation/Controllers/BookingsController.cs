@@ -652,6 +652,35 @@ namespace Nailify.Capstone.Presentation.Controllers
                 .TransferSalonAsync(bookingId, request, actorId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
+        /// <summary>
+        /// Lễ tân lấy danh sách các đơn đặt lịch bị tự động hủy do trễ 15 phút trong ngày của Salon.
+        /// </summary>
+        [HttpGet("salon/{salonId}/late-cancelled")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetLateCancelledBookings(Guid salonId)
+        {
+            var response = await _bookingService.GetLateCancelledBookingsBySalonAsync(salonId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Lễ tân khôi phục & Check-in cho khách đặt trước đến trễ (sau khi bị auto-cancel 15p).
+        /// </summary>
+        [HttpPost("{id}/late-checkin")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> LateCheckIn(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.LateCheckInBookingAsync(id, currentUserId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
     }
 
     public class CheckInForm
