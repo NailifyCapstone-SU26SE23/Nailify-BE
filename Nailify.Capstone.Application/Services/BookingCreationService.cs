@@ -54,7 +54,7 @@ namespace Nailify.Capstone.Application.Services
             _logger = logger;
         }
 
-        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
         {
             var normalizedItems = NormalizePriceRequestItems(bookingItems);
             var normalizedPromotionIds = selectedPromotionIds?
@@ -80,48 +80,58 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
             }
 
-            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId);
-            if (!loyaltyResult.IsSucceeded)
+            var promotionDiscountAmount = 0m;
+            var loyaltyDiscountAmount = 0m;
+            var appliedPromotionDiscounts = new List<BookingDiscount>();
+
+            if (customerId.HasValue)
             {
-                return new ApiErrorResult<BookingPriceResponseDTO>(loyaltyResult.Message);
-            }
-
-            var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
-                customerId,
-                calculation.Items,
-                normalizedPromotionIds);
-
-            var (promotionDiscountAmount, appliedPromotionDiscounts) =
-                await _promotionService.CalculateDiscountsAsync(new Booking
+                var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId.Value);
+                if (!loyaltyResult.IsSucceeded)
                 {
-                    BookingId = bookingId,
-                    CustomerId = customerId,
-                    BookingItems = calculation.Items
-                }, applicablePromotions);
+                    return new ApiErrorResult<BookingPriceResponseDTO>(loyaltyResult.Message);
+                }
 
-            var loyaltyDiscountAmount = decimal.Round(
-                calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
-                0,
-                MidpointRounding.AwayFromZero);
+                var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                    customerId.Value,
+                    calculation.Items,
+                    normalizedPromotionIds);
+
+                (promotionDiscountAmount, appliedPromotionDiscounts) =
+                    await _promotionService.CalculateDiscountsAsync(new Booking
+                    {
+                        BookingId = bookingId,
+                        CustomerId = customerId.Value,
+                        BookingItems = calculation.Items
+                    }, applicablePromotions);
+
+                loyaltyDiscountAmount = decimal.Round(
+                    calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    0,
+                    MidpointRounding.AwayFromZero);
+
+                if (loyaltyDiscountAmount > 0)
+                {
+                    appliedPromotionDiscounts.Add(new BookingDiscount
+                    {
+                        BookingId = bookingId,
+                        Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                        DiscountAmount = loyaltyDiscountAmount,
+                        IsAutoApplied = true,
+                        AppliedDate = DateTime.UtcNow.AddHours(7),
+                        LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                    });
+                }
+            }
 
             var discountBreakdown = appliedPromotionDiscounts
                 .Select(discount => new DiscountBreakdownDTO
                 {
                     Name = discount.Name,
                     Amount = discount.DiscountAmount,
-                    Type = "Promotion"
+                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion"
                 })
                 .ToList();
-
-            if (loyaltyDiscountAmount > 0)
-            {
-                discountBreakdown.Add(new DiscountBreakdownDTO
-                {
-                    Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
-                    Amount = loyaltyDiscountAmount,
-                    Type = "Loyalty"
-                });
-            }
 
             var totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
             var response = new BookingPriceResponseDTO
