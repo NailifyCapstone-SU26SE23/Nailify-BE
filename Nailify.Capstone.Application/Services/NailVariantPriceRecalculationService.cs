@@ -47,6 +47,40 @@ namespace Nailify.Capstone.Application.Services
                 "Recalculate all nail variant prices successfully.");
         }
 
+        public async Task<ApiResult<CustomerNailPriceRecalculationResponseDTO>> RecalculateAllCustomerNailsAsync()
+        {
+            var customerNails = await _unitOfWork.CustomerNailRepository.GetAllCustomerNailsAsync();
+            var updatedCustomerNails = 0;
+
+            foreach (var customerNail in customerNails)
+            {
+                var recalculatedPrice = (customerNail.NailSurface?.Price ?? 0m)
+                    + customerNail.CustomerNailComponents.Sum(component =>
+                        ((component.Component?.Price ?? 0m) + (component.CustomerComponent?.Price ?? 0m))
+                        * GetFingerPriceMultiplier(component.FingerIndex));
+
+                if (customerNail.Price != recalculatedPrice)
+                {
+                    customerNail.Price = recalculatedPrice;
+                    updatedCustomerNails++;
+                }
+
+                _unitOfWork.CustomerNailRepository.Update(customerNail);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var response = new CustomerNailPriceRecalculationResponseDTO
+            {
+                TotalCustomerNails = customerNails.Count,
+                UpdatedCustomerNails = updatedCustomerNails
+            };
+
+            return new ApiSuccessResult<CustomerNailPriceRecalculationResponseDTO>(
+                response,
+                "Recalculate all customer nail prices successfully.");
+        }
+
         private static int GetFingerPriceMultiplier(int fingerIndex)
         {
             return fingerIndex == -1 ? 5 : 1;

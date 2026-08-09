@@ -28,5 +28,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _recalculationService.RecalculateAllAsync();
             return Ok(result);
         }
+
+        [HttpPost("customer-nails/recalculate")]
+        [ProducesResponseType(typeof(ApiResult<CustomerNailPriceRecalculationResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> RecalculateAllCustomerNails()
+        {
+            var result = await _recalculationService.RecalculateAllCustomerNailsAsync();
+            return Ok(result);
+        }
     }
 }
