@@ -46,5 +46,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// loại trừ chính booking đó.
         /// </summary>
         Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null);
+        Task<List<Booking>> GetLateCancelledBookingsBySalonAsync(Guid salonId, DateTime date);
     }
 }

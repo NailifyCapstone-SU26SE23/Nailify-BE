@@ -17,5 +17,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingIdResponseDTO>> GetBookingIdByOrderCodeAsync(long orderCode);
         Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId);
         Task<ApiResult<BookingResponseDTO>> GetBookingDetailWithWarrantyAsync(Guid bookingId);
+        Task<ApiResult<List<BookingResponseDTO>>> GetLateCancelledBookingsBySalonAsync(Guid salonId);
     }
 }

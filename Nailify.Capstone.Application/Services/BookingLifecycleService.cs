@@ -716,6 +716,42 @@ namespace Nailify.Capstone.Application.Services
             var discountAmount = decimal.Round(price * discountRate, 0, MidpointRounding.AwayFromZero);
             return DiscountedPriceCalculation.Success(discountAmount, price - discountAmount);
         }
+
+        public async Task<ApiResult<BookingResponseDTO>> LateCheckInBookingAsync(Guid bookingId, Guid actorId)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
+            if (booking == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
+            }
+            if (booking.Status != BookingStatus.Cancelled)
+            {
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể khôi phục Check-in trễ cho đơn ở trạng thái 'Cancelled'. Trạng thái hiện tại: '{booking.Status}'.");
+            }
+
+            booking.ReopenAndCheckInLate(actorId);
+            _unitOfWork.BookingRepository.Update(booking);
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
+            if (procedures.Any() && booking.NailArtistId.HasValue)
+            {
+                var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                foreach (var segment in timeline)
+                {
+                    var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                    procedure.EstimatedStartTime = segment.StartTime;
+                    procedure.EstimatedEndTime = segment.EndTime;
+                    if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
+                    {
+                        procedure.AssignedArtistId = booking.NailArtistId.Value;
+                    }
+                    _unitOfWork.BookingProcedureRepository.Update(procedure);
+                }
+            }
+            await _unitOfWork.SaveChangesAsync();
+            var response = _mapper.Map<BookingResponseDTO>(booking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Khôi phục và Check-in đơn trễ cho khách thành công.");
+        }
+
         private sealed record DiscountedPriceCalculation(
            bool IsSucceeded,
            decimal DiscountAmount,

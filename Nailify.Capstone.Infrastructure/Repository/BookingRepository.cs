@@ -277,15 +277,50 @@ namespace Nailify.Capstone.Infrastructure.Repository
             var range = GetDateRangeUtc(bookingDate);
             var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
 
-            return await FindByCondition(x =>
+            var approvedBookings =  await FindByCondition(x =>
                                              x.SalonId == salonId
                                              && x.BookingDate >= range.start
                                              && x.BookingDate <= range.end
                                              && x.Status == BookingStatus.Approved
-                                             && x.BookingId != excludeBookingId
-                                             && x.StartTime < endTime
-                                             && startTime < x.StartTime.Add(TimeSpan.FromMinutes(x.TotalDuration)))
-                        .CountAsync();
+                                             && (!excludeBookingId.HasValue || x.BookingId != excludeBookingId.Value))     
+                        .ToListAsync();
+
+            return approvedBookings.Count(b =>
+                                                b.StartTime < endTime &&
+                                                startTime < b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration))
+            );
+        }
+
+        public async Task<List<Booking>> GetLateCancelledBookingsBySalonAsync(Guid salonId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            var cancelledBookings = await FindByCondition(x =>
+                                                              x.SalonId == salonId 
+                                                              && x.BookingDate >= range.start 
+                                                              && x.BookingDate <= range.end 
+                                                              && x.Status == BookingStatus.Cancelled)
+                                        .Include(x => x.Customer)
+                                            .ThenInclude(x => x.User)
+                                        .Include(x => x.NailArtist)
+                                            .ThenInclude(x => x.Account)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.NailVariant)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.Service)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.ShapeMethodConfig)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.CustomerNailRequest)
+                                                .ThenInclude(x => x.CustomerNail)
+
+                                        .Include(x => x.BookingHistories)
+                                        .ToListAsync();
+            return cancelledBookings.Where(b =>
+                b.BookingHistories.Any(h =>
+                    h.Payload != null &&
+                    (h.Payload.Contains("trễ quá 15 phút") || h.Payload.Contains("tự động hủy do khách trễ"))
+                )
+            ).ToList();
         }
     }
 }

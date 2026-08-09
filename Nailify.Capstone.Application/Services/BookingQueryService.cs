@@ -82,5 +82,12 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<BookingResponseDTO>(response, "Lấy thông tin chi tiết đặt lịch thành công.");
         }
 
+        public async Task<ApiResult<List<BookingResponseDTO>>> GetLateCancelledBookingsBySalonAsync(Guid salonId)
+        {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+            var bookings = await _unitOfWork.BookingRepository.GetLateCancelledBookingsBySalonAsync(salonId, today);
+            var response = _mapper.Map<List<BookingResponseDTO>>(bookings);
+            return new ApiSuccessResult<List<BookingResponseDTO>>(response, "Lấy danh sách các đơn bị hủy do trễ của Salon thành công.");
+        }
     }
 }

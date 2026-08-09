@@ -58,7 +58,7 @@ namespace Nailify.Capstone.Application.Services
             var queue = _mapper.Map<WalkInQueue>(request);
             queue.QueuePosition = nextPost;
             queue.Status = QueueStatus.Waiting;
-            queue.ArrivalTime = DateTime.UtcNow;
+            queue.ArrivalTime = DateTime.UtcNow.AddHours(7);;
 
             // Tự động kiểm tra và tạo Account + Customer ngay khi thêm khách vãng lai vào hàng chờ
             if (!queue.CustomerId.HasValue)
