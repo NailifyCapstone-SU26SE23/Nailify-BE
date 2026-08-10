@@ -96,5 +96,20 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.NailArtistBreaks)
                 .ToListAsync();
         }
+        public async Task<NailArtist?> GetAvailableAlternativeArtistAsync(Guid salonId, Guid excludeArtistId, DateTime date, TimeSpan startTime, int durationMinutes)
+        {
+            var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
+
+            return await FindByCondition(x => x.Account.SalonId == salonId 
+                                           && x.ConcurrentCapacity > 0 
+                                           && x.NailArtistId != excludeArtistId, trackChanges: false)
+                .Include(x => x.Account)
+                .Where(x => !x.Bookings.Any(b => b.BookingDate.Date == date.Date 
+                                              && b.Status != BookingStatus.Cancelled 
+                                              && b.Status != BookingStatus.Completed
+                                              && b.StartTime < endTime 
+                                              && b.EndTime > startTime))
+                .FirstOrDefaultAsync();
+        }
     }
 }

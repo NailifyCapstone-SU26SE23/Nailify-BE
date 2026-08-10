@@ -87,7 +87,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 var customerId = GetCurrentUserId();
                 var response = await _bookingService.CreateBookingAsync(customerId, request);
-                if (!response.IsSucceeded) return BadRequest(response);
+                 if (!response.IsSucceeded) return BadRequest(response);
                 return Ok(response);
             }
             catch (UnauthorizedAccessException)

@@ -82,10 +82,30 @@ namespace Nailify.Capstone.Application.Services
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
+            var staffArtistAccountIds = pagedResult.Items
+                .Where(u => u.Role == UserRole.Staff_Artist)
+                .Select(u => u.UserId)
+                .ToList();
+
+            var artists = new List<Nailify.Capstone.Domain.Entities.NailArtist>();
+            if (staffArtistAccountIds.Any())
+            {
+                var artistResult = await _unitOfWork.NailArtistRepository.GetPagedAsync(
+                    1, 1000, 
+                    a => staffArtistAccountIds.Contains(a.AccountId));
+                artists = artistResult.Items.ToList();
+            }
+
             foreach (var dto in mappedItems)
             {
                 var user = pagedResult.Items.First(x => x.UserId == dto.UserId);
-                await PopulateUserContextAsync(user, dto);
+                
+                dto.SalonId = user.SalonId;
+                if (user.Role == UserRole.Staff_Artist)
+                {
+                    var artist = artists.FirstOrDefault(a => a.AccountId == user.UserId);
+                    dto.StaffId = artist?.NailArtistId;
+                }
             }
 
             var response = new PagedList<UserDto>(

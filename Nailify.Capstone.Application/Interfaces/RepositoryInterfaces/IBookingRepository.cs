@@ -36,6 +36,12 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// </summary>
         Task<IEnumerable<Booking>> GetChairOccupancyBySalonAsync(Guid salonId, DateTime date, TimeSpan atTime);
         /// <summary>
+        /// Lấy đơn đặt lịch đang được thực hiện (InProgress) của một thợ, loại trừ một đơn cụ thể.
+        /// Sử dụng để kiểm tra đè ca.
+        /// </summary>
+        Task<Booking?> GetCurrentBusyBookingWithProceduresAsync(Guid artistId, Guid excludeBookingId, DateTime todayDate);
+        
+        /// <summary>
         /// Tìm đơn bảo hành (warranty booking) của một đơn gốc.
         /// Trả về null nếu chưa có đơn bảo hành active.
         /// </summary>

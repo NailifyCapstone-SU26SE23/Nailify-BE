@@ -614,8 +614,8 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
 
-                    unitPrice += (customNail.Price ?? 0) + (customNailRequest.Price ?? 0);
-                    unitDuration += (customNail.Duration ?? 60) + (customNailRequest.Duration ?? 0);
+                    unitPrice += customNailRequest.Price ?? customNail.Price ?? 0;
+                    unitDuration += customNailRequest.Duration ?? customNail.Duration ?? 60;
                 }
 
                 if (item.NailVariantId.HasValue)

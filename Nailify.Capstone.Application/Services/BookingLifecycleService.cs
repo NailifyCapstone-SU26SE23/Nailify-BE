@@ -104,6 +104,11 @@ namespace Nailify.Capstone.Application.Services
                 _unitOfWork.BookingRepository.Update(booking);
                 //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
                 await _unitOfWork.SaveChangesAsync();
+                
+                if (!booking.IsLateArrival)
+                {
+                    await _bookingSchedulingService.HandleOverlappingOnCheckInAsync(booking);
+                }
             }
 
             var response = _mapper.Map<BookingResponseDTO>(booking);
@@ -116,58 +121,19 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if (booking.Status != BookingStatus.Approved && booking.Status != BookingStatus.CheckedIn)
+            if (booking.Status != BookingStatus.CheckedIn)
             {
-                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể check-in đơn đã được xác nhận duyệt ('Approved') hoặc đang check-in. Trạng thái hiện tại: '{booking.Status}'.");
+                return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể cập nhật ảnh tình trạng tay khi đơn đã ở trạng thái Checked-in. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            /*
+
             booking.CheckInImageUrl = request.CheckInImageUrl;
-            booking.Status = BookingStatus.CheckedIn;
             booking.UpdatedAt = DateTime.UtcNow;
-            var history = new BookingHistory
-            {
-                BookingHistoryId = Guid.NewGuid(),
-                BookingId = booking.BookingId,
-                EventType = "CheckedIn",
-                Payload = $"Check-in thành công. Đã chụp trạng thái tay trước khi làm: {request.CheckInImageUrl}",
-                CreatedAt = DateTime.UtcNow
-            };
-            */
-            booking.CheckIn(request.CheckInImageUrl, actorId);
+
             _unitOfWork.BookingRepository.Update(booking);
-            //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
             await _unitOfWork.SaveChangesAsync();
-            if (booking.IsLateArrival)
-            {
-                var originalArtistId = booking.NailArtistId;
-                booking.NailArtistId = null;
-
-                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
-                foreach (var proc in procedures)
-                {
-                    proc.AssignedArtistId = null;
-                    _unitOfWork.BookingProcedureRepository.Update(proc);
-                }
-
-                _unitOfWork.BookingRepository.Update(booking);
-                await _unitOfWork.SaveChangesAsync();
-                var addToQueueRequest = new AddToQueueRequestDTO
-                {
-                    SalonId = booking.SalonId,
-                    CustomerId = booking.CustomerId,
-                    OriginalBookingId = booking.BookingId,
-                    GuestName = $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}",
-                    GuestPhone = booking.Customer.User.Phone,
-                    RequestNote = "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ.",
-                    AssignedNailArtistId = originalArtistId
-                };
-
-                await _queueService.AddToQueueAsync(actorId, addToQueueRequest);
-            }
+            
             var response = _mapper.Map<BookingResponseDTO>(booking);
-            return new ApiSuccessResult<BookingResponseDTO>(response, booking.IsLateArrival
-                            ? "Khách hàng đến muộn -> Tự động chuyển xuống hàng chờ."
-                            : "Khách hàng Check-in thành công.");
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật ảnh tình trạng bàn tay thành công.");
         }
         public async Task<ApiResult<BookingResponseDTO>> ManualCheckInBookingAsync(Guid bookingId, Guid actorId)
         {
@@ -197,6 +163,12 @@ namespace Nailify.Capstone.Application.Services
             booking.CheckInWithoutImage(actorId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+            
+            if (!booking.IsLateArrival)
+            {
+                await _bookingSchedulingService.HandleOverlappingOnCheckInAsync(booking);
+            }
+            
             if (booking.IsLateArrival)
             {
                 var originalArtistId = booking.NailArtistId;
