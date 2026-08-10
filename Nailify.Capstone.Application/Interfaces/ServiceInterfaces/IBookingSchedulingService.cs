@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common.Models.Scheduling;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -11,6 +11,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IBookingSchedulingService
     {
+        Task HandleOverlappingOnCheckInAsync(Booking checkedInBooking);
         List<ProcedureScheduleSegment> BuildProcedureTimeline(List<BookingProcedure> procedures,TimeSpan bookingStartTime);
 
         Task<bool> HasCapacityConflictAsync(Guid artistId,DateTime bookingDate,

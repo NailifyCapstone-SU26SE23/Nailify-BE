@@ -1,23 +1,34 @@
 using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 
 namespace Nailify.Capstone.Application.Services
 {
     public class BookingSchedulingService : IBookingSchedulingService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
+        private readonly IPromotionService _promotionService;
 
-        public BookingSchedulingService(IUnitOfWork unitOfWork)
+        public BookingSchedulingService(
+            IUnitOfWork unitOfWork, 
+            INotificationService notificationService,
+            IPromotionService promotionService)
         {
             _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
+            _promotionService = promotionService;
         }
 
         public List<ProcedureScheduleSegment> BuildProcedureTimeline(
@@ -93,31 +104,67 @@ namespace Nailify.Capstone.Application.Services
         public async Task<List<BookingProcedure>> GenerateMockBookingProceduresAsync(List<BookingItemRequestDTO> items, Guid salonId)
         {
             var mockProcedures = new List<BookingProcedure>();
-            int tempStepOrder = 1;
 
             var mockBooking = new Booking { BookingId = Guid.NewGuid() };
             var mockBookingItem = new BookingItem { BookingItemId = Guid.NewGuid(), Booking = mockBooking, BookingId = mockBooking.BookingId };
 
+            // Query common procedures from master Procedure catalog (ProcedureType == Common or IsMainStep == true)
+            var commonProcedures = _unitOfWork.ProcedureRepository.FindByCondition(
+                p => p.Status == "Active" && (p.ProcedureType == ProcedureType.Common || p.IsMainStep)
+            ).OrderBy(p => p.CreateAt).ToList();
+
             foreach (var item in items)
             {
-                // 1. Nếu là mẫu móng có sẵn (NailVariant)
+                int currentStepOrder = 1;
+
+                foreach (var commonProc in commonProcedures)
+                {
+                    var passiveDuration = commonProc.PassiveDuration;
+                    mockProcedures.Add(new BookingProcedure
+                    {
+                        BookingProcedureId = Guid.NewGuid(),
+                        BookingItemId = mockBookingItem.BookingItemId,
+                        BookingItem = mockBookingItem,
+                        ProcedureId = commonProc.ProcedureId,
+                        ProcedureName = commonProc.Name,
+                        StepOrder = currentStepOrder++,
+                        Duration = commonProc.Duration ?? 10,
+                        ActiveDuration = commonProc.ActiveDuration,
+                        PassiveDuration = passiveDuration,
+                        CanOverlap = passiveDuration >= 4 && commonProc.CanOverlap,
+                        TransitionBuffer = commonProc.TransitionBuffer > 0 ? commonProc.TransitionBuffer : 1,
+                        IsRequired = commonProc.IsRequired,
+                        IsMainStep = true,
+                        Status = BookingProcedureStatus.Pending
+                    });
+                }
+
                 if (item.NailVariantId.HasValue)
                 {
                     var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
                     foreach (var np in activeNailProcedures)
                     {
+                        // Avoid duplicating common procedures if already included
+                        if (commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
+                            continue;
+
                         var passiveDuration = np.Procedure.PassiveDuration;
                         mockProcedures.Add(new BookingProcedure
                         {
                             BookingProcedureId = Guid.NewGuid(),
                             BookingItemId = mockBookingItem.BookingItemId,
                             BookingItem = mockBookingItem,
-                            StepOrder = tempStepOrder++,
-                            Duration = np.Procedure.Duration ?? 0,
+                            ProcedureId = np.ProcedureId,
+                            ProcedureName = np.Procedure.Name,
+                            StepOrder = currentStepOrder++,
+                            Duration = np.Procedure.Duration ?? 15,
                             ActiveDuration = np.Procedure.ActiveDuration,
                             PassiveDuration = passiveDuration,
                             CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
-                            TransitionBuffer = np.Procedure.TransitionBuffer > 0  ? np.Procedure.TransitionBuffer : 1
+                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                            IsRequired = np.Procedure.IsRequired,
+                            IsMainStep = np.Procedure.IsMainStep,
+                            Status = BookingProcedureStatus.Pending
                         });
                     }
                 }
@@ -133,7 +180,8 @@ namespace Nailify.Capstone.Application.Services
                             BookingProcedureId = Guid.NewGuid(),
                             BookingItemId = mockBookingItem.BookingItemId,
                             BookingItem = mockBookingItem,
-                            StepOrder = tempStepOrder++,
+                            ProcedureName = service.Name,
+                            StepOrder = currentStepOrder++,
                             Duration = service.Duration,
                             ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
                             PassiveDuration = 0,
@@ -158,20 +206,52 @@ namespace Nailify.Capstone.Application.Services
                         if (customNail != null)
                         {
                             duration = customNail.Duration ?? 60;
+
+                            var customProcs = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByCustomerNailIdAsync(customNail.CustomerNailId);
+                            foreach (var np in customProcs)
+                            {
+                                if (commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
+                                    continue;
+
+                                var passiveDuration = np.Procedure.PassiveDuration;
+                                mockProcedures.Add(new BookingProcedure
+                                {
+                                    BookingProcedureId = Guid.NewGuid(),
+                                    BookingItemId = mockBookingItem.BookingItemId,
+                                    BookingItem = mockBookingItem,
+                                    ProcedureId = np.ProcedureId,
+                                    ProcedureName = np.Procedure.Name,
+                                    StepOrder = currentStepOrder++,
+                                    Duration = np.Procedure.Duration ?? 15,
+                                    ActiveDuration = np.Procedure.ActiveDuration,
+                                    PassiveDuration = passiveDuration,
+                                    CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
+                                    TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                    IsRequired = np.Procedure.IsRequired,
+                                    IsMainStep = np.Procedure.IsMainStep,
+                                    Status = BookingProcedureStatus.Pending
+                                });
+                            }
                         }
                     }
-                    mockProcedures.Add(new BookingProcedure
+
+                    // Fallback if no specific custom procedures linked yet
+                    if (!mockProcedures.Any(p => p.StepOrder > commonProcedures.Count))
                     {
-                        BookingProcedureId = Guid.NewGuid(),
-                        BookingItemId = mockBookingItem.BookingItemId,
-                        BookingItem = mockBookingItem,
-                        StepOrder = tempStepOrder++,
-                        Duration = duration,
-                        ActiveDuration = duration,
-                        PassiveDuration = 0,
-                        CanOverlap = false,
+                        mockProcedures.Add(new BookingProcedure
+                        {
+                            BookingProcedureId = Guid.NewGuid(),
+                            BookingItemId = mockBookingItem.BookingItemId,
+                            BookingItem = mockBookingItem,
+                            ProcedureName = "Gia công & Hoàn thiện mẫu Customize",
+                            StepOrder = currentStepOrder++,
+                            Duration = duration,
+                            ActiveDuration = duration,
+                            PassiveDuration = 0,
+                            CanOverlap = false,
                         TransitionBuffer = 1
-                    });
+                        });
+                    }
                 }
             }
             return mockProcedures;
@@ -217,6 +297,155 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return false;
+        }
+
+        public async Task HandleOverlappingOnCheckInAsync(Booking checkedInBooking)
+        {
+            if (checkedInBooking.NailArtistId == null)
+            {
+                return;
+            }
+            var artistId = checkedInBooking.NailArtistId.Value;
+
+            // 1. Tìm xem Thợ hiện tại đang làm cho đơn nào khác không
+            var currentBusyBooking = await _unitOfWork.BookingRepository
+                .GetCurrentBusyBookingWithProceduresAsync(artistId, checkedInBooking.BookingId, checkedInBooking.BookingDate.Date);
+
+            if (currentBusyBooking == null)
+            {
+                return; // Thợ rảnh, không bị đè ca
+            }
+            // 2. Lấy công đoạn (Procedure) mà Thợ đang thực hiện cho Khách B
+            var activeProcedure = currentBusyBooking.BookingItems
+                                                    .SelectMany(x => x.BookingProcedures)
+                                                    .OrderBy(x => x.StepOrder)
+                                                    .FirstOrDefault(x => x.Status == BookingProcedureStatus.InProgress);
+
+            if (activeProcedure == null)
+            {
+                return;
+            }
+            // Nếu được overlap -> cho phép làm song song -> Không cần cảnh báo
+            if (activeProcedure.CanOverlap)
+            {
+                return; 
+            }
+
+            // Nếu không cho phép đè ca -> Bị kẹt
+            var nowTime = DateTime.UtcNow.AddHours(7).TimeOfDay;
+            int delayMinutes = activeProcedure.EstimatedEndTime.HasValue 
+                ? (int)(activeProcedure.EstimatedEndTime.Value - nowTime).TotalMinutes 
+                : 15;
+            
+            // Ko trễ thì thoát
+            if (delayMinutes <= 0)
+            {
+                return;
+            }
+
+            // Điều phối Thợ phụ
+            var firstStep = checkedInBooking.BookingItems
+                                                .SelectMany(x => x.BookingProcedures)
+                                                .FirstOrDefault(x => x.StepOrder == 1);
+
+            int prepDuration = firstStep != null ? firstStep.Duration : 15;
+
+            var availableAlternativeArtist = await _unitOfWork.NailArtistRepository
+                .GetAvailableAlternativeArtistAsync(checkedInBooking.SalonId, artistId, checkedInBooking.BookingDate.Date, checkedInBooking.StartTime, prepDuration);
+
+            if (availableAlternativeArtist != null)
+            {
+                var procedure = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(checkedInBooking.BookingId, trackChanges: true);
+                // Gán Thợ C vào bước Prep đầu tiên của Khách A
+                var targetProcedures = procedure.OrderBy(x => x.StepOrder)
+                                                .ToList();
+
+                var firstPrepStep = targetProcedures.FirstOrDefault(x => x.IsMainStep == false || x.StepOrder == 1);
+                if (firstPrepStep != null)
+                {
+                    firstPrepStep.AssignedArtistId = availableAlternativeArtist.NailArtistId;
+                    _unitOfWork.BookingProcedureRepository.Update(firstPrepStep);
+                    await _unitOfWork.SaveChangesAsync();
+                    
+
+                    await _notificationService.SendNotificationToUserAsync(
+                        checkedInBooking.CustomerId.ToString(), 
+                        "ArtistChanged", 
+                        new { Message = $"Thợ phụ {availableAlternativeArtist.Account.FirstName} sẽ hỗ trợ làm sạch móng trước cho bạn." });
+                    return;
+                }
+            }
+
+            if (delayMinutes > 5)
+            {
+                var alternativeArtistsDto = new List<SuggestedReassignArtistDTO>();
+                var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(checkedInBooking.SalonId);
+                var existingProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(checkedInBooking.BookingId);
+                var segments = BuildProcedureTimeline(existingProcedures, checkedInBooking.StartTime);
+
+                foreach (var artist in activeArtists)
+                {
+                    if (artist.NailArtistId == artistId) 
+                    {
+                        continue;
+                    }
+                    bool hasConflict = await HasSimulationConflictAsync(
+                        artist.NailArtistId,
+                        checkedInBooking.BookingDate,
+                        segments,
+                        new List<ProcedureScheduleSegment>(),
+                        capacity: artist.ConcurrentCapacity,
+                        excludingBookingId: checkedInBooking.BookingId
+                    );
+
+                    alternativeArtistsDto.Add(new SuggestedReassignArtistDTO
+                    {
+                        NailArtistId = artist.NailArtistId,
+                        ArtistName = artist.Account != null ? $"{artist.Account.FirstName} {artist.Account.LastName}" : "Thợ nail",
+                        SkillMatchLevel = 100, // Hardcoded for SLA alert fallback
+                        IsFullyAvailable = !hasConflict
+                    });
+                }
+
+                var alertDto = new SlaViolationAlertDTO
+                {
+                    SalonId = checkedInBooking.SalonId,
+                    AffectedBookingId = checkedInBooking.BookingId,
+                    CustomerName = checkedInBooking.Customer?.User?.FirstName ?? "Khách hàng",
+                    CurrentArtistId = artistId,
+                    EstimatedDelayMinutes = delayMinutes,
+                    OverrunningBookingOrQueueId = currentBusyBooking.BookingId,
+                    AvailableAlternativeArtists = alternativeArtistsDto.OrderByDescending(a => a.IsFullyAvailable).ToList()
+                };
+
+                // Gửi SignalR tới Manager POS & Staff (thông qua group "Salon_{salonId}")
+                await _notificationService.SendNotificationToSalonStaffAsync(
+                    checkedInBooking.SalonId.ToString(), 
+                    "SLA_VIOLATION_ALERT", 
+                    alertDto);
+            }
+
+            string customerMessage = $"Thợ của bạn đang hoàn thiện bước cuối, dự kiến phục vụ sau {delayMinutes} phút.";
+
+            if (delayMinutes >= 10)
+            {
+                var voucherResult = await _promotionService.AddVoucherForRescheduleAsync(checkedInBooking.BookingId);
+                if (voucherResult != null && voucherResult.IsSucceeded)
+                {
+                    customerMessage += " Hệ thống đã tự động gửi tặng bạn 1 Voucher đền bù vào ví vì sự chậm trễ này. Mong bạn thông cảm!";
+                }
+            }
+
+            await _notificationService.SendNotificationToUserAsync(
+                checkedInBooking.CustomerId.ToString(), 
+                "DelayETA", 
+                new { Message = customerMessage });
+
+            // BR-01.4: Gửi cho Màn hình Lễ tân (SalonStaff) để cập nhật ETA
+            await _notificationService.SendNotificationToSalonStaffAsync(
+                checkedInBooking.SalonId.ToString(), 
+                "DelayETA", 
+                new { Message = $"Khách hàng {checkedInBooking.Customer?.User?.FirstName} đang chờ. {customerMessage}" });
         }
     }
 }

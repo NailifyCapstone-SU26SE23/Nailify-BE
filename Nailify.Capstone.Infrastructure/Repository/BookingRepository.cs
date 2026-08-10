@@ -322,5 +322,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 )
             ).ToList();
         }
+
+        public async Task<Booking?> GetCurrentBusyBookingWithProceduresAsync(Guid artistId, Guid excludeBookingId, DateTime todayDate)
+        {
+            return await FindByCondition(x => x.NailArtistId == artistId
+                                           && x.Status == BookingStatus.InProgress
+                                           && x.BookingDate.Date == todayDate.Date
+                                           && x.BookingId != excludeBookingId, trackChanges: false)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(bi => bi.BookingProcedures)
+                        .ThenInclude(bp => bp.Procedure)
+                .FirstOrDefaultAsync();
+        }
     }
 }

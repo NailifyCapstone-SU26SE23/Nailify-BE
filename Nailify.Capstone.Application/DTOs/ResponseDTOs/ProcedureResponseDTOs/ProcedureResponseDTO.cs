@@ -3,6 +3,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.ProcedureRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,5 +22,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.ProcedureResponseDTOs
         public DateTime CreateAt { get; set; }
         public bool IsRequired { get; set; }
         public bool IsMainStep { get; set; }
+        public ProcedureType ProcedureType { get; set; }
     }
 }

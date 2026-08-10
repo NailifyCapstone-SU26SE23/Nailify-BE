@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<ProcedureResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll([FromQuery] PagingRequestParameters parameters)
+        public async Task<IActionResult> GetAll([FromQuery] ProcedurePagingParameters parameters)
         {
             var result = await _procedureService.GetAllProceduresAsync(parameters);
             return Ok(result);

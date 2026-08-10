@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -28,7 +28,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(np => np.CustomerNailId == customerNailId && np.Status == "Active")
                 .Include(np => np.Procedure)
-                .Where(np => np.Procedure.Status == "Active")
+                .Where(np => np.IsCustomStep || (np.Procedure != null && np.Procedure.Status == "Active"))
                 .OrderBy(np => np.StepOrder)
                 .ToListAsync();
         }
