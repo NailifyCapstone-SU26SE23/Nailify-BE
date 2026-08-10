@@ -706,6 +706,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.HasOne(np => np.Procedure)
                       .WithMany(p => p.NailProcedures)
                       .HasForeignKey(np => np.ProcedureId)
+                      .IsRequired(false)
                       .OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<BookingProcedure>(entity =>

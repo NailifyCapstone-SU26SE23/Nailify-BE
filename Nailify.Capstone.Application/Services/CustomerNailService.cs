@@ -290,6 +290,39 @@ namespace Nailify.Capstone.Application.Services
             nailRequest.Status = CustomerNailStatus.Reviewed;
             nailRequest.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
+
+            // Xử lý lưu các bước quy trình (Procedures) nếu có
+            if (request.Procedures != null && request.Procedures.Any())
+            {
+                var existingProcedures = _unitOfWork.NailProcedureRepository
+                    .FindByCondition(np => np.CustomerNailId == nailRequest.CustomerNailId)
+                    .ToList();
+
+                foreach (var ep in existingProcedures)
+                {
+                    _unitOfWork.NailProcedureRepository.Delete(ep);
+                }
+
+                int stepOrder = 1;
+                foreach (var proc in request.Procedures)
+                {
+                    var nailProcedure = new NailProcedure
+                    {
+                        CustomerNailId = nailRequest.CustomerNailId,
+                        ProcedureId = proc.IsCustomStep ? null : proc.ProcedureId,
+                        Name = proc.IsCustomStep ? proc.Name : null,
+                        EstimatedMinutes = proc.IsCustomStep ? proc.EstimatedMinutes : null,
+                        Price = proc.IsCustomStep ? proc.Price : null,
+                        Note = proc.Note,
+                        IsCustomStep = proc.IsCustomStep,
+                        StepOrder = proc.StepOrder > 0 ? proc.StepOrder : stepOrder,
+                        Status = "Active"
+                    };
+                    await _unitOfWork.NailProcedureRepository.CreateAsync(nailProcedure);
+                    stepOrder++;
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);

@@ -374,7 +374,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                          customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Quoted))
                     {
                         var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailRequest.CustomerNailId);
-                        itemDuration += (customerNail?.Duration ?? 60) + (customNailRequest.Duration ?? 0);
+                        itemDuration += customNailRequest.Duration ?? customerNail?.Duration ?? 60;
                     }
                 }
 
