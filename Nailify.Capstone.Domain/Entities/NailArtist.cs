@@ -17,5 +17,6 @@ namespace Nailify.Capstone.Domain.Entities
 
         public virtual ICollection<NailArtistSkill> NailArtistSkills { get; set; }
         public virtual ICollection<NailArtistBreak> NailArtistBreaks { get; set; } = new List<NailArtistBreak>();
+        public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
     }
 }

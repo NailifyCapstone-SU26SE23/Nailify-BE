@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
 using System.Collections.Generic;
@@ -100,15 +101,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
 
-            return await FindByCondition(x => x.Account.SalonId == salonId 
-                                           && x.ConcurrentCapacity > 0 
+            return await FindByCondition(x => x.Account.SalonId == salonId
+                                           && x.ConcurrentCapacity > 0
                                            && x.NailArtistId != excludeArtistId, trackChanges: false)
                 .Include(x => x.Account)
-                .Where(x => !x.Bookings.Any(b => b.BookingDate.Date == date.Date 
-                                              && b.Status != BookingStatus.Cancelled 
+                .Where(x => !x.Bookings.Any(b => b.BookingDate.Date == date.Date
+                                              && b.Status != BookingStatus.Cancelled
                                               && b.Status != BookingStatus.Completed
-                                              && b.StartTime < endTime 
-                                              && b.EndTime > startTime))
+                                              && b.StartTime < endTime
+                                              && b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration)) > startTime))
                 .FirstOrDefaultAsync();
         }
     }
