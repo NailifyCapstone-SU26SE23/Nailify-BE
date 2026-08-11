@@ -1,5 +1,4 @@
 using AutoMapper;
-using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -195,11 +194,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var favorites = await _unitOfWork.FavoriteNailRepository
-                .FindByCondition(f =>
-                    f.UserId == userId.Value &&
-                    f.NailVariantId != null &&
-                    variantIds.Contains(f.NailVariantId.Value))
-                .ToListAsync();
+                .GetFavoritesByVariantIdsAsync(userId.Value, variantIds);
 
             var favoriteByVariantId = favorites
                 .GroupBy(favorite => favorite.NailVariantId!.Value)
