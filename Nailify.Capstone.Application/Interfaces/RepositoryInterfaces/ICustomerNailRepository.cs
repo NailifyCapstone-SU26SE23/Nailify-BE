@@ -8,5 +8,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null);
         Task<CustomerNail?> GetCustomerNailDetailAsync(int customerNailId);
+        Task<List<CustomerNail>> GetAllCustomerNailsAsync();
     }
 }

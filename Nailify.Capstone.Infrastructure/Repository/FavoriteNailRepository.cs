@@ -34,6 +34,29 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public Task<List<FavoriteNail>> GetFavoritesWithDetailsAsync(Guid userId)
             => BuildQuery().Where(f => f.UserId == userId).ToListAsync();
 
+        public async Task<List<FavoriteNail>> GetFavoritesByDesignAndVariantIdsAsync(Guid userId, IEnumerable<int> designIds, IEnumerable<int> variantIds)
+        {
+            var designIdList = designIds as IReadOnlyCollection<int> ?? designIds.ToList();
+            var variantIdList = variantIds as IReadOnlyCollection<int> ?? variantIds.ToList();
+
+            return await _dbSet.AsNoTracking()
+                .Where(f => f.UserId == userId &&
+                    ((f.NailVariantId == null && f.NailDesignId != null && designIdList.Contains(f.NailDesignId.Value)) ||
+                     (f.NailVariantId != null && variantIdList.Contains(f.NailVariantId.Value))))
+                .ToListAsync();
+        }
+
+        public async Task<List<FavoriteNail>> GetFavoritesByVariantIdsAsync(Guid userId, IEnumerable<int> variantIds)
+        {
+            var variantIdList = variantIds as IReadOnlyCollection<int> ?? variantIds.ToList();
+
+            return await _dbSet.AsNoTracking()
+                .Where(f => f.UserId == userId &&
+                            f.NailVariantId != null &&
+                            variantIdList.Contains(f.NailVariantId.Value))
+                .ToListAsync();
+        }
+
         private IQueryable<FavoriteNail> BuildQuery()
             => _dbSet
                 .AsNoTracking()
