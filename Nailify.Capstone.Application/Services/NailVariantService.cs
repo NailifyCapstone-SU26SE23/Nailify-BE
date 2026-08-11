@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -19,16 +20,17 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null)
+        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null)
         {
             var pagedResult = await _unitOfWork.NailVariantRepository.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name);
             var mappedItems = _mapper.Map<List<NailVariantDto>>(pagedResult.Items);
+            await PopulateFavoriteStatusAsync(mappedItems, userId);
             var resultPagedList = new PagedList<NailVariantDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
             return new ApiSuccessResult<PagedList<NailVariantDto>>(resultPagedList, "Lấy danh sách biến thể thành công");
         }
 
-        public async Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id)
+        public async Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id, Guid? userId = null)
         {
             var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
             if (variant == null)
@@ -36,7 +38,9 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
 
-            return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(variant), "Lấy thông tin biến thể thành công.");
+            var variantDto = _mapper.Map<NailVariantDto>(variant);
+            await PopulateFavoriteStatusAsync(new[] { variantDto }, userId);
+            return new ApiSuccessResult<NailVariantDto>(variantDto, "Lấy thông tin biến thể thành công.");
         }
 
         public async Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null)
@@ -53,7 +57,6 @@ namespace Nailify.Capstone.Application.Services
             variant.Duration = await CalculateNailVariantDurationAsync(request.NailShapeId, request.NailSurfaceId);
             await _unitOfWork.NailVariantRepository.CreateAsync(variant);
             await _unitOfWork.SaveChangesAsync();
-            await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
 
             var createdVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(variant.NailVariantId);
             return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(createdVariant), "Tạo biến thể thành công.");
@@ -67,7 +70,6 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
 
-            var previousNailDesignId = variant.NailDesignId;
             var validationError = await ValidateReferencesAsync(request.NailDesignId, request.NailShapeId, request.NailSurfaceId);
             if (validationError != null)
             {
@@ -84,11 +86,6 @@ namespace Nailify.Capstone.Application.Services
             variant.Duration = await CalculateNailVariantDurationAsync(request.NailShapeId, request.NailSurfaceId, id);
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
-            await UpdateNailDesignPriceRangeAsync(previousNailDesignId);
-            if (previousNailDesignId != variant.NailDesignId)
-            {
-                await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
-            }
 
             var updatedVariant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
             return new ApiSuccessResult<NailVariantDto>(_mapper.Map<NailVariantDto>(updatedVariant), "Cập nhật biến thể thành công.");
@@ -102,10 +99,8 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<bool>("Không tìm thấy biến thể.");
             }
 
-            var nailDesignId = variant.NailDesignId;
             _unitOfWork.NailVariantRepository.Delete(variant);
             await _unitOfWork.SaveChangesAsync();
-            await UpdateNailDesignPriceRangeAsync(nailDesignId);
 
             return new ApiSuccessResult<bool>(true, "Xóa biến thể móng thành.");
         }
@@ -148,27 +143,6 @@ namespace Nailify.Capstone.Application.Services
             return (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
-        private async Task UpdateNailDesignPriceRangeAsync(int? nailDesignId)
-        {
-            if (!nailDesignId.HasValue)
-            {
-                return;
-            }
-
-            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId.Value);
-            if (nailDesign == null)
-            {
-                return;
-            }
-
-            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId.Value);
-            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
-            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
-
-            _unitOfWork.NailDesignRepository.Update(nailDesign);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
         private async Task<string?> ValidateReferencesAsync(int? nailDesignId, int? nailShapeId, int? nailSurfaceId)
         {
             var design = nailDesignId.HasValue
@@ -192,7 +166,7 @@ namespace Nailify.Capstone.Application.Services
             return null;
         }
 
-        public async Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId)
+        public async Task<ApiResult<List<NailVariantDto>>> GetCapableNailVariantsAsync(Guid artistId, Guid? userId = null)
         {
             var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(artistId);
             if (artist == null)
@@ -202,8 +176,43 @@ namespace Nailify.Capstone.Application.Services
 
             var capableVariants = await _unitOfWork.NailVariantRepository.GetNailVariantsCapableByArtistAsync(artistId);
             var response = _mapper.Map<List<NailVariantDto>>(capableVariants);
+            await PopulateFavoriteStatusAsync(response, userId);
 
             return new ApiSuccessResult<List<NailVariantDto>>(response, "Lấy danh sách mẫu móng thợ có thể thực hiện thành công.");
+        }
+        private async Task PopulateFavoriteStatusAsync(IEnumerable<NailVariantDto> variants, Guid? userId)
+        {
+            if (userId == null)
+            {
+                return;
+            }
+
+            var variantList = variants.ToList();
+            var variantIds = variantList.Select(variant => variant.NailVariantId).ToHashSet();
+            if (!variantIds.Any())
+            {
+                return;
+            }
+
+            var favorites = await _unitOfWork.FavoriteNailRepository
+                .FindByCondition(f =>
+                    f.UserId == userId.Value &&
+                    f.NailVariantId != null &&
+                    variantIds.Contains(f.NailVariantId.Value))
+                .ToListAsync();
+
+            var favoriteByVariantId = favorites
+                .GroupBy(favorite => favorite.NailVariantId!.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            foreach (var variant in variantList)
+            {
+                if (favoriteByVariantId.TryGetValue(variant.NailVariantId, out var favorite))
+                {
+                    variant.IsFavorited = true;
+                    variant.FavoriteNailId = favorite.FavoriteNailId;
+                }
+            }
         }
     }
 }

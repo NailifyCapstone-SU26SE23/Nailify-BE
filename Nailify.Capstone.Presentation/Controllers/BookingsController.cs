@@ -12,6 +12,7 @@ using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -102,8 +103,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> CalculatePrice([FromBody] BookingPriceRequestDTO request)
         {
+            var customerIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var customerId = Guid.TryParse(customerIdClaim, out var parsedCustomerId)
+                ? parsedCustomerId
+                : (Guid?)null;
+
             var response = await _bookingService.CalculateBookingPriceAsync(
-                GetCurrentUserId(),
+                customerId,
                 request.BookingItems,
                 request.SelectedPromotionIds); 
 

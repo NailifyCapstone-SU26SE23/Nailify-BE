@@ -13,6 +13,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public bool IsFavorited { get; set; }
+        public int? FavoriteNailId { get; set; }
         public List<CategoryDto> Categories { get; set; } = new List<CategoryDto>();
         public List<NailVariantDto> NailVariants { get; set; } = new List<NailVariantDto>();
 

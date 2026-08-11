@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request);
         Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(
-            Guid customerId,
+            Guid? customerId,
             IEnumerable<BookingItemRequestDTO> bookingItems,
             List<int>? selectedPromotionIds = null);
     }

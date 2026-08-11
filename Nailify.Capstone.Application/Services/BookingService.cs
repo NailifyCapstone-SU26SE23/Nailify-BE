@@ -34,7 +34,7 @@ namespace Nailify.Capstone.Application.Services
         }
         public Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request)
          => _bookingCreationService.CreateBookingAsync(customerId, request);
-        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
             => _bookingCreationService.CalculateBookingPriceAsync(customerId, bookingItems, selectedPromotionIds);
         public Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
             => _bookingLifecycleService.VerifyQrCodeAsync(qrToken, actorId);

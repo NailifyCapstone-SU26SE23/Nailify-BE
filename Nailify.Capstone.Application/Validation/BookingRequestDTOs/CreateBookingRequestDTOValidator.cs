@@ -27,8 +27,11 @@ namespace Nailify.Capstone.Application.Validation.BookingRequestDTOs
             RuleForEach(x => x.BookingItems).ChildRules(item =>
             {
                 item.RuleFor(i => i)
-                    .Must(i => i.ServiceId.HasValue || i.NailVariantId.HasValue || i.CustomerNailId.HasValue)
-                    .WithMessage("Mỗi mục đặt lịch phải chứa Dịch vụ (Service), Biến thể móng (NailVariant) hoặc Mẫu thiết kế riêng (CustomerNail).");
+                    .Must(i => i.ServiceId.HasValue
+                        || i.NailVariantId.HasValue
+                        || i.CustomerNailId.HasValue
+                        || i.CustomerNailRequestId.HasValue)
+                    .WithMessage("Mỗi mục đặt lịch phải chứa Dịch vụ (Service), Biến thể móng (NailVariant), Mẫu thiết kế riêng (CustomerNail) hoặc Yêu cầu mẫu thiết kế riêng (CustomerNailRequest).");
             });
         }
     }

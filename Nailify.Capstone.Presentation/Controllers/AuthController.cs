@@ -71,22 +71,23 @@ namespace Nailify.Capstone.Presentation.Controllers
             try
             {
                 var result = await _authService.GoogleLoginAsync(request);
+
                 if (result == null)
                 {
                     return Unauthorized(new
                     {
                         isSucceeded = false,
-                        message = "Google token khÃ´ng há»£p lá»‡."
+                        message = "Google token không hợp lệ."
                     });
                 }
 
                 return Ok(new
                 {
                     isSucceeded = true,
-                    message = "ÄÄƒng nháº­p Google thÃ nh cÃ´ng.",
+                    message = "Đăng nhập Google thành công.",
                     data = new
                     {
-                        token = result.Token,
+                        token = result.Token
                     }
                 });
             }
@@ -95,7 +96,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return Unauthorized(new
                 {
                     isSucceeded = false,
-                    message = "Google token khÃ´ng há»£p lá»‡."
+                    message = "Google token không hợp lệ."
                 });
             }
             catch (InvalidOperationException ex)
