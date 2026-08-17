@@ -23,9 +23,8 @@ namespace Nailify.Capstone.Domain.Entities
     public class Transaction
     {
         public int TransactionId { get; set; }
-        public Guid BookingId { get; set; }
-        public Booking Booking { get; set; } = null!;
-
+        public Guid? BookingId { get; set; }
+        public Booking? Booking { get; set; }
         public string OrderCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string? Reference { get; set; } 

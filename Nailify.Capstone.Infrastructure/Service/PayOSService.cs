@@ -9,6 +9,10 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Distributed;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
@@ -20,6 +24,8 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly IUnitOfWork _unitOfWork;
         private readonly PayOSHelper _payOSHelper;
         private readonly ILogger<PayOSService> _logger;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IDistributedCache _cache;
         private const string PayOSBaseUrl = "https://api-merchant.payos.vn";
 
         public PayOSService(
@@ -28,6 +34,8 @@ namespace Nailify.Capstone.Infrastructure.Service
             IPaymentUrls paymentUrls,
             IUnitOfWork unitOfWork,
             PayOSHelper payOSHelper,
+            IServiceProvider serviceProvider,
+            IDistributedCache cache,
             ILogger<PayOSService> logger)
         {
             _httpClient = httpClientFactory.CreateClient();
@@ -35,7 +43,131 @@ namespace Nailify.Capstone.Infrastructure.Service
             _paymentUrls = paymentUrls;
             _unitOfWork = unitOfWork;
             _payOSHelper = payOSHelper;
+            _serviceProvider = serviceProvider;
+            _cache = cache;
             _logger = logger;
+        }
+
+        public class PendingBookingPaymentData
+        {
+            public Guid CustomerId { get; set; }
+            public CreateBookingRequestDTO Request { get; set; } = null!;
+        }
+
+        public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkForBookingRequestAsync(Guid customerId, CreateBookingRequestDTO request)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var slotHoldService = scope.ServiceProvider.GetRequiredService<ISlotHoldService>();
+                var bookingCreationService = scope.ServiceProvider.GetRequiredService<IBookingCreationService>();
+
+                if (request.NailArtistId.HasValue && !string.IsNullOrEmpty(request.HoldToken))
+                {
+                    var isValidHold = await slotHoldService.ValidateHoldTokenAsync(request.HoldToken, customerId, request.NailArtistId.Value, request.BookingDate, request.StartTime);
+                    if (!isValidHold)
+                    {
+                        return (false, "Mã giữ chỗ không hợp lệ hoặc đã hết hạn.", null);
+                    }
+                }
+
+                var priceResult = await bookingCreationService.CalculateBookingPriceAsync(customerId, request.BookingItems, request.SelectedPromotionIds);
+                if (!priceResult.IsSucceeded)
+                {
+                    return (false, priceResult.Message ?? "Lỗi tính giá.", null);
+                }
+
+                var amountDue = priceResult.Data?.TotalPrice ?? 0m;
+                var finalAmountDue = amountDue * 0.2m; // 20% deposit
+                if (finalAmountDue <= 0)
+                {
+                    // If the booking requires 0 payment (e.g. 100% discount or warranty), we shouldn't create a payment link.
+                    // But for consistency with your flow, we handle it if needed. Let's assume there's an amount to pay.
+                    if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
+                }
+
+                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                var amount = (int)Math.Round(finalAmountDue, MidpointRounding.AwayFromZero);
+                if (amount <= 0)
+                {
+                     return (false, "So tien thanh toan khong hop le.", null);
+                }
+
+                var description = $"Coc don {orderCode}";
+                var itemName = $"Coc don {orderCode}";
+                var signature = CreatePaymentRequestSignature(amount, description, orderCode);
+
+                var paymentRequest = new
+                {
+                    orderCode,
+                    amount,
+                    description,
+                    items = new[]
+                    {
+                        new { name = itemName, quantity = 1, price = amount }
+                    },
+                    cancelUrl = _paymentUrls.CancelUrl,
+                    returnUrl = _paymentUrls.ReturnUrl,
+                    signature
+                };
+
+                using var content = new StringContent(JsonSerializer.Serialize(paymentRequest, JsonOptions), Encoding.UTF8, "application/json");
+                ApplyAuthenticationHeaders();
+
+                var response = await _httpClient.PostAsync($"{PayOSBaseUrl}/v2/payment-requests", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, $"Loi tu PayOS: {responseContent}", null);
+                }
+
+                var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                if (paymentResult.TryGetProperty("code", out var codeElement) && codeElement.GetString() != "00")
+                {
+                    var desc = paymentResult.TryGetProperty("desc", out var descElement) ? descElement.GetString() : responseContent;
+                    return (false, $"Loi tu PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
+                }
+
+                if (!paymentResult.TryGetProperty("data", out var data))
+                {
+                    return (false, $"PayOS response khong co data: {responseContent}", null);
+                }
+
+                var pendingData = new PendingBookingPaymentData
+                {
+                    CustomerId = customerId,
+                    Request = request
+                };
+                
+                var cacheKey = $"payos:booking_req:{orderCode}";
+                var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(20) };
+                await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(pendingData), cacheOptions);
+
+                var transaction = new Transaction
+                {
+                    BookingId = null,
+                    OrderCode = orderCode.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    Amount = finalAmountDue,
+                    PaymentLinkId = GetString(data, "paymentLinkId"),
+                    CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
+                    QrCode = GetString(data, "qrCode") ?? string.Empty,
+                    Status = TransactionStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                    WebhookPayload = string.Empty
+                };
+
+                await _unitOfWork.TransactionRepository.CreateAsync(transaction);
+                await _unitOfWork.SaveChangesAsync();
+                StartStatusPolling(orderCode, transaction.ExpiresAt);
+
+                return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Loi khi tao link thanh toan cho request.");
+                return (false, $"Loi khi tao link thanh toan: {ex.Message}", null);
+            }
         }
 
         public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkAsync(Guid bookingId)
@@ -131,6 +263,7 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
+                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
             }
@@ -174,13 +307,8 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
                 if (transaction.Status == TransactionStatus.Paid)
                 {
-                    transaction.Booking.AmountPaid = transaction.Amount;
-                    transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
-                }
-
-                if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
-                {
-                    transaction.Booking.CheckOut(Guid.Empty);
+                    await EnsureBookingForPaidTransactionAsync(transaction);
+                    ApplyPaidAmountToBookingAsync(transaction);
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -364,12 +492,108 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             if (newStatus == TransactionStatus.Paid)
             {
-                transaction.Booking.AmountPaid = transaction.Amount;
-                transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
+                await EnsureBookingForPaidTransactionAsync(transaction);
+                ApplyPaidAmountToBookingAsync(transaction);
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task EnsureBookingForPaidTransactionAsync(Transaction transaction)
+        {
+            if (transaction.BookingId.HasValue)
+            {
+                transaction.Booking ??= await _unitOfWork.BookingRepository.GetByIdAsync(transaction.BookingId.Value);
+                return;
+            }
+
+            var cacheKey = $"payos:booking_req:{transaction.OrderCode}";
+            var cachedJson = await _cache.GetStringAsync(cacheKey);
+            if (string.IsNullOrWhiteSpace(cachedJson))
+            {
+                return;
+            }
+
+            var pendingData = JsonSerializer.Deserialize<PendingBookingPaymentData>(cachedJson);
+            if (pendingData == null)
+            {
+                return;
+            }
+
+            using var scope = _serviceProvider.CreateScope();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+            var createResult = await bookingService.CreateBookingAsync(pendingData.CustomerId, pendingData.Request);
+            if (!createResult.IsSucceeded || createResult.Data == null)
+            {
+                _logger.LogError(
+                    "Failed to create booking after successful payment. OrderCode: {OrderCode}, Error: {Error}",
+                    transaction.OrderCode,
+                    createResult.Message);
+                return;
+            }
+
+            transaction.BookingId = createResult.Data.BookingId;
+            transaction.Booking = await _unitOfWork.BookingRepository.GetByIdAsync(createResult.Data.BookingId);
+            await _cache.RemoveAsync(cacheKey);
+        }
+
+        private static void ApplyPaidAmountToBookingAsync(Transaction transaction)
+        {
+            if (transaction.Booking == null)
+            {
+                return;
+            }
+
+            transaction.Booking.AmountPaid = transaction.Amount;
+            transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
+            if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
+            {
+                transaction.Booking.CheckOut(Guid.Empty);
+            }
+        }
+
+        private void StartStatusPolling(long orderCode, DateTime expiresAt)
+        {
+            _ = Task.Run(async () =>
+            {
+                var maxDuration = expiresAt - DateTime.UtcNow;
+                if (maxDuration < TimeSpan.FromMinutes(1))
+                {
+                    maxDuration = TimeSpan.FromMinutes(1);
+                }
+
+                var deadline = DateTime.UtcNow.Add(maxDuration);
+                var delay = TimeSpan.FromSeconds(10);
+
+                var attempt = 0;
+                while (DateTime.UtcNow < deadline)
+                {
+                    attempt++;
+                    try
+                    {
+                        var (_, _, status) = await GetPaymentStatusAsync(orderCode);
+                        if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Auto status poll failed for order code {OrderCode} on attempt {Attempt}.",
+                            orderCode,
+                            attempt);
+                    }
+
+                    if (DateTime.UtcNow < deadline)
+                    {
+                        await Task.Delay(delay);
+                    }
+                }
+            });
         }
 
         private PaymentResponseDto ToResponse(Transaction transaction)
