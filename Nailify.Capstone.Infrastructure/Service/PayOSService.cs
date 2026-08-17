@@ -24,7 +24,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         private readonly IUnitOfWork _unitOfWork;
         private readonly PayOSHelper _payOSHelper;
         private readonly ILogger<PayOSService> _logger;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IDistributedCache _cache;
         private const string PayOSBaseUrl = "https://api-merchant.payos.vn";
 
@@ -34,7 +34,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             IPaymentUrls paymentUrls,
             IUnitOfWork unitOfWork,
             PayOSHelper payOSHelper,
-            IServiceProvider serviceProvider,
+            IServiceScopeFactory scopeFactory,
             IDistributedCache cache,
             ILogger<PayOSService> logger)
         {
@@ -43,7 +43,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             _paymentUrls = paymentUrls;
             _unitOfWork = unitOfWork;
             _payOSHelper = payOSHelper;
-            _serviceProvider = serviceProvider;
+            _scopeFactory = scopeFactory;
             _cache = cache;
             _logger = logger;
         }
@@ -58,7 +58,7 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                using var scope = _scopeFactory.CreateScope();
                 var slotHoldService = scope.ServiceProvider.GetRequiredService<ISlotHoldService>();
                 var bookingCreationService = scope.ServiceProvider.GetRequiredService<IBookingCreationService>();
 
@@ -521,7 +521,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 return;
             }
 
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = _scopeFactory.CreateScope();
             var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
             var createResult = await bookingService.CreateBookingAsync(pendingData.CustomerId, pendingData.Request);
@@ -573,8 +573,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                     attempt++;
                     try
                     {
-                        var (_, _, status) = await GetPaymentStatusAsync(orderCode);
-                        if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                        using var scope = _scopeFactory.CreateScope();
+                        var scopedPaymentService = scope.ServiceProvider.GetRequiredService<PayOSService>();
+                        var (_, _, status) = await scopedPaymentService.GetPaymentStatusAsync(orderCode);
+                        if (IsTerminalPayOSStatus(status))
                         {
                             return;
                         }
@@ -593,7 +595,32 @@ namespace Nailify.Capstone.Infrastructure.Service
                         await Task.Delay(delay);
                     }
                 }
+
+                using var overdueScope = _scopeFactory.CreateScope();
+                var overduePaymentService = overdueScope.ServiceProvider.GetRequiredService<PayOSService>();
+                await overduePaymentService.MarkTransactionOverdueAsync(orderCode);
             });
+        }
+
+        private async Task MarkTransactionOverdueAsync(long orderCode)
+        {
+            var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(
+                orderCode.ToString(CultureInfo.InvariantCulture),
+                trackChanges: true);
+
+            if (transaction == null || transaction.Status == TransactionStatus.Paid || transaction.Status == TransactionStatus.Cancelled || transaction.Status == TransactionStatus.Overdue)
+            {
+                return;
+            }
+
+            transaction.Status = TransactionStatus.Overdue;
+            _unitOfWork.TransactionRepository.Update(transaction);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        private static bool IsTerminalPayOSStatus(string? status)
+        {
+            return status?.ToUpperInvariant() is "PAID" or "CANCELLED" or "CANCELED" or "EXPIRED";
         }
 
         private PaymentResponseDto ToResponse(Transaction transaction)
