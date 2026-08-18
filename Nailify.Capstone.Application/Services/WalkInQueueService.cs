@@ -594,6 +594,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             newBooking.Price = totalPrice;
+            newBooking.AmountDue = totalPrice;
             newBooking.TotalPrice = totalPrice;
             newBooking.TotalDuration = totalDuration > 0 ? totalDuration : 30;
 
