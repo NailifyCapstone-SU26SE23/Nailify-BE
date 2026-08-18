@@ -9,7 +9,7 @@ namespace Nailify.Capstone.Domain.Entities
         public ComponentType ComponentType { get; set; }
         public decimal? Price { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsPublic { get; set; } = false;
+        //public bool IsPublic { get; set; } = false;
         public string Status { get; set; } = "Active";
 
         public virtual User User { get; set; } = null!;
