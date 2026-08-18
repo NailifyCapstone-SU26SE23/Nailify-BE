@@ -23,13 +23,16 @@ namespace Nailify.Capstone.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
         private readonly IBookingSkillMatchingService _skillMatchingService;
+        private readonly IPromotionService _promotionService;
+
         public NailArtistEmergencyService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IBookingSchedulingService schedulingService,
             INotificationService notificationService,
             IEmailService emailService,
-            IBookingSkillMatchingService skillMatchingService)
+            IBookingSkillMatchingService skillMatchingService,
+            IPromotionService promotionService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -37,6 +40,7 @@ namespace Nailify.Capstone.Application.Services
             _notificationService = notificationService;
             _emailService = emailService;
             _skillMatchingService = skillMatchingService;
+            _promotionService = promotionService;
         }
 
         public async Task<EmergencyOffResultDTO> ProcessAffectedBookingsForDateAsync(Guid artistId, DateTime targetDate, string reason)
@@ -184,16 +188,9 @@ namespace Nailify.Capstone.Application.Services
                             x.NailArtistId = candidate.NailArtistId;
                             _unitOfWork.BookingRepository.Update(x);
 
-                            // HƯỚNG DẪN LUỒNG ĐỀ XUẤT GIỜ MỚI & TẶNG VOUCHER ĐỀN BÙ (BR-02.3) - Author: ThanhDT
-                            //  - Khách đặt lúc 15:00. Thợ ban đầu bận đột xuất (Emergency Off).
-                            //  - Không có thợ nào khác rảnh ĐÚNG 15:00.
-                            //  - Hệ thống tự động dùng thuật toán Nearest Slot Search quét khoảng lệch (+/- 30-60 phút):
-                            //    Ví dụ: Thử các mốc [15:30 -> 14:30 -> 16:00 -> 14:00].
-                            //  - Khi tìm thấy thợ rảnh tại slot 15:30 (hoặc 14:30/16:00):
-                            //    => Đề xuất khách dời lịch sang giờ này (`BookingStatus.RescheduleSuggested`).
-                            //    => VÌ KHÁCH BỊ ĐỜI LỊCH SO VỚI DỰ KIẾN, HỆ THỐNG CÓ THỂ TẶNG VOUCHER ĐỀN BÙ CHO KHÁCH HÀNG.
-                            // TuePDG
-                            // TODO: cấp Voucher đền bù dời lịch
+                            // Tự động cộng Voucher đền bù dời lịch cho khách hàng
+                            await _promotionService.AddVoucherForRescheduleAsync(x.BookingId);
+
                             response.RescheduleSuggestedCount++;
 
                             var detailDto = _mapper.Map<EmergencyBookingHandlingDetailDTO>(x);
@@ -221,19 +218,13 @@ namespace Nailify.Capstone.Application.Services
                     continue;
                 }
 
-                //  HƯỚNG DẪN LUỒNG HỦY ĐƠN & HOÀN CỌC + VOUCHER KHI KHÔNG CÓ THỢ NÀO THAY THẾ (Author: ThanhDT)
-                // Khi đã thử tất cả thợ và tất cả các khung giờ (+/- 60p) nhưng không có thợ nào đủ skill/rảnh.
-                // LUỒNG XỬ LÝ:
-                //   1. Hủy đơn hàng và đánh dấu Cancelled.
-                //   2. Hoàn lại 100% tiền đặt cọc (nếu đơn có thanh toán cọc trước) qua Payment Gateway/Ví.
-                //   3. Tặng Voucher đền bù đặc biệt (VD: Voucher 20% hoặc 100k) tạ lỗi vì Salon phải tự động hủy đơn của khách.
+                // LUỒNG HỦY ĐƠN & HOÀN CỌC + VOUCHER KHI KHÔNG CÓ THỢ NÀO THAY THẾ
                 string cancelReason = $"[Tự động hủy] Sự cố thợ bận đột xuất ({reason}) - Không có thợ/slot có kỹ năng phù hợp thay thế.";
                 x.Cancel(Guid.Empty, cancelReason);
                 _unitOfWork.BookingRepository.Update(x);
 
-
-                // TuePDG
-                // TODO: Bổ sung hoàn tiền cọc & cấp Voucher đền bù hủy đơn
+                // Tự động cộng Voucher đền bù hủy đơn cho khách hàng
+                await _promotionService.AddVoucherForCancelledAsync(x.BookingId);
 
                 response.CancelledAndRefundedCount++;
 
