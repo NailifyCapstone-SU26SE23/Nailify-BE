@@ -408,6 +408,3 @@ appsettings.Development.json
 .claude/
 AGENTS.md
 CLAUDE.md
-/Nailify.Capstone.Presentation/Controllers/HelperController.cs
-/Nailify.Capstone.Application/Services/RecalculationService.cs
-/Nailify.Capstone.Application/Interfaces/ServiceInterfaces/IRecalculationService.cs
