@@ -124,21 +124,28 @@ namespace Nailify.Capstone.Application.Services
                 .ToList();
 
             dto.GlobalPromotionPerformance = paidBookings
-                .SelectMany(b => b.BookingDiscounts.Select(d => new { Booking = b, Discount = d }))
-                .Where(x => x.Discount.PromotionId.HasValue || !string.IsNullOrWhiteSpace(x.Discount.Name))
-                .GroupBy(x => new { x.Discount.PromotionId, PromotionName = x.Discount.Promotion?.Name ?? x.Discount.Name })
-                .Select(g => new PromotionPerformanceDto
-                {
-                    PromotionId = g.Key.PromotionId ?? 0,
-                    PromotionName = g.Key.PromotionName,
-                    UsageCount = g.Count(),
-                    DiscountGiven = g.Sum(x => x.Discount.DiscountAmount),
-                    RevenueGenerated = paidTransactions
-                        .Where(t => g.Select(x => x.Booking.BookingId).Contains(t.BookingId))
-                        .Sum(t => t.Amount)
-                })
-                .OrderByDescending(p => p.RevenueGenerated)
-                .ToList();
+     .SelectMany(b => b.BookingDiscounts.Select(d => new { Booking = b, Discount = d }))
+     .Where(x => x.Discount.PromotionId.HasValue || !string.IsNullOrWhiteSpace(x.Discount.Name))
+     .GroupBy(x => new
+     {
+         x.Discount.PromotionId,
+         PromotionName = x.Discount.Promotion?.Name ?? x.Discount.Name
+     })
+     .Select(g => new PromotionPerformanceDto
+     {
+         PromotionId = g.Key.PromotionId ?? 0,
+         PromotionName = g.Key.PromotionName,
+         UsageCount = g.Count(),
+         DiscountGiven = g.Sum(x => x.Discount.DiscountAmount),
+         RevenueGenerated = paidTransactions
+             .Where(t =>
+                 t.BookingId.HasValue &&
+                 g.Select(x => x.Booking.BookingId)
+                     .Contains(t.BookingId.Value))
+             .Sum(t => t.Amount)
+     })
+     .OrderByDescending(p => p.RevenueGenerated)
+     .ToList();
 
             // 3. Save to Redis Cache (TTL = 15 minutes)
             var cacheOptions = new DistributedCacheEntryOptions
