@@ -7,8 +7,6 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailShapeRequestDTOs
     public class NailShapeUpdateRequest : IMapFrom<NailShape>
     {
         public string Name { get; set; } = string.Empty;
-        public decimal Price { get; set; }
-        public int? Duration { get; set; }
 
         public void Mapping(Profile profile)
         {

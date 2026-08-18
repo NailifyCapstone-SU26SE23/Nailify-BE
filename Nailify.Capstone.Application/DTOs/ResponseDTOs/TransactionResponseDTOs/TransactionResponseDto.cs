@@ -5,7 +5,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
     public class TransactionResponseDto
     {
         public int TransactionId { get; set; }
-        public Guid BookingId { get; set; }
+        public Guid? BookingId { get; set; }
         public string OrderCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string? Reference { get; set; }

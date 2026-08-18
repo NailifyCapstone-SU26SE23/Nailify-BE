@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nailify.Capstone.Infrastruc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nailify.Capstone.Presentation", "Nailify.Capstone.Presentation\Nailify.Capstone.Presentation.csproj", "{05CFC470-9BAE-B6AC-5941-A79881830579}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nailify.Capstone.Test", "Nailify.Capstone.Test\Nailify.Capstone.Test.csproj", "{A5BDAA05-3CA9-4621-8937-3A242D783FC4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{05CFC470-9BAE-B6AC-5941-A79881830579}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05CFC470-9BAE-B6AC-5941-A79881830579}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05CFC470-9BAE-B6AC-5941-A79881830579}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5BDAA05-3CA9-4621-8937-3A242D783FC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5BDAA05-3CA9-4621-8937-3A242D783FC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5BDAA05-3CA9-4621-8937-3A242D783FC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5BDAA05-3CA9-4621-8937-3A242D783FC4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

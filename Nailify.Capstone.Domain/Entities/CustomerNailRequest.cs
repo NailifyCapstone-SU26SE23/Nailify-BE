@@ -19,6 +19,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int? Duration { get; set; }  // Thời gian làm chốt cho request này
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
+        public bool IsCustomerRequest { get; set; } = false; 
         public virtual CustomerNail CustomerNail { get; set; } = null!;
         public virtual Salon Salon { get; set; } = null!;
         public virtual NailArtist? ApprovedArtist { get; set; }

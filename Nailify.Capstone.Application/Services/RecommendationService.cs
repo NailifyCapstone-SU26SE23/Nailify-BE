@@ -8,13 +8,10 @@ using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -25,16 +22,18 @@ namespace Nailify.Capstone.Application.Services
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
-
+        private readonly ILogger<RecommendationService> _logger;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly INemotronConfiguration _nemotronConfiguration;
 
-        public RecommendationService(IUnitOfWork unitOfWork, IMapper mapper, INemotronConfiguration nemotronConfiguration)
+        public RecommendationService(IUnitOfWork unitOfWork, IMapper mapper,
+            INemotronConfiguration nemotronConfiguration, ILogger<RecommendationService> logger)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _nemotronConfiguration = nemotronConfiguration;
+            _logger = logger;
         }
 
         public async Task<ApiResult<RecommendedNailCompositionDto>> GetRecommendedCompositionAsync(Guid userId)
@@ -71,7 +70,6 @@ namespace Nailify.Capstone.Application.Services
 
             var shapes = await _unitOfWork.NailShapeRepository.GetAllNailShapesAsync();
             var surfaces = await _unitOfWork.NailSurfaceRepository.GetAllNailSurfacesAsync();
-            var components = await _unitOfWork.ComponentRepository.GetAllComponentsAsync();
 
             if (!shapes.Any())
             {
@@ -83,20 +81,17 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<RecommendedNailCompositionDto>("Không có dữ liệu cho bề mặt móng");
             }
 
-            var llmResult = await TryGetOpenRouterCompositionAsync(request, shapes, surfaces, components);
+            var llmResult = await TryGetOpenRouterCompositionAsync(request, shapes, surfaces);
             var selectedShape = ResolveRecommendedShape(llmResult, request, shapes);
             var selectedSurface = ResolveRecommendedSurface(llmResult, request, surfaces);
-            var selectedComponents = ResolveRecommendedComponents(llmResult, request, components);
             var colors = ResolveRecommendedColors(llmResult, request);
 
             var dto = new RecommendedNailCompositionDto
             {
                 NailShapeId = selectedShape.NailShapeId,
                 NailSurfaceId = selectedSurface.NailSurfaceId,
-                ComponentIds = selectedComponents.Select(component => component.ComponentId).ToList(),
                 NailShape = _mapper.Map<NailShapeDto>(selectedShape),
                 NailSurface = _mapper.Map<NailSurfaceDto>(selectedSurface),
-                Components = _mapper.Map<List<ComponentDto>>(selectedComponents),
                 Colors = colors
             };
 
@@ -377,7 +372,7 @@ namespace Nailify.Capstone.Application.Services
                 double dotProduct = 0;
                 // La do lon hinhh hoc cua mau mong do
                 double variantNorm = 0;
-                for(int i = 0; i < featureList.Count; i++)
+                for (int i = 0; i < featureList.Count; i++)
                 {
                     // Triet tieu mau mong ko hop (0.0)
                     dotProduct += userVector[i] * variantVector[i];
@@ -563,7 +558,7 @@ namespace Nailify.Capstone.Application.Services
                 {
                     bool isMatch = preferredNailShapeId == v.NailShapeId;
                     string desc = isMatch ? "Dáng móng ưa thích của bạn." : "Dáng móng của mẫu thiết kế.";
-                    
+
                     if (!isMatch && !string.IsNullOrEmpty(customer.HandShape))
                     {
                         if (customer.HandShape.Contains("Mu bàn tay rộng") || customer.HandShape.Contains("mập") || customer.HandShape.Contains("ngắn") || customer.HandShape.Contains("đều tròn"))
@@ -677,7 +672,7 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 var complexityOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.Complexity);
-                var complexityVal = complexityOpt != null? ParseOptionValues(complexityOpt.OptionValue).FirstOrDefault() : null;
+                var complexityVal = complexityOpt != null ? ParseOptionValues(complexityOpt.OptionValue).FirstOrDefault() : null;
                 var skinToneOpt = options.FirstOrDefault(x => x.QuizQuestion.Category == QuizCategory.SkinTone);
                 var skinToneVal = skinToneOpt != null ? ParseOptionValues(skinToneOpt.OptionValue).FirstOrDefault() : null;
 
@@ -888,42 +883,85 @@ namespace Nailify.Capstone.Application.Services
         }
 
         private async Task<LlmCompositionResult?> TryGetOpenRouterCompositionAsync(
-            RecommendationCompositionRequest request,
-            List<NailShape> shapes,
-            List<NailSurface> surfaces,
-            List<Component> components)
+    RecommendationCompositionRequest request,
+    List<NailShape> shapes,
+    List<NailSurface> surfaces)
         {
             var provider = _nemotronConfiguration.LlmProvider;
             var apiKey = _nemotronConfiguration.OpenRouterApiKey;
             var model = _nemotronConfiguration.OpenRouterModel;
             var baseUrl = _nemotronConfiguration.OpenRouterBaseUrl;
 
+            _logger.LogInformation(
+                "[LLM] Attempting LLM recommendation. Provider: {Provider}, Model: {Model}",
+                provider,
+                model);
+
             try
             {
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, baseUrl);
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+                httpRequest.Headers.Authorization =
+                    new AuthenticationHeaderValue("Bearer", apiKey);
+
                 httpRequest.Content = new StringContent(
-                    JsonSerializer.Serialize(BuildOpenRouterRequest(model, request, shapes, surfaces, components), LlmJsonOptions),
+                    JsonSerializer.Serialize(
+                        BuildOpenRouterRequest(model, request, shapes, surfaces),
+                        LlmJsonOptions),
                     Encoding.UTF8,
                     "application/json");
 
-                using var response = await OpenRouterHttpClient.SendAsync(httpRequest);
+                _logger.LogInformation(
+                    "[LLM] Sending request to {BaseUrl}",
+                    baseUrl);
+
+                using var response =
+                    await OpenRouterHttpClient.SendAsync(httpRequest);
+
                 if (!response.IsSuccessStatusCode)
                 {
+                    _logger.LogWarning(
+                        "[LLM] Request failed. StatusCode: {StatusCode}. FALLBACK will be used.",
+                        response.StatusCode);
+
                     return null;
                 }
 
                 var body = await response.Content.ReadAsStringAsync();
+
                 var content = ExtractOpenRouterMessageContent(body);
+
                 if (string.IsNullOrWhiteSpace(content))
                 {
+                    _logger.LogWarning(
+                        "[LLM] Response contained no usable content. FALLBACK will be used.");
+
                     return null;
                 }
 
-                return ParseLlmCompositionResult(content);
+                var result = ParseLlmCompositionResult(content);
+
+                if (result == null)
+                {
+                    _logger.LogWarning(
+                        "[LLM] Failed to parse LLM response. FALLBACK will be used.");
+
+                    return null;
+                }
+
+                _logger.LogInformation(
+                    "[LLM] SUCCESS. Nemotron/LLM recommendation received. ShapeId: {ShapeId}, SurfaceId: {SurfaceId}",
+                    result.NailShapeId,
+                    result.NailSurfaceId);
+
+                return result;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(
+                    ex,
+                    "[LLM] Exception while calling LLM. FALLBACK will be used.");
+
                 return null;
             }
         }
@@ -932,10 +970,9 @@ namespace Nailify.Capstone.Application.Services
             string model,
             RecommendationCompositionRequest request,
             List<NailShape> shapes,
-            List<NailSurface> surfaces,
-            List<Component> components)
+            List<NailSurface> surfaces)
         {
-            var prompt = BuildCompositionPrompt(request, shapes, surfaces, components);
+            var prompt = BuildCompositionPrompt(request, shapes, surfaces);
             return new
             {
                 model,
@@ -961,14 +998,12 @@ namespace Nailify.Capstone.Application.Services
         private string BuildCompositionPrompt(
             RecommendationCompositionRequest request,
             List<NailShape> shapes,
-            List<NailSurface> surfaces,
-            List<Component> components)
+            List<NailSurface> surfaces)
         {
             var catalog = new
             {
                 shapes = shapes.Select(shape => new { id = shape.NailShapeId, shape.Name }),
                 surfaces = surfaces.Select(surface => new { id = surface.NailSurfaceId, surface.Name, surface.FinishType, surface.Price }),
-                components = components.Select(component => new { id = component.ComponentId, component.Name, type = component.ComponentType.ToString(), component.Price })
             };
 
             var profile = new
@@ -992,7 +1027,7 @@ namespace Nailify.Capstone.Application.Services
             builder.AppendLine("Available catalog:");
             builder.AppendLine(JsonSerializer.Serialize(catalog));
             builder.AppendLine();
-            builder.AppendLine("Choose one nail shape, one nail surface, up to five components, and two or three colors.");
+            builder.AppendLine("Choose one nail shape, one nail surface, and two or three colors.");
             builder.AppendLine("Respect preferredNailShapeId when it exists in the catalog.");
             builder.AppendLine("Colors must be #RRGGBB hex values.");
             builder.AppendLine();
@@ -1001,7 +1036,6 @@ namespace Nailify.Capstone.Application.Services
             builder.AppendLine("  \"nail_shape_id\": 1,");
             builder.AppendLine("  \"surface_id\": 1,");
             builder.AppendLine("  \"colors\": [\"#F5F5DC\"],");
-            builder.AppendLine("  \"component_ids\": [1]");
             builder.AppendLine("}");
             return builder.ToString();
         }
@@ -1050,12 +1084,6 @@ namespace Nailify.Capstone.Application.Services
 
                 result.NailShapeId = GetNullableInt(root, "nail_shape_id") ?? GetNullableInt(root, "nailShapeId");
                 result.NailSurfaceId = GetNullableInt(root, "surface_id") ?? GetNullableInt(root, "nailSurfaceId");
-
-                if (root.TryGetProperty("component_ids", out var componentIds)
-                    || root.TryGetProperty("componentIds", out componentIds))
-                {
-                    result.ComponentIds = ReadIntArray(componentIds);
-                }
 
                 if (root.TryGetProperty("colors", out var colors))
                 {
@@ -1160,61 +1188,71 @@ namespace Nailify.Capstone.Application.Services
             return glossySurface ?? surfaces.OrderBy(surface => surface.NailSurfaceId).First();
         }
 
-        private NailShape ResolveRecommendedShape(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<NailShape> shapes)
+        private NailShape ResolveRecommendedShape(
+    LlmCompositionResult? llmResult,
+    RecommendationCompositionRequest request,
+    List<NailShape> shapes)
         {
             if (request.PreferredNailShapeId.HasValue)
             {
-                var preferredShape = shapes.FirstOrDefault(shape => shape.NailShapeId == request.PreferredNailShapeId.Value);
+                var preferredShape = shapes.FirstOrDefault(
+                    shape => shape.NailShapeId == request.PreferredNailShapeId.Value);
+
                 if (preferredShape != null)
                 {
+                    _logger.LogInformation(
+                        "[RECOMMENDATION] Using user's preferred nail shape: {ShapeId}",
+                        preferredShape.NailShapeId);
+
                     return preferredShape;
                 }
             }
 
             if (llmResult?.NailShapeId.HasValue == true)
             {
-                var llmShape = shapes.FirstOrDefault(shape => shape.NailShapeId == llmResult.NailShapeId.Value);
+                var llmShape = shapes.FirstOrDefault(
+                    shape => shape.NailShapeId == llmResult.NailShapeId.Value);
+
                 if (llmShape != null)
                 {
+                    _logger.LogInformation(
+                        "[RECOMMENDATION] Using LLM recommended shape: {ShapeId}",
+                        llmShape.NailShapeId);
+
                     return llmShape;
                 }
             }
 
+            _logger.LogInformation(
+                "[RECOMMENDATION] Using RULE-BASED FALLBACK for nail shape.");
+
             return SelectRecommendedShape(request, shapes);
         }
 
-        private NailSurface ResolveRecommendedSurface(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<NailSurface> surfaces)
+        private NailSurface ResolveRecommendedSurface(
+    LlmCompositionResult? llmResult,
+    RecommendationCompositionRequest request,
+    List<NailSurface> surfaces)
         {
             if (llmResult?.NailSurfaceId.HasValue == true)
             {
-                var llmSurface = surfaces.FirstOrDefault(surface => surface.NailSurfaceId == llmResult.NailSurfaceId.Value);
+                var llmSurface = surfaces.FirstOrDefault(
+                    surface => surface.NailSurfaceId == llmResult.NailSurfaceId.Value);
+
                 if (llmSurface != null)
                 {
+                    _logger.LogInformation(
+                        "[RECOMMENDATION] Using LLM recommended surface: {SurfaceId}",
+                        llmSurface.NailSurfaceId);
+
                     return llmSurface;
                 }
             }
 
+            _logger.LogInformation(
+                "[RECOMMENDATION] Using RULE-BASED FALLBACK for nail surface.");
+
             return SelectRecommendedSurface(request, surfaces);
-        }
-
-        private List<Component> ResolveRecommendedComponents(LlmCompositionResult? llmResult, RecommendationCompositionRequest request, List<Component> components)
-        {
-            if (llmResult?.ComponentIds.Any() == true)
-            {
-                var catalogById = components.ToDictionary(component => component.ComponentId);
-                var selected = llmResult.ComponentIds
-                    .Distinct()
-                    .Where(catalogById.ContainsKey)
-                    .Select(componentId => catalogById[componentId])
-                    .ToList();
-
-                if (selected.Any())
-                {
-                    return selected;
-                }
-            }
-
-            return SelectRecommendedComponents(request, components);
         }
 
         private List<string> ResolveRecommendedColors(LlmCompositionResult? llmResult, RecommendationCompositionRequest request)
@@ -1225,59 +1263,6 @@ namespace Nailify.Capstone.Application.Services
                 .ToList();
 
             return BuildRandomizedColors(request, llmColors);
-        }
-
-        private List<Component> SelectRecommendedComponents(RecommendationCompositionRequest request, List<Component> components)
-        {
-            if (!components.Any())
-            {
-                return new List<Component>();
-            }
-
-            var preferredStyles = request.PreferredStyles ?? new List<string>();
-            var preferredComplexity = request.PreferredComplexity ?? string.Empty;
-            var maxComponents = preferredComplexity.Equals("complex", StringComparison.OrdinalIgnoreCase)
-                ? 5
-                : preferredComplexity.Equals("moderate", StringComparison.OrdinalIgnoreCase)
-                    ? 3
-                    : 2;
-
-            return components
-                .Select(component => new
-                {
-                    Component = component,
-                    Score = ScoreComponent(component, preferredStyles)
-                })
-                .OrderByDescending(item => item.Score)
-                .ThenBy(item => item.Component.Price)
-                .ThenBy(item => item.Component.ComponentId)
-                .Take(maxComponents)
-                .Select(item => item.Component)
-                .ToList();
-        }
-
-        private int ScoreComponent(Component component, List<string> preferredStyles)
-        {
-            var score = 0;
-
-            foreach (var style in preferredStyles)
-            {
-                if (!string.IsNullOrWhiteSpace(style) && component.Name.Contains(style, StringComparison.OrdinalIgnoreCase))
-                {
-                    score += 3;
-                }
-            }
-
-            if (preferredStyles.Any(style => style.Contains("minimal", StringComparison.OrdinalIgnoreCase)))
-            {
-                var simpleKeywords = new[] { "pearl", "line", "dot", "foil", "minimal", "simple" };
-                if (simpleKeywords.Any(keyword => component.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
-                {
-                    score += 2;
-                }
-            }
-
-            return score;
         }
 
         private List<string> BuildRandomizedColors(RecommendationCompositionRequest request, List<string> suggestedColors)
@@ -1338,7 +1323,6 @@ namespace Nailify.Capstone.Application.Services
         {
             public int? NailShapeId { get; set; }
             public int? NailSurfaceId { get; set; }
-            public List<int> ComponentIds { get; set; } = new List<int>();
             public List<string> Colors { get; set; } = new List<string>();
         }
 
