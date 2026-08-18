@@ -19,8 +19,8 @@ namespace Nailify.Capstone.Application.Validation.WaitlistRequestDTOs
             RuleFor(x => x.RequestedStartTime)
                 .NotEmpty().WithMessage("Vui lòng chọn khung giờ mong muốn.");
 
-            RuleFor(x => x.WaitlistItems)
-                .NotEmpty().WithMessage("Đăng ký danh sách chờ phải có ít nhất 1 dịch vụ hoặc mẫu móng.");
+            //RuleFor(x => x.WaitlistItems)
+            //    .NotEmpty().WithMessage("Đăng ký danh sách chờ phải có ít nhất 1 dịch vụ hoặc mẫu móng.");
         }
     }
 }
