@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using System.Security.Claims;
 using Nailify.Capstone.Infrastructure.Service;
 using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.BankAccountInfo;
 
@@ -29,6 +31,23 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> CreatePaymentLink(Guid bookingId)
         {
             var result = await _paymentService.CreatePaymentLinkAsync(bookingId);
+
+            if (!result.Success)
+                return BadRequest(new ApiErrorResult<object>(result.Message));
+
+            return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
+        }
+
+        [HttpPost("create-for-request")]
+        public async Task<IActionResult> CreatePaymentLinkFromRequest([FromBody] CreateBookingRequestDTO request)
+        {
+            var customerIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(customerIdClaim) || !Guid.TryParse(customerIdClaim, out var customerId))
+            {
+                return Unauthorized(new ApiErrorResult<object>("Không tìm thấy thông tin tài khoản."));
+            }
+
+            var result = await _paymentService.CreatePaymentLinkForBookingRequestAsync(customerId, request);
 
             if (!result.Success)
                 return BadRequest(new ApiErrorResult<object>(result.Message));

@@ -149,7 +149,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IShapeMethodConfigService, ShapeMethodConfigService>();
             services.AddScoped<INailSurfaceService, NailSurfaceService>();
             services.AddScoped<INailVariantService, NailVariantService>();
-            services.AddScoped<INailVariantPriceRecalculationService, NailVariantPriceRecalculationService>();
+            services.AddScoped<IRecalculationService, RecalculationService>();
             services.AddScoped<INailComponentService, NailComponentService>();
             services.AddScoped<ICustomerComponentService, CustomerComponentService>();
             services.AddScoped<ICustomerNailService, CustomerNailService>();

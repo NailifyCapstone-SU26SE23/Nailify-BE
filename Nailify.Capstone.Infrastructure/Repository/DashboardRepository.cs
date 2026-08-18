@@ -83,7 +83,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var idList = bookingIds.ToList();
             return await _context.Transactions.AsNoTracking()
-                .Where(t => idList.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
+                .Where(t => idList.Contains((Guid)t.BookingId) && t.Status == TransactionStatus.Paid)
                 .ToListAsync();
         }
 
@@ -120,7 +120,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var idList = bookingIds.ToList();
             return await _context.Transactions.AsNoTracking()
-                .Where(t => idList.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
+                .Where(t => idList.Contains((Guid)t.BookingId) && t.Status == TransactionStatus.Paid)
                 .SumAsync(t => t.Amount);
         }
 
@@ -128,7 +128,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var idList = bookingIds.ToList();
             var result = await _context.Transactions.AsNoTracking()
-                .Where(t => idList.Contains(t.BookingId) && t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
+                .Where(t => idList.Contains((Guid)t.BookingId) && t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
                 .GroupBy(t => t.CreatedAt.Date)
                 .Select(g => new { Date = g.Key, Total = g.Sum(t => t.Amount) })
                 .OrderBy(g => g.Date)

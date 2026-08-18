@@ -97,7 +97,7 @@ namespace Nailify.Capstone.Application.Services
             return new TransactionResponseDto
             {
                 TransactionId = transaction.TransactionId,
-                BookingId = transaction.BookingId,
+                BookingId = (Guid)transaction.BookingId,
                 OrderCode = transaction.OrderCode,
                 Amount = transaction.Amount,
                 Reference = transaction.Reference,
