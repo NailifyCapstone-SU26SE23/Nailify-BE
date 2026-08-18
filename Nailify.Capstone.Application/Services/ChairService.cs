@@ -126,6 +126,10 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<List<ChairResponseDTO>>> GetAvailableChairsAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes)
         {
+            if (durationMinutes <= 0)
+            {
+                return new ApiErrorResult<List<ChairResponseDTO>>("Thời lượng dịch vụ (duration) phải lớn hơn 0 phút.");
+            }
             var salon = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
             if (salon == null)
             {

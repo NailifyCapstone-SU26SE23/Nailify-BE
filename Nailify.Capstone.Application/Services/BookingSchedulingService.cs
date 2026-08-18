@@ -141,78 +141,63 @@ namespace Nailify.Capstone.Application.Services
 
                 if (item.NailVariantId.HasValue)
                 {
-                    var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
-                    foreach (var np in activeNailProcedures)
-                    {
-                        // Avoid duplicating common procedures if already included
-                        if (commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
-                            continue;
+                    var activeNailProcedures = (await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value))
+                        .Where(np => !commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
+                        .ToList();
 
-                        var passiveDuration = np.Procedure.PassiveDuration;
-                        mockProcedures.Add(new BookingProcedure
+                    if (activeNailProcedures.Any())
+                    {
+                        var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
+                        int targetDuration = variant?.Duration ?? 0;
+                        int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure.Duration ?? 0);
+
+                        if (targetDuration > 0 && totalCatalogDuration > 0 && targetDuration != totalCatalogDuration)
                         {
-                            BookingProcedureId = Guid.NewGuid(),
-                            BookingItemId = mockBookingItem.BookingItemId,
-                            BookingItem = mockBookingItem,
-                            ProcedureId = np.ProcedureId,
-                            ProcedureName = np.Procedure.Name,
-                            StepOrder = currentStepOrder++,
-                            Duration = np.Procedure.Duration ?? 15,
-                            ActiveDuration = np.Procedure.ActiveDuration,
-                            PassiveDuration = passiveDuration,
-                            CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
-                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
-                            IsRequired = np.Procedure.IsRequired,
-                            IsMainStep = np.Procedure.IsMainStep,
-                            Status = BookingProcedureStatus.Pending
-                        });
-                    }
-                }
+                            double scaleFactor = (double)targetDuration / totalCatalogDuration;
+                            int accumulatedDuration = 0;
+                            int count = activeNailProcedures.Count;
 
-                // 2. Nếu là dịch vụ lẻ (Service)
-                if (item.ServiceId.HasValue)
-                {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if (service != null)
-                    {
-                        mockProcedures.Add(new BookingProcedure
-                        {
-                            BookingProcedureId = Guid.NewGuid(),
-                            BookingItemId = mockBookingItem.BookingItemId,
-                            BookingItem = mockBookingItem,
-                            ProcedureName = service.Name,
-                            StepOrder = currentStepOrder++,
-                            Duration = service.Duration,
-                            ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
-                            PassiveDuration = 0,
-                            CanOverlap = false,
-                            TransitionBuffer = 1
-                        });
-                    }
-                }
-                // 3. Nếu là mẫu móng custom (CustomerNail)
-                if (item.CustomerNailRequestId.HasValue)
-                {
-                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
-                    int duration = 60; // Mặc định
-
-                    if (customNailRequest != null && customNailRequest.SalonId == salonId && customNailRequest.Duration.HasValue)
-                    {
-                        duration = customNailRequest.Duration.Value;
-                    }
-                    else if (customNailRequest != null)
-                    {
-                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
-                        if (customNail != null)
-                        {
-                            duration = customNail.Duration ?? 60;
-
-                            var customProcs = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByCustomerNailIdAsync(customNail.CustomerNailId);
-                            foreach (var np in customProcs)
+                            for (int i = 0; i < count; i++)
                             {
-                                if (commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
-                                    continue;
+                                var np = activeNailProcedures[i];
+                                int catalogDuration = np.Procedure.Duration ?? 0;
+                                int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
+                                if (i == count - 1)
+                                {
+                                    scaledDuration = Math.Max(1, targetDuration - accumulatedDuration);
+                                }
+                                else
+                                {
+                                    accumulatedDuration += scaledDuration;
+                                }
+
+                                int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(np.Procedure.ActiveDuration * scaleFactor)));
+                                int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
+
+                                mockProcedures.Add(new BookingProcedure
+                                {
+                                    BookingProcedureId = Guid.NewGuid(),
+                                    BookingItemId = mockBookingItem.BookingItemId,
+                                    BookingItem = mockBookingItem,
+                                    ProcedureId = np.ProcedureId,
+                                    ProcedureName = np.Procedure.Name,
+                                    StepOrder = currentStepOrder++,
+                                    Duration = scaledDuration,
+                                    ActiveDuration = scaledActive,
+                                    PassiveDuration = scaledPassive,
+                                    CanOverlap = scaledPassive >= 4 && np.Procedure.CanOverlap,
+                                    TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                    IsRequired = np.Procedure.IsRequired,
+                                    IsMainStep = np.Procedure.IsMainStep,
+                                    Status = BookingProcedureStatus.Pending
+                                });
+                            }
+                        }
+                        else
+                        {
+                            foreach (var np in activeNailProcedures)
+                            {
                                 var passiveDuration = np.Procedure.PassiveDuration;
                                 mockProcedures.Add(new BookingProcedure
                                 {
@@ -234,6 +219,145 @@ namespace Nailify.Capstone.Application.Services
                             }
                         }
                     }
+                }
+
+                // 2. Nếu là dáng móng (ShapeMethodConfig)
+                if (item.ShapeMethodConfigId.HasValue)
+                {
+                    var shapeMethodConfig = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(item.ShapeMethodConfigId.Value);
+                    if (shapeMethodConfig != null)
+                    {
+                        mockProcedures.Add(new BookingProcedure
+                        {
+                            BookingProcedureId = Guid.NewGuid(),
+                            BookingItemId = mockBookingItem.BookingItemId,
+                            BookingItem = mockBookingItem,
+                            ProcedureName = $"Tạo dáng & làm móng: {shapeMethodConfig.Name}",
+                            StepOrder = currentStepOrder++,
+                            Duration = shapeMethodConfig.Duration,
+                            ActiveDuration = shapeMethodConfig.Duration,
+                            PassiveDuration = 0,
+                            CanOverlap = false,
+                            TransitionBuffer = 1
+                        });
+                    }
+                }
+
+                // 3. Nếu là dịch vụ lẻ (Service)
+                if (item.ServiceId.HasValue)
+                {
+                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
+                    if (service != null)
+                    {
+                        mockProcedures.Add(new BookingProcedure
+                        {
+                            BookingProcedureId = Guid.NewGuid(),
+                            BookingItemId = mockBookingItem.BookingItemId,
+                            BookingItem = mockBookingItem,
+                            ProcedureName = service.Name,
+                            StepOrder = currentStepOrder++,
+                            Duration = service.Duration,
+                            ActiveDuration = service.Duration,
+                            PassiveDuration = 0,
+                            CanOverlap = false,
+                            TransitionBuffer = 1
+                        });
+                    }
+                }
+
+                // 4. Nếu là mẫu móng custom (CustomerNail)
+                if (item.CustomerNailRequestId.HasValue)
+                {
+                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
+                    int duration = 60;
+
+                    if (customNailRequest != null && customNailRequest.SalonId == salonId && customNailRequest.Duration.HasValue)
+                    {
+                        duration = customNailRequest.Duration.Value;
+                    }
+                    else if (customNailRequest != null)
+                    {
+                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
+                        if (customNail != null)
+                        {
+                            duration = customNail.Duration ?? 60;
+                            var customProcs = (await _unitOfWork.NailProcedureRepository.GetActiveProceduresByCustomerNailIdAsync(customNail.CustomerNailId))
+                                .Where(np => !commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
+                                .ToList();
+
+                            if (customProcs.Any())
+                            {
+                                int totalCatalogDuration = customProcs.Sum(x => x.Procedure.Duration ?? 0);
+                                if (duration > 0 && totalCatalogDuration > 0 && duration != totalCatalogDuration)
+                                {
+                                    double scaleFactor = (double)duration / totalCatalogDuration;
+                                    int accumulatedDuration = 0;
+                                    int count = customProcs.Count;
+
+                                    for (int i = 0; i < count; i++)
+                                    {
+                                        var np = customProcs[i];
+                                        int catalogDuration = np.Procedure.Duration ?? 0;
+                                        int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
+
+                                        if (i == count - 1)
+                                        {
+                                            scaledDuration = Math.Max(1, duration - accumulatedDuration);
+                                        }
+                                        else
+                                        {
+                                            accumulatedDuration += scaledDuration;
+                                        }
+
+                                        int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(np.Procedure.ActiveDuration * scaleFactor)));
+                                        int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
+
+                                        mockProcedures.Add(new BookingProcedure
+                                        {
+                                            BookingProcedureId = Guid.NewGuid(),
+                                            BookingItemId = mockBookingItem.BookingItemId,
+                                            BookingItem = mockBookingItem,
+                                            ProcedureId = np.ProcedureId,
+                                            ProcedureName = np.Procedure.Name,
+                                            StepOrder = currentStepOrder++,
+                                            Duration = scaledDuration,
+                                            ActiveDuration = scaledActive,
+                                            PassiveDuration = scaledPassive,
+                                            CanOverlap = scaledPassive >= 4 && np.Procedure.CanOverlap,
+                                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                            IsRequired = np.Procedure.IsRequired,
+                                            IsMainStep = np.Procedure.IsMainStep,
+                                            Status = BookingProcedureStatus.Pending
+                                        });
+                                    }
+                                }
+                                else
+                                {
+                                    foreach (var np in customProcs)
+                                    {
+                                        var passiveDuration = np.Procedure.PassiveDuration;
+                                        mockProcedures.Add(new BookingProcedure
+                                        {
+                                            BookingProcedureId = Guid.NewGuid(),
+                                            BookingItemId = mockBookingItem.BookingItemId,
+                                            BookingItem = mockBookingItem,
+                                            ProcedureId = np.ProcedureId,
+                                            ProcedureName = np.Procedure.Name,
+                                            StepOrder = currentStepOrder++,
+                                            Duration = np.Procedure.Duration ?? 15,
+                                            ActiveDuration = np.Procedure.ActiveDuration,
+                                            PassiveDuration = passiveDuration,
+                                            CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
+                                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                            IsRequired = np.Procedure.IsRequired,
+                                            IsMainStep = np.Procedure.IsMainStep,
+                                            Status = BookingProcedureStatus.Pending
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     // Fallback if no specific custom procedures linked yet
                     if (!mockProcedures.Any(p => p.StepOrder > commonProcedures.Count))
@@ -249,7 +373,7 @@ namespace Nailify.Capstone.Application.Services
                             ActiveDuration = duration,
                             PassiveDuration = 0,
                             CanOverlap = false,
-                        TransitionBuffer = 1
+                            TransitionBuffer = 1
                         });
                     }
                 }
