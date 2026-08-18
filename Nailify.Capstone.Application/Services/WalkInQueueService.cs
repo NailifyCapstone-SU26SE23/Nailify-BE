@@ -530,7 +530,7 @@ namespace Nailify.Capstone.Application.Services
                 StartTime = localNow.TimeOfDay,
                 Status = BookingStatus.CheckedIn,
                 ActualCheckInTime = localNow,
-                ActualStartTime = localNow,
+                ActualStartTime = localNow
             };
 
             var createdItems = new List<BookingItem>();
