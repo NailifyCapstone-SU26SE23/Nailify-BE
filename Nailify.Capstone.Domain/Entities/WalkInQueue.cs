@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Enums;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid? AssignedNailArtistId { get; set; }
         public string? RequestNote { get; set; }        // khách muốn làm gì
         public int? EstimatedWait { get; set; }         // phút chờ ước tính
+        public string? SelectedItemsJson { get; set; }  // JSON danh sách dịch vụ chọn khi đăng ký hàng chờ
         public virtual Salon Salon { get; set; } = null!;
         public virtual Customer? Customer { get; set; }
         public virtual Booking? OriginalBooking { get; set; }

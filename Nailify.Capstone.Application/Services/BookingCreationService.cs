@@ -182,6 +182,14 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
             }
 
+            // BR-01: Ngày đặt lịch không được là ngày trong quá khứ
+            var localToday = DateTime.UtcNow.AddHours(7).Date;
+            var requestLocalDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            if (requestLocalDate < localToday)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Ngày đặt lịch không được là ngày trong quá khứ.");
+            }
+
             // Tự động kiểm tra và cưỡng chế thợ khi đặt lịch mẫu custom
             var customRequestError = await ResolveCustomerNailRequestIdsAsync(request.BookingItems, request.SalonId, request.NailArtistId);
             if (!string.IsNullOrWhiteSpace(customRequestError))

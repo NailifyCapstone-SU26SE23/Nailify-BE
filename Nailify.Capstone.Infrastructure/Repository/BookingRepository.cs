@@ -94,7 +94,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.BookingDate <= range.end
                                          && x.ChairId != null
                                          && x.Status != BookingStatus.Cancelled
-                                         && x.Status != BookingStatus.Rejected)
+                                         && x.Status != BookingStatus.Rejected
+                                         && x.Status != BookingStatus.ServiceCompleted)
                                      .Include(x => x.Customer)
                                          .ThenInclude(c => c.User)
                                      .ToListAsync();
