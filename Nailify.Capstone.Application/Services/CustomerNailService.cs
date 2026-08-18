@@ -211,7 +211,9 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng này đang trong quá trình duyệt tại chi nhánh này.");
             }
+            
             var request = _mapper.Map<CustomerNailRequest>(requestDto);
+            request.IsCustomerRequest = true;
             await _unitOfWork.CustomerNailRequestRepository.CreateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 

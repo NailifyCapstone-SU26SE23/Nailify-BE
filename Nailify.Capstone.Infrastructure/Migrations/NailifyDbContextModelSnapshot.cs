@@ -691,9 +691,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool>("IsPublic")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -839,6 +836,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Property<int?>("Duration")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsCustomerRequest")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal?>("Price")
                         .HasPrecision(18, 2)
@@ -1903,7 +1903,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<Guid>("BookingId")
+                    b.Property<Guid?>("BookingId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CheckoutUrl")
@@ -2819,8 +2819,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasOne("Nailify.Capstone.Domain.Entities.Booking", "Booking")
                         .WithMany()
                         .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Booking");
                 });
