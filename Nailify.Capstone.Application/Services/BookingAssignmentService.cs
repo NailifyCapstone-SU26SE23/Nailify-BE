@@ -568,7 +568,8 @@ namespace Nailify.Capstone.Application.Services
                     request.StaffArtistId,
                     booking.BookingDate,
                     timeline,
-                    artist.ConcurrentCapacity
+                    artist.ConcurrentCapacity,
+                    bookingId
                 );
                 if (isConflict)
                 {
