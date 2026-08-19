@@ -853,6 +853,7 @@ namespace Nailify.Capstone.Application.Services
             booking.TotalDuration += totalAddedDuration;
             booking.Price = (booking.Price ?? 0) + totalAddedPrice;
             booking.TotalPrice = (booking.TotalPrice ?? 0) + totalAddedPrice;
+            booking.AmountDue = Math.Max(0, (booking.TotalPrice ?? 0) - (booking.AmountPaid ?? 0));
 
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
