@@ -873,7 +873,9 @@ namespace Nailify.Capstone.Application.Services
                     );
                 }
             }
-            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(createdProcedures);
+
+            var allProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(allProcedures.OrderBy(x => x.StepOrder).ToList());
             return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, $"Thêm {request.AddonItems.Count} dịch vụ phát sinh thành công!");
         }
     }
