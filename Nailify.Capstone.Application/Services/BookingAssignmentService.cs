@@ -473,6 +473,19 @@ namespace Nailify.Capstone.Application.Services
             var targetEndTime = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
             var procedures = await _unitOfWork.BookingProcedureRepository
                                               .GetProceduresByBookingIdAsync(bookingId);
+            if (!procedures.Any())
+            {
+                var itemRequests = bookingItems.Select(x => new BookingItemRequestDTO
+                {
+                    ServiceId = x.ServiceId,
+                    NailVariantId = x.NailVariantId,
+                    CustomerNailRequestId = x.CustomerNailRequestId,
+                    Quantity = x.Quantity
+                }).ToList();
+
+                procedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(itemRequests, booking.SalonId);
+            }
+
             var timeline = _bookingSchedulingService.BuildProcedureTimeline(
                 procedures, booking.StartTime);
 
@@ -497,7 +510,8 @@ namespace Nailify.Capstone.Application.Services
                                   approvedArtist.NailArtistId,
                                   booking.BookingDate,
                                   timeline,
-                                  approvedArtist.ConcurrentCapacity);
+                                  approvedArtist.ConcurrentCapacity,
+                                  bookingId);
                                 if (!isConflict)
                                 {
                                     var singleArtistDto = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
@@ -533,7 +547,8 @@ namespace Nailify.Capstone.Application.Services
                                          artist.NailArtistId,
                                          booking.BookingDate,
                                          timeline,
-                                         artist.ConcurrentCapacity);
+                                         artist.ConcurrentCapacity,
+                                         bookingId);
                 if (isConflict) continue;
                 availableArtists.Add(artist);
             }
