@@ -27,15 +27,17 @@ namespace Nailify.Capstone.Application.Services
         private readonly ILogger<BookingService> _logger;
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly INotificationService _notificationService;
+        private readonly IPromotionService _promotionService;
         public BookingLifecycleService(
-                                        IUnitOfWork unitOfWork,
-                                        IMapper mapper,
-                                        IWalkInQueueService queueService,
-                                        IBookingSchedulingService bookingSchedulingService,
-                                        ILoyaltyTierService loyaltyTierService,
-                                        ILogger<BookingService> logger,
-                                        IBookingProcedureService bookingProcedureService,
-                                        INotificationService notificationService)
+                                         IUnitOfWork unitOfWork,
+                                         IMapper mapper,
+                                         IWalkInQueueService queueService,
+                                         IBookingSchedulingService bookingSchedulingService,
+                                         ILoyaltyTierService loyaltyTierService,
+                                         ILogger<BookingService> logger,
+                                         IBookingProcedureService bookingProcedureService,
+                                         INotificationService notificationService,
+                                         IPromotionService promotionService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -45,6 +47,7 @@ namespace Nailify.Capstone.Application.Services
             _logger = logger;
             _bookingProcedureService = bookingProcedureService;
             _notificationService = notificationService;
+            _promotionService = promotionService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -472,6 +475,7 @@ namespace Nailify.Capstone.Application.Services
                     Quantity = x.Quantity,
                     ServiceId = x.ServiceId,
                     NailVariantId = x.NailVariantId,
+                    ShapeMethodConfigId = x.ShapeMethodConfigId,
                     CustomerNailRequestId = x.CustomerNailRequestId
                 };
 
@@ -535,6 +539,37 @@ namespace Nailify.Capstone.Application.Services
                     itemDuration += customNailRequest.Duration ?? customerNail.Duration ?? 60;
                 }
 
+                if (x.ShapeMethodConfigId.HasValue)
+                {
+                    var shapeMethodConfig = await _unitOfWork.ShapeMethodConfigRepository.GetByIdAsync(x.ShapeMethodConfigId.Value);
+                    if (shapeMethodConfig == null)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>($"Không tìm thấy cấu hình cách làm dáng móng ID {x.ShapeMethodConfigId.Value}");
+                    }
+
+                    if (x.NailVariantId.HasValue)
+                    {
+                        var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
+                        if (variant?.NailShapeId != shapeMethodConfig.NailShapeId)
+                        {
+                            return new ApiErrorResult<BookingResponseDTO>("Cấu hình cách làm không thuộc dáng móng đã chọn.");
+                        }
+                    }
+
+                    if (x.CustomerNailRequestId.HasValue)
+                    {
+                        customerNail ??= await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(
+                            (createdCustomNailRequest ?? await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(x.CustomerNailRequestId.Value))!.CustomerNailId);
+                        if (customerNail?.NailShapeId != shapeMethodConfig.NailShapeId)
+                        {
+                            return new ApiErrorResult<BookingResponseDTO>("Cấu hình cách làm không thuộc dáng móng đã chọn.");
+                        }
+                    }
+
+                    itemPrice += shapeMethodConfig.Price;
+                    itemDuration += shapeMethodConfig.Duration;
+                }
+
                 item.Price = itemPrice;
                 item.Duration = itemDuration;
 
@@ -574,6 +609,53 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
+            var selectedPromotionIds = request.SelectedPromotionIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList()
+                ?? booking.BookingDiscounts
+                    .Where(discount => discount.PromotionId.HasValue && !discount.IsAutoApplied)
+                    .Select(discount => discount.PromotionId!.Value)
+                    .Distinct()
+                    .ToList();
+            var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                booking.CustomerId,
+                bookingItems,
+                selectedPromotionIds.Any() ? selectedPromotionIds : null);
+            var (promotionDiscountAmount, appliedBookingDiscounts) =
+                await _promotionService.CalculateDiscountsAsync(new Booking
+                {
+                    BookingId = bookingId,
+                    CustomerId = booking.CustomerId,
+                    BookingItems = bookingItems
+                }, applicablePromotions);
+
+            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(booking.CustomerId);
+            if (!loyaltyResult.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingResponseDTO>(loyaltyResult.Message);
+            }
+
+            var loyaltyDiscountAmount = decimal.Round(
+                totalPrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                0,
+                MidpointRounding.AwayFromZero);
+
+            if (loyaltyDiscountAmount > 0)
+            {
+                appliedBookingDiscounts.Add(new BookingDiscount
+                {
+                    BookingId = bookingId,
+                    Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                    DiscountAmount = loyaltyDiscountAmount,
+                    IsAutoApplied = true,
+                    AppliedDate = DateTime.UtcNow.AddHours(7),
+                    LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                });
+            }
+
+            var totalDiscountAmount = promotionDiscountAmount + loyaltyDiscountAmount;
+
             // BẮT ĐẦU TRANSACTION AN TOÀN TRÁNH RACE CONDITION KHI CẬP NHẬT BOOKING
             await _unitOfWork.BeginTransactionAsync();
             try
@@ -598,22 +680,26 @@ namespace Nailify.Capstone.Application.Services
                 booking.BookingDate = request.BookingDate;
                 booking.StartTime = request.StartTime;
                 booking.NailArtistId = request.NailArtistId;
-                var priceResult = await CalculateDiscountedPriceAsync(booking.CustomerId, totalPrice);
-                if (!priceResult.IsSucceeded)
-                {
-                    await _unitOfWork.RollbackTransactionAsync();
-                    return new ApiErrorResult<BookingResponseDTO>(priceResult.ErrorMessage!);
-                }
 
                 booking.Price = totalPrice;
-                booking.Discount = -priceResult.DiscountAmount;
-                booking.TotalPrice = priceResult.TotalPrice;
-                booking.AmountDue = Math.Max(0, priceResult.TotalPrice - (booking.AmountPaid ?? 0));
+                booking.Discount = -totalDiscountAmount;
+                booking.TotalPrice = Math.Max(0, totalPrice - totalDiscountAmount);
+                booking.AmountDue = Math.Max(0, (booking.TotalPrice ?? 0) - (booking.AmountPaid ?? 0));
                 booking.TotalDuration = totalDuration;
                 booking.UpdatedAt = DateTime.UtcNow;
 
                 // Clear list trong memory của booking
                 booking.BookingItems.Clear();
+                var oldDiscounts = await _unitOfWork.BookingDiscountRepository.GetByBookingIdAsync(bookingId);
+                foreach (var oldDiscount in oldDiscounts)
+                {
+                    oldDiscount.Booking = null!;
+                    oldDiscount.Promotion = null;
+                    oldDiscount.LoyaltyTier = null;
+                    oldDiscount.LoyaltyTransaction = null;
+                    _unitOfWork.BookingDiscountRepository.Delete(oldDiscount);
+                }
+                booking.BookingDiscounts.Clear();
 
                 booking.Updated(oldPrice, oldDuration, actorId);
 
@@ -628,6 +714,11 @@ namespace Nailify.Capstone.Application.Services
                 foreach (var item in bookingItems)
                 {
                     await _unitOfWork.BookingItemRepository.CreateAsync(item);
+                }
+
+                foreach (var discount in appliedBookingDiscounts)
+                {
+                    await _unitOfWork.BookingDiscountRepository.CreateAsync(discount);
                 }
 
                 await _unitOfWork.SaveChangesAsync();
