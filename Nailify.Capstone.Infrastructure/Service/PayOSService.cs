@@ -329,7 +329,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 if (transaction.Status == TransactionStatus.Paid)
                 {
                     await EnsureBookingForPaidTransactionAsync(transaction);
-                    ApplyPaidAmountToBookingAsync(transaction);
+                    await ApplyPaidAmountToBookingAsync(transaction);
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -511,7 +511,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
 
             var newStatus = ParseStatus(payOSStatus);
-            if (transaction.Status == newStatus && (newStatus != TransactionStatus.Paid || transaction.PaidAt.HasValue))
+            if (transaction.Status == newStatus && newStatus != TransactionStatus.Paid)
             {
                 return;
             }
@@ -524,7 +524,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             if (newStatus == TransactionStatus.Paid)
             {
                 await EnsureBookingForPaidTransactionAsync(transaction);
-                ApplyPaidAmountToBookingAsync(transaction);
+                await ApplyPaidAmountToBookingAsync(transaction);
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);
@@ -570,15 +570,25 @@ namespace Nailify.Capstone.Infrastructure.Service
             await _cache.RemoveAsync(cacheKey);
         }
 
-        private static void ApplyPaidAmountToBookingAsync(Transaction transaction)
+        private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
-            if (transaction.Booking == null)
+            if (transaction.Booking == null || !transaction.BookingId.HasValue)
             {
                 return;
             }
 
-            transaction.Booking.AmountPaid = transaction.Amount;
-            transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
+            var paidAmountBeforeCurrentTransaction = await _unitOfWork.TransactionRepository
+                .FindByCondition(t =>
+                    t.BookingId == transaction.BookingId &&
+                    t.TransactionId != transaction.TransactionId &&
+                    t.Status == TransactionStatus.Paid)
+                .SumAsync(t => t.Amount);
+
+            var amountPaid = paidAmountBeforeCurrentTransaction + transaction.Amount;
+            var totalPrice = transaction.Booking.TotalPrice ?? 0m;
+
+            transaction.Booking.AmountPaid = amountPaid;
+            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - amountPaid);
             if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
             {
                 transaction.Booking.CheckOut(Guid.Empty);
