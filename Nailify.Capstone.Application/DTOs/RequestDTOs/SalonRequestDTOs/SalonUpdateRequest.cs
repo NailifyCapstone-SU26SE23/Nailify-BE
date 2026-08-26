@@ -18,6 +18,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.SalonRequestDTOs
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public string? Status { get; set; } = string.Empty;
+        public decimal DepositConfig { get; set; } 
 
         public void Mapping(Profile profile)
         {

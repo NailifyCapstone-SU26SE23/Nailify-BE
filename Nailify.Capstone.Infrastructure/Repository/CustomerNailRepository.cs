@@ -28,6 +28,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 query = query.Where(nail => nail.Name.ToLower().Contains(normalizedName));
             }
 
+            query = query.Where(nail => nail.Status == "Active");
+
             var count = await query.CountAsync();
             var items = await query
                 .Skip((pageNumber - 1) * pageSize)
