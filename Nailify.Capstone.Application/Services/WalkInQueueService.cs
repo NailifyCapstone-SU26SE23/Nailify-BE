@@ -3,6 +3,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalkInQueueResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -21,21 +22,53 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IBookingSchedulingService _bookingSchedulingService;
+        private readonly IPasswordHasher _passwordHasher;
+        private readonly INotificationService _notificationService;
+        private readonly IBookingProcedureService _bookingProcedureService;
 
-        public WalkInQueueService(IUnitOfWork unitOfWork, IMapper mapper, IBookingSchedulingService bookingSchedulingService)
+        public WalkInQueueService(
+            IUnitOfWork unitOfWork,
+            IMapper mapper,
+            IBookingSchedulingService bookingSchedulingService,
+            IPasswordHasher passwordHasher,
+            INotificationService notificationService,
+            IBookingProcedureService bookingProcedureService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _bookingSchedulingService = bookingSchedulingService;
+            _passwordHasher = passwordHasher;
+            _notificationService = notificationService;
+            _bookingProcedureService = bookingProcedureService;
         }
 
         public async Task<ApiResult<WalkInQueueResponseDTO>> AddToQueueAsync(Guid actorId, AddToQueueRequestDTO request)
         {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+            var workingArtistCount = await _unitOfWork.ScheduleRepository.GetWorkingArtistCountByDateAsync(request.SalonId, today);
+            if (workingArtistCount == 0)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Salon hôm nay không có thợ làm việc.");
+            }
+            int maxWalkInCapacity = Math.Max(2, (int)Math.Ceiling(workingArtistCount * 2 * 0.3));
+            var activeWaitingCount = await _unitOfWork.WalkInQueueRepository.GetActiveWaitingCountAsync(request.SalonId);
+            if (activeWaitingCount >= maxWalkInCapacity)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Hàng chờ tại sảnh đã đạt giới hạn tối đa ({activeWaitingCount}/{maxWalkInCapacity} khách). Salon tạm dừng nhận thêm khách vãng lai.");
+            }
             var nextPost = await _unitOfWork.WalkInQueueRepository.GetNextPositionAsync(request.SalonId);
             var queue = _mapper.Map<WalkInQueue>(request);
             queue.QueuePosition = nextPost;
             queue.Status = QueueStatus.Waiting;
-            queue.ArrivalTime = DateTime.UtcNow;
+            queue.ArrivalTime = DateTime.UtcNow.AddHours(7);;
+
+            // Tự động kiểm tra và tạo Account + Customer ngay khi thêm khách vãng lai vào hàng chờ
+            if (!queue.CustomerId.HasValue)
+            {
+                var guestUser = await GetOrCreateGuestUserAsync(request.GuestName, request.GuestPhone);
+                queue.CustomerId = guestUser.UserId;
+            }
 
             var items = request.BookingItems ?? new List<BookingItemRequestDTO>();
             if (request.OriginalBookingId.HasValue && !items.Any())
@@ -47,18 +80,22 @@ namespace Nailify.Capstone.Application.Services
                     {
                         ServiceId = x.ServiceId,
                         NailVariantId = x.NailVariantId,
-                        CustomerNailId = x.CustomerNailId,
+                        CustomerNailRequestId = x.CustomerNailRequestId,
                         Quantity = x.Quantity
                     }).ToList();
                 }
             }
             queue.EstimatedWait = await CalculateEstimatedWaitTimeAsync(request.SalonId, items);
+            if (items.Any())
+            {
+                queue.SelectedItemsJson = System.Text.Json.JsonSerializer.Serialize(items);
+            }
             await _unitOfWork.WalkInQueueRepository.CreateAsync(queue);
             await _unitOfWork.SaveChangesAsync();
             // Recalculate cho toàn bộ hàng chờ hiện tại
             await RecalculateQueueWaitTimesAsync(request.SalonId);
             var response = _mapper.Map<WalkInQueueResponseDTO>(queue);
-            return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã thêm khách vào hàng chờ vãng lai thành công.");
+            return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã thêm khách vào hàng chờ vãng lai và tự động khởi tạo/liên kết tài khoản thành công.");
             /*
             await _unitOfWork.WalkInQueueRepository.CreateAsync(queue);
             await _unitOfWork.SaveChangesAsync();
@@ -97,7 +134,7 @@ namespace Nailify.Capstone.Application.Services
                     {
                         ServiceId = x.ServiceId,
                         NailVariantId = x.NailVariantId,
-                        CustomerNailId = x.CustomerNailId,
+                        CustomerNailRequestId = x.CustomerNailRequestId,
                         Quantity = x.Quantity
                     }).ToList();
                 }
@@ -106,7 +143,16 @@ namespace Nailify.Capstone.Application.Services
             var walkInProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(items, queue.SalonId);
             if (!walkInProcs.Any())
             {
-                walkInProcs.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10, CanOverlap = false });
+                var bookProcedures = new BookingProcedure
+                {
+                    Duration = 30,
+                    ActiveDuration = 20,
+                    PassiveDuration = 10,
+                    CanOverlap = true,
+                    TransitionBuffer = 1
+                };
+
+                walkInProcs.Add(bookProcedures);
             }
 
             var timeline = _bookingSchedulingService.BuildProcedureTimeline(walkInProcs, currentTime);
@@ -137,20 +183,31 @@ namespace Nailify.Capstone.Application.Services
         {
             var activeArtists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(salonId);
             var workingArtists = activeArtists.Where(a => a.Status == "Active").ToList();
-            if (!workingArtists.Any()) return 60;
+            if (!workingArtists.Any())
+            {
+                return 60;
+            }
             // Giả lập mock procedure cho khách hàng mới này
             var mockProcedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(requestedItems, salonId);
             if (!mockProcedures.Any())
             {
+                var bookProcedures = new BookingProcedure
+                {
+                    Duration = 30,
+                    ActiveDuration = 20,
+                    PassiveDuration = 10,
+                    CanOverlap = true,
+                    TransitionBuffer = 1
+                };
                 // Mặc định 30 phút nếu không có dịch vụ cụ thể
-                mockProcedures.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10, CanOverlap = false });
+                mockProcedures.Add(bookProcedures);
             }
             int totalDuration = mockProcedures.Sum(p => p.Duration);
 
             var localNow = DateTime.UtcNow.AddHours(7).TimeOfDay;
             var minWaitTime = int.MaxValue;
 
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var queueList = await _unitOfWork.WalkInQueueRepository.GetTodayQueueAsync(salonId);
             var waitingQueue = queueList
                                        .Where(q => q.Status == QueueStatus.Waiting || q.Status == QueueStatus.Called)
@@ -158,12 +215,16 @@ namespace Nailify.Capstone.Application.Services
                                        .ToList();
             foreach (var artist in workingArtists)
             {
-                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, DateTime.Today);
-                if (schedule == null) continue;
+                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, today);
+                if (schedule == null)
+                {
+                    continue;
+                }
                 var candidateStart = localNow < schedule.ShiftStart ? schedule.ShiftStart : localNow;
                 var artistSimulatedSegments = new List<ProcedureScheduleSegment>();
 
-                foreach (var ahead in waitingQueue.Where(q => q.AssignedNailArtistId == artist.NailArtistId || !q.AssignedNailArtistId.HasValue))
+                var waitingQueueForArtist = waitingQueue.Where(x => x.AssignedNailArtistId == artist.NailArtistId || !x.AssignedNailArtistId.HasValue);
+                foreach (var ahead in waitingQueueForArtist)
                 {
                     // Lấy các item của khách đi trước
                     var aheadItems = new List<BookingItemRequestDTO>();
@@ -172,11 +233,22 @@ namespace Nailify.Capstone.Application.Services
                         var b = await _unitOfWork.BookingRepository.GetBookingDetailAsync(ahead.OriginalBookingId.Value);
                         if (b != null)
                         {
-                            aheadItems = b.BookingItems.Select(x => new BookingItemRequestDTO { ServiceId = x.ServiceId, NailVariantId = x.NailVariantId, CustomerNailId = x.CustomerNailId, Quantity = x.Quantity }).ToList();
+                            aheadItems = b.BookingItems.Select(x => new BookingItemRequestDTO { ServiceId = x.ServiceId, NailVariantId = x.NailVariantId, CustomerNailRequestId = x.CustomerNailRequestId, Quantity = x.Quantity }).ToList();
                         }
                     }
                     var aheadProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(aheadItems, salonId);
-                    if (!aheadProcs.Any()) aheadProcs.Add(new BookingProcedure { Duration = 30, ActiveDuration = 20, PassiveDuration = 10 });
+                    if (!aheadProcs.Any())
+                    {
+                        var bookingProcedures = new BookingProcedure
+                        {
+                            Duration = 30,
+                            ActiveDuration = 20,
+                            PassiveDuration = 10,
+                            CanOverlap = true,
+                            TransitionBuffer = 1
+                        };
+                        aheadProcs.Add(bookingProcedures);
+                    }
                     // Tìm slot rảnh sớm nhất cho khách đi trước
                     var aheadStart = candidateStart;
                     while (aheadStart.Add(TimeSpan.FromMinutes(aheadProcs.Sum(x => x.Duration))) <= schedule.ShiftEnd)
@@ -260,9 +332,9 @@ namespace Nailify.Capstone.Application.Services
                 {
                     // Nếu có đè vào, xem lượng thời gian đè (delay) là bao nhiêu
                     var delayMinutes = (overlapWalkIn.EndTime - booking.StartTime).TotalMinutes;
-                    if (delayMinutes > 15)
+                    if (delayMinutes > 5)
                     {
-                        return true; // Làm trễ hẹn khách đặt trước quá 15 phút -> Block!
+                        return true; // Làm trễ hẹn khách đặt trước quá 5 phút -> Block!
                     }
                 }
             }
@@ -270,14 +342,14 @@ namespace Nailify.Capstone.Application.Services
         }
         private (DateTime start, DateTime end) GetDateRangeUtc(DateTime date)
         {
-            var localDate = date.Date;
+            var localDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             var start = DateTime.SpecifyKind(localDate.AddHours(-7), DateTimeKind.Utc);
             var end = start.AddDays(1).AddTicks(-1);
             return (start, end);
         }
         public async Task RecalculateQueueWaitTimesAsync(Guid salonId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var queueList = await _unitOfWork.WalkInQueueRepository.GetTodayQueueAsync(salonId, trackChanges: true);
             var waitingQueue = queueList
                 .Where(q => q.Status == QueueStatus.Waiting || q.Status == QueueStatus.Called)
@@ -295,7 +367,7 @@ namespace Nailify.Capstone.Application.Services
                         {
                             ServiceId = x.ServiceId,
                             NailVariantId = x.NailVariantId,
-                            CustomerNailId = x.CustomerNailId,
+                            CustomerNailRequestId = x.CustomerNailRequestId,
                             Quantity = x.Quantity
                         }).ToList();
                     }
@@ -306,6 +378,54 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
+        private async Task<User> GetOrCreateGuestUserAsync(string? guestName, string? guestPhone)
+        {
+            var phone = string.IsNullOrWhiteSpace(guestPhone) ? $"09{Random.Shared.Next(10000000, 99999999)}" : guestPhone.Trim();
+            
+            var existingUser = await _unitOfWork.UserRepository.GetUserByPhoneAsync(phone);
+            if (existingUser != null)
+            {
+                var existingCustomer = await _unitOfWork.CustomerRepository.GetByIdAsync(existingUser.UserId);
+                if (existingCustomer == null)
+                {
+                    existingCustomer = new Customer { UserId = existingUser.UserId, LoyaltyPoint = 0 };
+                    await _unitOfWork.CustomerRepository.CreateAsync(existingCustomer);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+                return existingUser;
+            }
+
+            var nameParts = (string.IsNullOrWhiteSpace(guestName) ? "Khách Vãng Lai" : guestName.Trim()).Split(' ');
+            string firstName = nameParts.Length > 1 ? string.Join(" ", nameParts.Skip(1)) : nameParts[0];
+            string lastName = nameParts.Length > 1 ? nameParts[0] : "Khách";
+            string email = $"walkin_{phone}_{Guid.NewGuid().ToString("N")[..6]}@nailify.com";
+
+            var newUser = new User
+            {
+                UserId = Guid.NewGuid(),
+                Email = email,
+                Password = _passwordHasher.HashPassword("123456"),
+                Phone = phone,
+                FirstName = firstName,
+                LastName = lastName,
+                Role = UserRole.Customer,
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow.AddHours(7)
+            };
+
+            await _unitOfWork.UserRepository.CreateAsync(newUser);
+
+            var newCustomer = new Customer
+            {
+                UserId = newUser.UserId,
+                LoyaltyPoint = 0
+            };
+            await _unitOfWork.CustomerRepository.CreateAsync(newCustomer);
+            await _unitOfWork.SaveChangesAsync();
+
+            return newUser;
+        }
+
         public async Task<ApiResult<WalkInQueueResponseDTO>> CallQueueAsync(Guid queueId, Guid actorId)
         {
             var queue = await _unitOfWork.WalkInQueueRepository.GetByIdAsync(queueId);
@@ -313,12 +433,195 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<WalkInQueueResponseDTO>("Không tìm thấy khách hàng trong hàng chờ.");
             }
+
             queue.Status = QueueStatus.Called;
             queue.CalledTime = DateTime.UtcNow;
             _unitOfWork.WalkInQueueRepository.Update(queue);
             await _unitOfWork.SaveChangesAsync();
+
+            // Bắn tín hiệu SignalR / Notification trực tiếp về máy người dùng
+            if (queue.CustomerId.HasValue)
+            {
+                _ = _notificationService.SendNotificationToUserAsync(
+                    queue.CustomerId.Value.ToString(),
+                    "WALK_IN_QUEUE_CALLED",
+                    new
+                    {
+                        QueueId = queue.QueueId,
+                        QueuePosition = queue.QueuePosition,
+                        Title = "Đã đến lượt của bạn!",
+                        Message = $"Đã đến lượt phục vụ của bạn (Số STT: #{queue.QueuePosition})! Vui lòng di chuyển đến quầy để thợ phục vụ.",
+                        CalledAt = queue.CalledTime
+                    }
+                );
+            }
+
             var response = _mapper.Map<WalkInQueueResponseDTO>(queue);
             return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã gọi khách lên quầy chuẩn bị thực hiện.");
+        }
+
+        public async Task<ApiResult<BookingResponseDTO>> ConvertWalkInToBookingAsync(Guid queueId, Guid actorId)
+        {
+            var queue = await _unitOfWork.WalkInQueueRepository.GetByIdAsync(queueId);
+            if (queue == null)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy lượt hàng chờ.");
+            }
+
+            var localNow = DateTime.UtcNow.AddHours(7);
+
+            // 1. Trường hợp là khách đi trễ đã có OriginalBookingId
+            if (queue.OriginalBookingId.HasValue)
+            {
+                var originalBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(queue.OriginalBookingId.Value, trackChanges: true);
+                if (originalBooking != null)
+                {
+                    if (originalBooking.Status == BookingStatus.Cancelled)
+                    {
+                        originalBooking.ReopenAndCheckInLate(actorId);
+                    }
+                    else
+                    {
+                        originalBooking.Status = BookingStatus.CheckedIn;
+                        originalBooking.ActualCheckInTime = localNow;
+                        originalBooking.ActualStartTime = localNow;
+                        originalBooking.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                    if (queue.AssignedNailArtistId.HasValue)
+                    {
+                        originalBooking.NailArtistId = queue.AssignedNailArtistId.Value;
+                    }
+                    if (queue.ChairId.HasValue)
+                    {
+                        originalBooking.ChairId = queue.ChairId.Value;
+                    }
+
+                    _unitOfWork.BookingRepository.Update(originalBooking);
+
+                    queue.Status = QueueStatus.Done;
+                    queue.ServiceStartTime = localNow;
+                    _unitOfWork.WalkInQueueRepository.Update(queue);
+
+                    await _unitOfWork.SaveChangesAsync();
+
+                    var refreshedOriginal = await _unitOfWork.BookingRepository.GetBookingDetailAsync(originalBooking.BookingId);
+                    var resp = _mapper.Map<BookingResponseDTO>(refreshedOriginal);
+                    return new ApiSuccessResult<BookingResponseDTO>(resp, "Khôi phục và Check-in đơn đặt lịch trễ thành công.");
+                }
+            }
+
+            // 2. Tự động kiểm tra / khởi tạo Tài khoản cho khách vãng lai mới nếu chưa có
+            if (!queue.CustomerId.HasValue)
+            {
+                var guestUser = await GetOrCreateGuestUserAsync(queue.GuestName, queue.GuestPhone);
+                queue.CustomerId = guestUser.UserId;
+            }
+
+            // 3. Tạo đơn Booking mới chính thức từ lượt hàng chờ Walk-in
+            var newBooking = new Booking
+            {
+                BookingId = Guid.NewGuid(),
+                CustomerId = queue.CustomerId.Value,
+                SalonId = queue.SalonId,
+                ChairId = queue.ChairId,
+                NailArtistId = queue.AssignedNailArtistId,
+                BookingDate = localNow.Date,
+                StartTime = localNow.TimeOfDay,
+                Status = BookingStatus.CheckedIn,
+                ActualCheckInTime = localNow,
+                ActualStartTime = localNow
+            };
+
+            var createdItems = new List<BookingItem>();
+            decimal totalPrice = 0;
+            int totalDuration = 0;
+
+            if (!string.IsNullOrEmpty(queue.SelectedItemsJson))
+            {
+                try
+                {
+                    var selectedItems = System.Text.Json.JsonSerializer.Deserialize<List<BookingItemRequestDTO>>(queue.SelectedItemsJson);
+                    if (selectedItems != null && selectedItems.Any())
+                    {
+                        foreach (var itemReq in selectedItems)
+                        {
+                            decimal itemPrice = 0;
+                            int itemDuration = 0;
+
+                            if (itemReq.ServiceId.HasValue)
+                            {
+                                var service = await _unitOfWork.ServicesRepository.GetByIdAsync(itemReq.ServiceId.Value);
+                                if (service != null)
+                                {
+                                    itemPrice += service.Price;
+                                    itemDuration += service.Duration;
+                                }
+                            }
+
+                            if (itemReq.NailVariantId.HasValue)
+                            {
+                                var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(itemReq.NailVariantId.Value);
+                                if (variant != null)
+                                {
+                                    itemPrice += variant.Price;
+                                    itemDuration += (variant.Duration ?? 60);
+                                }
+                            }
+
+                            var bItem = new BookingItem
+                            {
+                                BookingItemId = Guid.NewGuid(),
+                                BookingId = newBooking.BookingId,
+                                ServiceId = itemReq.ServiceId,
+                                NailVariantId = itemReq.NailVariantId,
+                                CustomerNailRequestId = itemReq.CustomerNailRequestId,
+                                Price = itemPrice,
+                                Duration = itemDuration,
+                                Quantity = itemReq.Quantity > 0 ? itemReq.Quantity : 1
+                            };
+
+                            createdItems.Add(bItem);
+                            totalPrice += itemPrice * bItem.Quantity;
+                            totalDuration += itemDuration;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error deserializing SelectedItemsJson: {ex.Message}");
+                }
+            }
+
+            newBooking.Price = totalPrice;
+            newBooking.AmountDue = totalPrice;
+            newBooking.TotalPrice = totalPrice;
+            newBooking.TotalDuration = totalDuration > 0 ? totalDuration : 30;
+
+            await _unitOfWork.BookingRepository.CreateAsync(newBooking);
+
+            foreach (var bItem in createdItems)
+            {
+                await _unitOfWork.BookingItemRepository.CreateAsync(bItem);
+            }
+
+            queue.OriginalBookingId = newBooking.BookingId;
+            queue.Status = QueueStatus.Done;
+            queue.ServiceStartTime = localNow;
+            _unitOfWork.WalkInQueueRepository.Update(queue);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // 4. Khởi tạo các bước quy trình BookingProcedure cho đơn vãng lai
+            foreach (var bItem in createdItems)
+            {
+                await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(bItem);
+            }
+            await _unitOfWork.SaveChangesAsync();
+
+            var refreshedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(newBooking.BookingId);
+            var response = _mapper.Map<BookingResponseDTO>(refreshedBooking);
+            return new ApiSuccessResult<BookingResponseDTO>(response, "Đã tạo Đơn đặt lịch (Checked-in), tính giá tiền và khởi tạo các bước quy trình thành công.");
         }
 
         public async Task<ApiResult<WalkInQueueResponseDTO>> CompleteQueueEntryAsync(Guid queueId, Guid actorId)
@@ -332,7 +635,7 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.WalkInQueueRepository.Update(queue);
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<WalkInQueueResponseDTO>(queue);
-            return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã hoàn thành lượt chờ của khách (chuyển sang dịch vụ/booking).");
+            return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã hoàn thành lượt chờ của khách.");
         }
 
         public async Task<ApiResult<List<WalkInQueueResponseDTO>>> GetTodayQueueAsync(Guid salonId)
@@ -375,7 +678,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             // Lấy danh sách những người đang chờ khác cùng salon trong ngày hôm nay
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
             var waitingList = await _unitOfWork.WalkInQueueRepository.GetActiveWaitingEntriesAsync(walkIn.SalonId, walkIn.AssignedNailArtistId,trackChanges: true);
 
             // Đẩy lùi vị trí các khách hàng đang đứng trước khách hàng được ưu tiên
@@ -396,6 +699,48 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<WalkInQueueResponseDTO>(walkIn);
             return new ApiSuccessResult<WalkInQueueResponseDTO>(response, "Đã ưu tiên khách hàng lên đầu hàng chờ tại sảnh.");
         }
-
+        public async Task<ApiResult<WalkInQueueResponseDTO>> AssignChairToQueueAsync(Guid queueId, AssignQueueChairRequestDTO request, Guid actorId)
+        {
+            var queue = await _unitOfWork.WalkInQueueRepository.GetByIdAsync(queueId);
+            if (queue == null)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Không tìm thấy lượt hàng chờ.");
+            }
+            if (queue.Status != QueueStatus.Waiting && queue.Status != QueueStatus.Called)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Không thể phân ghế khi trạng thái là '{queue.Status}'. Chỉ được phân khi Waiting hoặc Called.");
+            }
+            var chair = await _unitOfWork.ChairRepository.GetByIdAsync(request.ChairId);
+            if (chair == null)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Không tìm thấy ghế.");
+            }
+            if (chair.SalonId != queue.SalonId)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>("Ghế không thuộc salon của lượt chờ này.");
+            }
+            if (chair.Status != "Active")
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Ghế '{chair.ChairName}' hiện không khả dụng (trạng thái: {chair.Status}).");
+            }
+            // 4. Kiểm tra ghế có đang bị booking khác chiếm tại thời điểm hiện tại không
+            var localNow = DateTime.UtcNow.AddHours(7);
+            var occupying = await _unitOfWork.BookingRepository.GetChairOccupancyBySalonAsync(queue.SalonId, localNow.Date, localNow.TimeOfDay);
+            bool isChairBusy = occupying.Any(b => b.ChairId == request.ChairId);
+            if (isChairBusy)
+            {
+                return new ApiErrorResult<WalkInQueueResponseDTO>(
+                    $"Ghế '{chair.ChairName}' đang có khách ngồi. Vui lòng chọn ghế khác.");
+            }
+            queue.ChairId = request.ChairId;
+            _unitOfWork.WalkInQueueRepository.Update(queue);
+            await _unitOfWork.SaveChangesAsync();
+            var refreshed = await _unitOfWork.WalkInQueueRepository.GetWithChairAsync(queueId);
+            var response = _mapper.Map<WalkInQueueResponseDTO>(refreshed);
+            return new ApiSuccessResult<WalkInQueueResponseDTO>(response,
+                $"Phân ghế '{chair.ChairName}' cho khách thành công.");
+        }
     }
 }

@@ -82,10 +82,30 @@ namespace Nailify.Capstone.Application.Services
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
+            var staffArtistAccountIds = pagedResult.Items
+                .Where(u => u.Role == UserRole.Staff_Artist)
+                .Select(u => u.UserId)
+                .ToList();
+
+            var artists = new List<Nailify.Capstone.Domain.Entities.NailArtist>();
+            if (staffArtistAccountIds.Any())
+            {
+                var artistResult = await _unitOfWork.NailArtistRepository.GetPagedAsync(
+                    1, 1000, 
+                    a => staffArtistAccountIds.Contains(a.AccountId));
+                artists = artistResult.Items.ToList();
+            }
+
             foreach (var dto in mappedItems)
             {
                 var user = pagedResult.Items.First(x => x.UserId == dto.UserId);
-                await PopulateUserContextAsync(user, dto);
+                
+                dto.SalonId = user.SalonId;
+                if (user.Role == UserRole.Staff_Artist)
+                {
+                    var artist = artists.FirstOrDefault(a => a.AccountId == user.UserId);
+                    dto.StaffId = artist?.NailArtistId;
+                }
             }
 
             var response = new PagedList<UserDto>(
@@ -215,6 +235,32 @@ namespace Nailify.Capstone.Application.Services
             await PopulateUserContextAsync(user, response);
             return new ApiSuccessResult<UserDto>(response, "Cập nhật thông tin cá nhân thành công.");
         }
+
+        public async Task<ApiResult<bool>> UpdatePasswordAsync(Guid userId, UpdatePasswordRequest request)
+        {
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active")
+            {
+                return new ApiResult<bool>(false, "Không tìm thấy tài khoản.");
+            }
+
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                return new ApiResult<bool>(false, "Mật khẩu không trùng khớp.");
+            }
+
+            if (!_passwordHasher.VerifyPassword(request.OldPassword, user.Password))
+            {
+                return new ApiResult<bool>(false, "Mật khẩu cũ không hợp lệ.");
+            }
+
+            user.Password = _passwordHasher.HashPassword(request.NewPassword);
+
+            _unitOfWork.UserRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            return new ApiSuccessResult<bool>(true, "Cập nhật mật khẩu thành công.");
+        }
         #endregion Account Management
         #region Customer Management
         public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request)
@@ -282,6 +328,22 @@ namespace Nailify.Capstone.Application.Services
             if (customer != null)
             {
                 _mapper.Map(customer, profileDto);
+                // Deserialize các chuỗi JSON từ Database
+                profileDto.PreferredColors = DeserializeList(customer.PreferredColorsJson);
+                profileDto.PreferredStyles = DeserializeList(customer.PreferredStylesJson);
+                profileDto.PreferredOccasions = DeserializeList(customer.PreferredOccasionsJson);
+
+                profileDto.SkinShade = customer.SkinShade;
+                profileDto.HandShape = customer.HandShape;
+                profileDto.PreferredComplexity = customer.PreferredComplexity;
+                profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
+
+                // Lấy tên dáng móng
+                if (customer.PreferredNailShapeId.HasValue)
+                {
+                    var shape = await _unitOfWork.NailShapeRepository.GetByIdAsync(customer.PreferredNailShapeId.Value);
+                    profileDto.PreferredNailShapeName = shape?.Name ?? string.Empty;
+                }
             }
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ khách hàng thành công.");
@@ -355,6 +417,18 @@ namespace Nailify.Capstone.Application.Services
                 var artists = await _unitOfWork.NailArtistRepository.GetPagedAsync(1, 1, x => x.AccountId == user.UserId);
                 var artist = artists.Items.FirstOrDefault();
                 response.StaffId = artist?.NailArtistId;
+            }
+        }
+        private List<string> DeserializeList(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return new List<string>();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
             }
         }
     }

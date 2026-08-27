@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
@@ -23,5 +24,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         // Thêm mới phương thức Claim công đoạn
         Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId);
         Task<ApiResult<List<IdleArtistResponseDTO>>> GetAvailableArtistsForProcedureAsync(Guid bookingProcedureId);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetArtistActiveProceduresAsync(Guid artistId);
+
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetClaimableProceduresAsync(Guid salonId);
+        Task<ApiResult<OnsiteAddonSimulationResponseDTO>> SimulateOnsiteAddonAsync(SimulateOnsiteAddonRequestDTO request);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> ConfirmOnsiteAddonAsync(ConfirmOnsiteAddonRequestDTO request);
     }
 }

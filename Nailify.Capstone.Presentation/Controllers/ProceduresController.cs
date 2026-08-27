@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<ProcedureResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll([FromQuery] PagingRequestParameters parameters)
+        public async Task<IActionResult> GetAll([FromQuery] ProcedurePagingParameters parameters)
         {
             var result = await _procedureService.GetAllProceduresAsync(parameters);
             return Ok(result);
@@ -115,6 +115,32 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        [HttpGet("customer-nail/{customerNailId}")]
+        [ProducesResponseType(typeof(ApiResult<List<NailProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetByCustomerNailId(int customerNailId)
+        {
+            var result = await _procedureService.GetNailProceduresByCustomerNailIdAsync(customerNailId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
+        }
+
+        [HttpPut("customer-nail/procedure/{nailProcedureId}")]
+        [ProducesResponseType(typeof(ApiResult<NailProcedureResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateCustomerNailProcedure(Guid nailProcedureId, [FromBody] CustomerNailProcedureRequestDTO request)
+        {
+            var result = await _procedureService.UpdateCustomerNailProcedureAsync(nailProcedureId, request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpDelete("customer-nail/procedure/{nailProcedureId}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteCustomerNailProcedure(Guid nailProcedureId)
+        {
+            var result = await _procedureService.DeleteCustomerNailProcedureAsync(nailProcedureId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
+        }
+
         /// <summary>
         /// Cấu hình/Gán quy trình làm móng cho một mẫu móng.
         /// </summary>
@@ -129,6 +155,15 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(result);
             }
             return Ok(result);
+        }
+
+        [HttpPost("assign/customer-nail/{customerNailId}")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AssignProceduresToCustomerNail(int customerNailId, [FromBody] List<CustomerNailProcedureRequestDTO> request)
+        {
+            var result = await _procedureService.AssignProceduresToCustomerNailAsync(customerNailId, request);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
     }
 }

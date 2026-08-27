@@ -41,5 +41,11 @@ namespace Nailify.Capstone.Application.Services
                            .Replace("[requestedDate]", requestedDate)
                            .Replace("[confirmUrl]", confirmUrl);
         }
+        public string GenerateForgotPasswordEmail(string username, string resetCode)
+        {
+            var template = ReadEmailTemplateContent("forgot-password");
+            return template.Replace("[username]", username)
+                           .Replace("[resetCode]", resetCode);
+        }
     }
 }

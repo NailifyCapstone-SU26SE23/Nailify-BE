@@ -38,7 +38,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .Include(x => x.BookingItems)
                                        .ThenInclude(x => x.Service)
                                     .Include(x => x.BookingItems)
-                                       .ThenInclude(x => x.CustomerNail)
+                                       .ThenInclude(x => x.ShapeMethodConfig)
+                                    .Include(x => x.BookingItems)
+                                       .ThenInclude(x => x.CustomerNailRequest)
+                                           .ThenInclude(x => x.CustomerNail)
                                     .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
                                     .Include(x => x.Chair)
@@ -80,6 +83,33 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.Status != BookingStatus.Rejected)
                                      .ToListAsync();
         }
+
+        public async Task<IEnumerable<Booking>> GetChairOccupancyBySalonAsync(Guid salonId, DateTime date, TimeSpan atTime)
+        {
+            var range = GetDateRangeUtc(date);
+            // Lấy tất cả booking trong ngày, đã gán ghế, chưa hủy/từ chối
+            var bookings = await FindByCondition(x =>
+                                         x.SalonId == salonId
+                                         && x.BookingDate >= range.start
+                                         && x.BookingDate <= range.end
+                                         && x.ChairId != null
+                                         && x.Status != BookingStatus.Cancelled
+                                         && x.Status != BookingStatus.Rejected
+                                         && x.Status != BookingStatus.ServiceCompleted)
+                                     .Include(x => x.Customer)
+                                         .ThenInclude(c => c.User)
+                                     .ToListAsync();
+
+            // Lọc những booking đang chiếm ghế TẠI thời điểm atTime
+            // (booking bắt đầu <= atTime < booking kết thúc)
+            return bookings.Where(b =>
+            {
+                var bStart = b.StartTime;
+                var bEnd   = b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration > 0 ? b.TotalDuration : 60));
+                return bStart <= atTime && atTime < bEnd;
+            });
+        }
+
 
         public async Task<PagedList<Booking>> GetBookingsByCustomerAsync(Guid customerId, int pageNumber, int pageSize, DateTime? startDate = null, DateTime? endDate = null, BookingStatus? status = null)
         {
@@ -125,7 +155,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(x => x.Service)
                 .Include(x => x.BookingItems)
-                    .ThenInclude(x => x.CustomerNail)
+                    .ThenInclude(x => x.ShapeMethodConfig)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.CustomerNailRequest)
+                        .ThenInclude(x => x.CustomerNail)
                 .Include(x => x.BookingDiscounts);
         }
 
@@ -206,6 +239,101 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                            && x.StartTime <= thresholdTime)
                         .CountAsync();
         }
+        public Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId)
+        {
+            return FindByCondition(x => x.CustomerId == customerId 
+                                   && x.Status == BookingStatus.Completed)
+                .Include(b => b.BookingItems)
+                    .ThenInclude(bi => bi.NailVariant)
+                        .ThenInclude(nv => nv!.NailDesign)
+                            .ThenInclude(d => d!.NailCategories)
+                                .ThenInclude(c => c.Category)
+                .ToListAsync();
+        }
+        public async Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x =>
+                x.NailArtistId == artistId
+                && x.BookingDate >= range.start
+                && x.BookingDate <= range.end
+                && x.Status == BookingStatus.Approved)
+                .Include(x => x.Customer)
+                    .ThenInclude(x => x.User)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.NailVariant)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.Service)
+                .ToListAsync();
+        }
+        public async Task<Booking?> GetWarrantyBookingAsync(Guid originalBookingId)
+                => await FindByCondition(x =>
+                                             x.WarrantyForBookingId == originalBookingId
+                                             && x.Status != BookingStatus.Cancelled
+                                             && x.Status != BookingStatus.Rejected)
+                        .FirstOrDefaultAsync();
 
+        public async Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null)
+        {
+            var range = GetDateRangeUtc(bookingDate);
+            var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
+
+            var approvedBookings =  await FindByCondition(x =>
+                                             x.SalonId == salonId
+                                             && x.BookingDate >= range.start
+                                             && x.BookingDate <= range.end
+                                             && x.Status == BookingStatus.Approved
+                                             && (!excludeBookingId.HasValue || x.BookingId != excludeBookingId.Value))     
+                        .ToListAsync();
+
+            return approvedBookings.Count(b =>
+                                                b.StartTime < endTime &&
+                                                startTime < b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration))
+            );
+        }
+
+        public async Task<List<Booking>> GetLateCancelledBookingsBySalonAsync(Guid salonId, DateTime date)
+        {
+            var range = GetDateRangeUtc(date);
+            var cancelledBookings = await FindByCondition(x =>
+                                                              x.SalonId == salonId 
+                                                              && x.BookingDate >= range.start 
+                                                              && x.BookingDate <= range.end 
+                                                              && x.Status == BookingStatus.Cancelled)
+                                        .Include(x => x.Customer)
+                                            .ThenInclude(x => x.User)
+                                        .Include(x => x.NailArtist)
+                                            .ThenInclude(x => x.Account)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.NailVariant)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.Service)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.ShapeMethodConfig)
+                                        .Include(x => x.BookingItems)
+                                            .ThenInclude(x => x.CustomerNailRequest)
+                                                .ThenInclude(x => x.CustomerNail)
+
+                                        .Include(x => x.BookingHistories)
+                                        .ToListAsync();
+            return cancelledBookings.Where(b =>
+                b.BookingHistories.Any(h =>
+                    h.Payload != null &&
+                    (h.Payload.Contains("trễ quá 15 phút") || h.Payload.Contains("tự động hủy do khách trễ"))
+                )
+            ).ToList();
+        }
+
+        public async Task<Booking?> GetCurrentBusyBookingWithProceduresAsync(Guid artistId, Guid excludeBookingId, DateTime todayDate)
+        {
+            return await FindByCondition(x => x.NailArtistId == artistId
+                                           && x.Status == BookingStatus.InProgress
+                                           && x.BookingDate.Date == todayDate.Date
+                                           && x.BookingId != excludeBookingId, trackChanges: false)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(bi => bi.BookingProcedures)
+                        .ThenInclude(bp => bp.Procedure)
+                .FirstOrDefaultAsync();
+        }
     }
 }

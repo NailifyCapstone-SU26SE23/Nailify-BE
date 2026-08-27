@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         string GenerateBookingReminderEmail(string username, string salonName, string startTime, string bookingDate);
         string GenerateWaitlistConfirmationEmail(string username, string startTime, string requestedDate, string confirmUrl);
+        string GenerateForgotPasswordEmail(string username, string resetCode);
     }
 }

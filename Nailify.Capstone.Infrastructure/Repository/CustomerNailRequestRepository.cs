@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                        .Include(x => x.CustomerNail)
                        .Include(x => x.Salon)
                        .Include(x => x.ApprovedArtist)
+                       .Where(x => x.IsCustomerRequest == true)
                        .AsQueryable();
             if (salonId.HasValue)
                 query = query.Where(x => x.SalonId == salonId.Value);
@@ -42,11 +43,30 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(r => r.CustomerNailRequestId == requestId)
                 .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailShape)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailSurface)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.CustomerNailComponents)
+                        .ThenInclude(c => c.CustomerComponent)
+                .Include(r => r.CustomerNail)
                     .ThenInclude(cn => cn.CustomerNailComponents)
                         .ThenInclude(c => c.Component)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailProcedures)
+                        .ThenInclude(np => np.Procedure)
                 .Include(r => r.Salon)
                 .Include(r => r.ApprovedArtist)
                     .ThenInclude(a => a.Account)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<CustomerNailRequest?> GetByCustomerNailAndSalonAsync(int customerNailId, Guid salonId)
+        {
+            return await FindByCondition(r =>
+                r.CustomerNailId == customerNailId &&
+                r.SalonId == salonId)
+                .OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt)
                 .FirstOrDefaultAsync();
         }
 

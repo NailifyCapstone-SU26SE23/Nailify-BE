@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Infrastructure
         private ICustomerRepository? _customerRepository;
         private ICategoryTypeRepository? _categoryTypeRepository;
         private ICategoryRepository? _categoryRepository;
+        private INailCategoryRepository? _nailCategoryRepository;
         private INailDesignRepository? _nailDesignRepository;
         private ISalonOperatingHourRepository? _salonOperatingHourRepository;
         private ISalonRepository? _salonRepository;
@@ -22,6 +23,7 @@ namespace Nailify.Capstone.Infrastructure
         private IScheduleRepository? _scheduleRepository;
         private IComponentRepository? _componentRepository;
         private INailShapeRepository? _nailShapeRepository;
+        private IShapeMethodConfigRepository? _shapeMethodConfigRepository;
         private INailSurfaceRepository? _nailSurfaceRepository;
         private INailVariantRepository? _nailVariantRepository;
         private INailComponentRepository? _nailComponentRepository;
@@ -50,7 +52,13 @@ namespace Nailify.Capstone.Infrastructure
         private IWalkInQueueRepository? _walkInQueueRepository;
         private ITransactionRepository? _transactionRepository;
         private IChairRepository? _chairRepository;
-
+        private INailArtistBreakRepository _nailArtistBreakRepository;
+        private IQuizQuestionRepository _quizQuestionRepository = null!;
+        private IQuizOptionRepository _quizOptionRepository = null!;
+        private ICustomerQuizAnswerRepository _customerQuizAnswerRepository = null!;
+        private ISalonOffDateRepository _salonOffDateRepository = null!;
+        private INailArtistTransferRepository _nailArtistTransferRepository = null!;
+        private IDashboardRepository _dashboardRepository = null!;
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -59,6 +67,7 @@ namespace Nailify.Capstone.Infrastructure
         public ICustomerRepository CustomerRepository => _customerRepository ??= new CustomerRepository(_context);
         public ICategoryTypeRepository CategoryTypeRepository => _categoryTypeRepository ??= new CategoryTypeRepository(_context);
         public ICategoryRepository CategoryRepository => _categoryRepository ??= new CategoryRepository(_context);
+        public INailCategoryRepository NailCategoryRepository => _nailCategoryRepository ??= new NailCategoryRepository(_context);
         public INailDesignRepository NailDesignRepository => _nailDesignRepository ??= new NailDesignRepository(_context);
 
         public ISalonOperatingHourRepository SalonOperatingHourRepository => _salonOperatingHourRepository ??= new SalonOperatingHourRepository(_context);
@@ -70,6 +79,7 @@ namespace Nailify.Capstone.Infrastructure
         public IScheduleRepository ScheduleRepository => _scheduleRepository ??= new ScheduleRepository(_context);
         public IComponentRepository ComponentRepository => _componentRepository ??= new ComponentRepository(_context);
         public INailShapeRepository NailShapeRepository => _nailShapeRepository ??= new NailShapeRepository(_context);
+        public IShapeMethodConfigRepository ShapeMethodConfigRepository => _shapeMethodConfigRepository ??= new ShapeMethodConfigRepository(_context);
         public INailSurfaceRepository NailSurfaceRepository => _nailSurfaceRepository ??= new NailSurfaceRepository(_context);
         public INailVariantRepository NailVariantRepository => _nailVariantRepository ??= new NailVariantRepository(_context);
         public INailComponentRepository NailComponentRepository => _nailComponentRepository ??= new NailComponentRepository(_context);
@@ -109,9 +119,31 @@ namespace Nailify.Capstone.Infrastructure
         public ITransactionRepository TransactionRepository => _transactionRepository ??= new TransactionRepository(_context);
         public IChairRepository ChairRepository => _chairRepository ??= new ChairRepository(_context);
 
+        public INailArtistBreakRepository NailArtistBreakRepository =>
+         _nailArtistBreakRepository ??= new NailArtistBreakRepository(_context);
+
+        public IQuizQuestionRepository QuizQuestionRepository => _quizQuestionRepository ??= new QuizQuestionRepository(_context);
+
+        public IQuizOptionRepository QuizOptionRepository => _quizOptionRepository ??= new QuizOptionRepository(_context);
+
+        public ICustomerQuizAnswerRepository CustomerQuizAnswerRepository => _customerQuizAnswerRepository ??= new CustomerQuizAnswerRepository(_context);
+
+        public ISalonOffDateRepository SalonOffDateRepository => _salonOffDateRepository ??= new SalonOffDateRepository(_context);
+
+        public INailArtistTransferRepository NailArtistTransferRepository => _nailArtistTransferRepository ??= new NailArtistTransferRepository(_context);
+
+        public IDashboardRepository DashboardRepository => _dashboardRepository ??= new DashboardRepository(_context);
+
         public async Task<int> SaveChangesAsync()
         {
-            return await _context.SaveChangesAsync();
+            try
+            {
+                return await _context.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+            {
+                throw new Nailify.Capstone.Application.Exceptions.ConcurrencyException("Dữ liệu đã bị thay đổi bởi một tác vụ khác. Vui lòng tải lại trang.", ex);
+            }
         }
 
         public void Dispose()

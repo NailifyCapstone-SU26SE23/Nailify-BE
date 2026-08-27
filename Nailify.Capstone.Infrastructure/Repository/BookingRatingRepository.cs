@@ -31,6 +31,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public Task<PagedList<BookingRating>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters)
             => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.Booking.NailArtistId == nailArtistId), parameters), parameters.PageNumber, parameters.PageSize);
 
+        public Task<PagedList<BookingRating>> GetByNailVariantIdAsync(int nailVariantId, BookingRatingRequestParameters parameters)
+            => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.Booking.BookingItems.Any(i => i.NailVariantId == nailVariantId)), parameters), parameters.PageNumber, parameters.PageSize);
+
         public Task<PagedList<BookingRating>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters)
             => ToPagedListAsync(ApplyFilters(BuildQuery().Where(x => x.CustomerId == customerId), parameters), parameters.PageNumber, parameters.PageSize);
 
@@ -42,6 +45,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                     .ThenInclude(x => x.Salon)
                 .Include(x => x.Booking)
                     .ThenInclude(x => x.NailArtist)
+                .Include(x => x.Booking)
+                    .ThenInclude(x => x.BookingItems)
                 .Include(x => x.Customer)
                     .ThenInclude(x => x.User);
 
@@ -65,6 +70,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
             if (parameters.Stars.HasValue)
             {
                 query = query.Where(x => x.OverallScore == parameters.Stars.Value);
+            }
+
+            if (parameters.IsNegativeOnly.HasValue && parameters.IsNegativeOnly.Value)
+            {
+                // Đánh giá tiêu cực: 1-2 sao hoặc có điểm số chi tiết thấp
+                query = query.Where(x => x.OverallScore <= 2 || (x.ServiceQuality.HasValue && x.ServiceQuality.Value <= 2));
             }
 
             return query;

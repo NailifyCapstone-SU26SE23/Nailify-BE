@@ -93,37 +93,22 @@ namespace Nailify.Capstone.Application.Services
 
             foreach (var variant in affectedVariants)
             {
-                variant.Price = (variant.NailShape?.Price ?? 0m)
-                    + (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Price);
-                variant.Duration = (variant.NailShape?.Duration ?? 0)
-                    + (variant.NailSurface?.Duration ?? 0)
+                variant.Price = (variant.NailSurface?.Price ?? 0m)
+                    + variant.NailComponents.Sum(nailComponent =>
+                        nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
+                variant.Duration = (variant.NailSurface?.Duration ?? 0)
                     + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
 
                 _unitOfWork.NailVariantRepository.Update(variant);
             }
 
             await _unitOfWork.SaveChangesAsync();
-            foreach (var nailDesignId in affectedVariants.Select(variant => variant.NailDesignId).Distinct())
-            {
-                await UpdateNailDesignPriceRangeAsync(nailDesignId);
-            }
         }
 
-        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        private static int GetFingerPriceMultiplier(int fingerIndex)
         {
-            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
-            if (nailDesign == null)
-            {
-                return;
-            }
-
-            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
-            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
-            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
-
-            _unitOfWork.NailDesignRepository.Update(nailDesign);
-            await _unitOfWork.SaveChangesAsync();
+            return fingerIndex == -1 ? 5 : 1;
         }
+
     }
 }

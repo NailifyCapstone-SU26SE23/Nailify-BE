@@ -37,10 +37,11 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<bool>> DeleteServiceAsync(Guid serviceId)
         {
             var service = await _unitOfWork.ServicesRepository.GetByIdAsync(serviceId);
-            if(service == null)
+            if (service == null)
             {
                 return new ApiErrorResult<bool>("Không tìm thấy dịch vụ cần xóa.");
             }
+
             _unitOfWork.ServicesRepository.Delete(service);
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Xóa dịch vụ thành công.");

@@ -25,6 +25,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.CustomerNailRequestResp
         public DateTime? UpdatedAt { get; set; }
         public string? ArtistFullName { get; set; }
         public string? SalonName { get; set; }
+        public bool IsCustomerRequest { get; set; }
         public CustomerNailDto? CustomerNail { get; set; }
         public SalonResponseDTO? Salon { get; set; }
         public NailArtistResponseDTO? ApprovedArtist { get; set; }

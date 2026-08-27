@@ -110,33 +110,20 @@ namespace Nailify.Capstone.Application.Services
             }
 
             variant.Price =
-                (variantDetail.NailShape?.Price ?? 0m)
-                + (variantDetail.NailSurface?.Price ?? 0m)
-                + (variantDetail.NailComponents?.Sum(nailComponent => nailComponent.Component?.Price ?? 0m) ?? 0m);
+                (variantDetail.NailSurface?.Price ?? 0m)
+                + (variantDetail.NailComponents?.Sum(nailComponent =>
+                    (nailComponent.Component?.Price ?? 0m) * GetFingerPriceMultiplier(nailComponent.FingerIndex)) ?? 0m);
 
-            variant.Duration = (variantDetail.NailShape.Duration ?? 0)
-                + (variantDetail.NailSurface.Duration ?? 0)
-                + variantDetail.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
+            variant.Duration = (variantDetail.NailSurface?.Duration ?? 0)
+                + (variantDetail.NailComponents?.Sum(nailComponent => nailComponent.Component?.Duration ?? 0) ?? 0);
 
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
-            await UpdateNailDesignPriceRangeAsync(variant.NailDesignId);
         }
 
-        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
+        private static int GetFingerPriceMultiplier(int fingerIndex)
         {
-            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
-            if (nailDesign == null)
-            {
-                return;
-            }
-
-            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
-            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
-            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
-
-            _unitOfWork.NailDesignRepository.Update(nailDesign);
-            await _unitOfWork.SaveChangesAsync();
+            return fingerIndex == -1 ? 5 : 1;
         }
 
         private async Task<string?> ValidateReferencesAsync(int componentId, int nailVariantId)

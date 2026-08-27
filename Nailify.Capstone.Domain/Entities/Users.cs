@@ -20,6 +20,7 @@ namespace Nailify.Capstone.Domain.Entities
         public string? AvatarUrl { get; set; }
         public UserRole Role { get; set; }
         public string Status { get; set; } = "Active";
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public virtual Salon? Salon { get; set; }
     }
 }

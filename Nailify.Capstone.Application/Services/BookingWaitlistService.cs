@@ -23,7 +23,14 @@ namespace Nailify.Capstone.Application.Services
         private readonly IPromotionService _promotionService;
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly IBookingSchedulingService _bookingSchedulingService;
-        public BookingWaitlistService(IUnitOfWork unitOfWork, IMapper mapper, ILoyaltyTierService loyaltyTierService, IPromotionService promotionService, IBookingProcedureService bookingProcedureService, IBookingSchedulingService bookingSchedulingService)
+        public BookingWaitlistService(
+                                        IUnitOfWork unitOfWork,
+                                        IMapper mapper,
+                                        ILoyaltyTierService loyaltyTierService,
+                                        IPromotionService promotionService,
+                                        IBookingProcedureService bookingProcedureService,
+                                        IBookingSchedulingService bookingSchedulingService
+                                     )
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -81,8 +88,8 @@ namespace Nailify.Capstone.Application.Services
                 int totalDuration = 0;
 
                 var sourceItems = (request?.BookingItems != null && request.BookingItems.Any())
-                    ? request.BookingItems.Select(b => new { b.Quantity, b.ServiceId, b.NailVariantId, b.CustomerNailId })
-                    : waitlist.WaitlistItems.Select(w => new { w.Quantity, w.ServiceId, w.NailVariantId, w.CustomerNailId });
+                    ? request.BookingItems.Select(b => new { b.Quantity, b.ServiceId, b.NailVariantId, CustomerNailRequestId = b.CustomerNailRequestId, CustomerNailId = (int?)null })
+                    : waitlist.WaitlistItems.Select(w => new { w.Quantity, w.ServiceId, w.NailVariantId, CustomerNailRequestId = (Guid?)null, w.CustomerNailId });
 
                 foreach (var x in sourceItems)
                 {
@@ -91,18 +98,41 @@ namespace Nailify.Capstone.Application.Services
                         Quantity = x.Quantity,
                         ServiceId = x.ServiceId,
                         NailVariantId = x.NailVariantId,
-                        CustomerNailId = x.CustomerNailId,
+                        CustomerNailRequestId = x.CustomerNailRequestId,
                     };
                     decimal itemPrice = 0;
                     int itemDuration = 0;
-                    if (x.CustomerNailId.HasValue)
+                    if (x.CustomerNailRequestId.HasValue)
+                    {
+                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(x.CustomerNailRequestId.Value);
+                        if (customNailRequest != null)
+                        {
+                            item.CustomerNailRequestId = customNailRequest.CustomerNailRequestId;
+                            itemPrice += customNailRequest.Price ?? 0;
+
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
+                            itemDuration += customNail?.Duration ?? 60;
+                            if (customNailRequest.Duration.HasValue)
+                            {
+                                itemDuration += customNailRequest.Duration.Value;
+                            }
+                        }
+                    }
+                    else if (x.CustomerNailId.HasValue)
                     {
 
                         var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(x.CustomerNailId.Value, waitlist.SalonId);
                         if (customNailRequest != null)
                         {
+                            item.CustomerNailRequestId = customNailRequest.CustomerNailRequestId;
                             itemPrice += customNailRequest.Price ?? 0;
-                            itemDuration += customNailRequest.Duration ?? 60;
+
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
+                            itemDuration += customNail?.Duration ?? 60;
+                            if (customNailRequest.Duration.HasValue)
+                            {
+                                itemDuration += customNailRequest.Duration.Value;
+                            }
                         }
                         else
                         {
@@ -132,10 +162,8 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
                     item.Price = itemPrice;
-                    item.DiscountAmount = 0;
-                    item.FinalPrice = itemPrice * Math.Max(x.Quantity, 1);
                     item.Duration = itemDuration;
-                    basePrice += item.FinalPrice;
+                    basePrice += item.Price * Math.Max(item.Quantity, 1);
                     totalDuration += item.Duration;
                     bookingItems.Add(item);
                 }
@@ -275,6 +303,33 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<WaitlistResponseDTO>("Bạn đã ở trong hàng chờ của khung giờ này rồi.");
             }
+            // kiem tra xem co bao nhieu tho dang lam viec trong ngay do
+            var workingArtistCount = await _unitOfWork.ScheduleRepository.GetWorkingArtistCountByDateAsync(request.SalonId, request.RequestedDate);
+
+            if(workingArtistCount == 0)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>("Salon không có thợ làm việc vào ngày này.");
+            }
+            //  Tinh dung luong hang cho toi da cho khung gio
+            int maxWailistCapcity = Math.Max(1, (int)Math.Ceiling(workingArtistCount * 0.3));
+
+            // Dem luot cho dang co cho khung gio
+            var activeWailistCount = await _unitOfWork.BookingWaitlistRepository.GetActiveWailistCountAsync(request.SalonId, request.RequestedDate, request.RequestedStartTime);
+
+            if(activeWailistCount >= maxWailistCapcity)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>(
+                                $"Hàng chờ cho khung giờ {request.RequestedStartTime:hh\\:mm} đã đạt giới hạn tối đa ({maxWailistCapcity} lượt). Vui lòng chọn khung giờ hoặc chi nhánh khác.");
+            }
+
+            int accumulatedWaitTime = activeWailistCount * 30;
+            if(accumulatedWaitTime >= 60)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>(
+                             $"Thời gian chờ dự kiến cho khung giờ này quá dài (~{accumulatedWaitTime} phút). Salon hiện tạm dừng nhận thêm lượt chờ.");
+            }
+
+            // Đếm số lượng lượt chờ hiện đang có cho khung giờ
             var position = await _unitOfWork.BookingWaitlistRepository.GetNextPositionAsync(
                 request.SalonId, 
                 request.RequestedDate, 
@@ -285,7 +340,7 @@ namespace Nailify.Capstone.Application.Services
             wailist.CustomerId = customerId;
             wailist.Position = position;
             wailist.Status = WaitlistStatus.Waiting;
-            wailist.CreatedAt = DateTime.UtcNow;
+            wailist.CreatedAt = DateTime.UtcNow.AddHours(7);
 
             // Calculate EstimatedDuration based on WaitlistItems
             int totalDuration = 0;
@@ -299,7 +354,12 @@ namespace Nailify.Capstone.Application.Services
                         var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetApprovedRequestAsync(item.CustomerNailId.Value, request.SalonId);
                         if (customNailRequest != null)
                         {
-                            itemDuration += customNailRequest.Duration ?? 60;
+                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
+                            itemDuration += customNail?.Duration ?? 60;
+                            if (customNailRequest.Duration.HasValue)
+                            {
+                                itemDuration += customNailRequest.Duration.Value;
+                            }
                         }
                         else
                         {

@@ -1,4 +1,4 @@
-using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+﻿using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
@@ -54,7 +54,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await FindByCondition(x => x.WailistId == waitlistId, false)
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
-                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.PreferredNailArtist)
+                    .ThenInclude(a => a.Account)
+                .OrderBy(x => x.Position)
                 .FirstOrDefaultAsync();
         }
 
@@ -110,7 +112,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
         public async Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date)
         {
-            var dateOnly = date.Date;
+            var dateOnly = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
             return await FindByCondition(x => x.PreferredNailArtistId == artistId
                                          && x.RequestedDate.Date == dateOnly
                                          && x.Status == WaitlistStatus.Notified
@@ -127,6 +129,70 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
                 .Include(x => x.WaitlistItems)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<int> GetActiveWailistCountAsync(Guid salonId, DateTime date, TimeSpan startTime)
+        {
+            var dateOnly = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
+            return await FindByCondition(x => x.SalonId == salonId
+                                         && x.RequestedDate.Date == dateOnly
+                                         && x.RequestedStartTime == startTime
+                                         && (
+                                         x.Status == WaitlistStatus.Waiting 
+                                         || x.Status == WaitlistStatus.Notified
+                                         ), false)
+                .CountAsync();
+        }
+
+        public async Task<BookingWaitlist?> GetSmartNextWaitingEntryAsync(Guid salonId, DateTime date, TimeSpan startTime, Guid? preferredNailArtistId, int freedDurationMinutes, int continuousWindowMinutes)
+        {
+            // 1. Lấy tất cả Waitlist entries ở trạng thái Waiting cho khung giờ & salon này
+            var candidates = await FindByCondition(x => x.SalonId == salonId
+                                                       && x.RequestedDate.Date == date.Date
+                                                       && x.RequestedStartTime == startTime
+                                                       && (preferredNailArtistId == null || x.PreferredNailArtistId == preferredNailArtistId)
+                                                       && x.Status == WaitlistStatus.Waiting, true)
+                                  .Include(x => x.Customer)
+                                        .ThenInclude(c => c.User)
+                                  .Include(x => x.Salon)
+                                  .Include(x => x.PreferredNailArtist)
+                                        .ThenInclude(a => a.Account)
+                                  .Include(x => x.WaitlistItems)
+                                  .ToListAsync();
+
+            if(!candidates.Any())
+            {
+                return null;
+            }
+
+            var scoredCandidates = candidates.Select(x =>
+            {
+                int duration = x.EstimatedDuration > 0 ? x.EstimatedDuration : 60;
+                double score = 0;
+                if (duration > continuousWindowMinutes)
+                {
+                    score = -9999;  // Quá thời gian rảnh liên tục thực tế => Loai
+                }
+                else if (duration == freedDurationMinutes)
+                {
+                    score += 100; // Ưu tiên hoàn toàn nếu trùng khớp
+                }
+                else if (duration <= continuousWindowMinutes)
+                {
+                    double fillRatio = (double)duration / continuousWindowMinutes;
+                    score += fillRatio * 80;
+                }
+
+                score += Math.Max(0, 20 - x.Position); // Ưu tiên những người ở vị trí cao hơn
+
+                return new { Candidate = x, TotalScore = score };
+            })
+            .Where(x => x.TotalScore > 0)
+            .OrderByDescending(x => x.TotalScore)
+            .ThenBy(x => x.Candidate.Position)
+            .FirstOrDefault();
+
+            return scoredCandidates?.Candidate;
         }
     }
 }

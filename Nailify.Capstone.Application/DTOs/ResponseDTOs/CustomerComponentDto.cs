@@ -11,6 +11,5 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string ImageUrl { get; set; } = string.Empty;
         public ComponentType ComponentType { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsPublic { get; set; }
     }
 }

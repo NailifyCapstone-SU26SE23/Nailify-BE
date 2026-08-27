@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
+using System.Security.Claims;
 
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -44,7 +45,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] string? name = null,
             [FromQuery] List<int>? categoryIds = null)
         {
-            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds);
+            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds, GetCurrentUserIdOrNull());
             return Ok(result);
         }
 
@@ -56,7 +57,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _nailDesignService.GetNailDesignByIdAsync(id);
+            var result = await _nailDesignService.GetNailDesignByIdAsync(id, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
@@ -72,7 +73,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Create([FromForm] NailDesignCreateRequest request, IFormFile? image)
         {
             var validationResult = await _designCreateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -80,15 +81,15 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return BadRequest(new ApiErrorResult<object>(validationResult.Errors.Select(error => error.ErrorMessage).ToList()));
             }
 
-            var uploadedImageUrls = new List<string>();
+            var uploadedImageUrl = string.Empty;
 
             try
             {
-                uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.CreateNailDesignAsync(request, uploadedImageUrls);
+                uploadedImageUrl = await UploadImageAsync(image);
+                var result = await _nailDesignService.CreateNailDesignAsync(request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
-                    await DeleteImagesAsync(uploadedImageUrls);
+                    await DeleteImageAsync(uploadedImageUrl);
                     return BadRequest(result);
                 }
 
@@ -96,7 +97,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                await DeleteImagesAsync(uploadedImageUrls);
+                await DeleteImageAsync(uploadedImageUrl);
                 return BadRequest(new ApiResult<object>(false, $"Tạo mẫu nail thất bại khi tải ảnh: {ex.Message}"));
             }
         }
@@ -109,7 +110,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<NailDesignDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, List<IFormFile>? images)
+        public async Task<IActionResult> Update(int id, [FromForm] NailDesignUpdateRequest request, IFormFile? image)
         {
             var validationResult = await _designUpdateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -123,29 +124,31 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return NotFound(existingResult);
             }
 
-            var uploadedImageUrls = new List<string>();
+            var uploadedImageUrl = string.Empty;
 
             try
             {
-                uploadedImageUrls = await UploadImagesAsync(images);
-                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrls);
+                uploadedImageUrl = await UploadImageAsync(image);
+                var result = await _nailDesignService.UpdateNailDesignAsync(id, request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
-                    await DeleteImagesAsync(uploadedImageUrls);
+                    await DeleteImageAsync(uploadedImageUrl);
                     return BadRequest(result);
                 }
 
-                var keptImageUrls = request.ExistingImageUrls.Distinct().ToList();
-                var removedImageUrls = existingResult.Data.ImageUrls
-                    .Except(keptImageUrls)
-                    .ToList();
-                await DeleteImagesAsync(removedImageUrls);
+                var oldImageUrl = existingResult.Data.ImageUrl;
+                var currentImageUrl = result.Data.ImageUrl;
+                if (!string.IsNullOrWhiteSpace(oldImageUrl)
+                    && !string.Equals(oldImageUrl, currentImageUrl, StringComparison.Ordinal))
+                {
+                    await DeleteImageAsync(oldImageUrl);
+                }
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                await DeleteImagesAsync(uploadedImageUrls);
+                await DeleteImageAsync(uploadedImageUrl);
                 return BadRequest(new ApiResult<object>(false, $"Cập nhật mẫu nail thất bại khi tải ảnh: {ex.Message}"));
             }
         }
@@ -170,7 +173,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return NotFound(result);
             }
 
-            await DeleteImagesAsync(existingResult.Data.ImageUrls);
+            await DeleteImageAsync(existingResult.Data.ImageUrl);
             return Ok(result);
         }
 
@@ -181,34 +184,31 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<List<NailDesignDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
-            var result = await _nailDesignService.GetNailDesignsByCategoryAsync(categoryId);
+            var result = await _nailDesignService.GetNailDesignsByCategoryAsync(categoryId, GetCurrentUserIdOrNull());
             return Ok(result);
         }
 
-        private async Task<List<string>> UploadImagesAsync(List<IFormFile>? images)
+        private Guid? GetCurrentUserIdOrNull()
         {
-            var validImages = images?
-                .Where(image => image != null && image.Length > 0)
-                .ToList() ?? new List<IFormFile>();
-
-            if (!validImages.Any())
-            {
-                return new List<string>();
-            }
-
-            return await _cloudinaryService.UploadMultipleImagesAsync(validImages);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
 
-        private async Task DeleteImagesAsync(IEnumerable<string>? imageUrls)
+        private async Task<string> UploadImageAsync(IFormFile? image)
         {
-            var urls = imageUrls?
-                .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
-                .Distinct()
-                .ToList() ?? new List<string>();
-
-            if (urls.Any())
+            if (image == null || image.Length == 0)
             {
-                await _cloudinaryService.DeleteMultipleImagesAsync(urls);
+                return string.Empty;
+            }
+
+            return await _cloudinaryService.UploadImageAsync(image);
+        }
+
+        private async Task DeleteImageAsync(string? imageUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                await _cloudinaryService.DeleteImageAsync(imageUrl);
             }
         }
     }

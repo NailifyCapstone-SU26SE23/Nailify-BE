@@ -17,6 +17,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
           Guid artistId,
           DateTime bookingDate,
           Guid? excludingBookingId = null);
-        Task<BookingProcedure?> GetProcedureWithBookingItemAsync(Guid bookingProcedureId);
+        Task<BookingProcedure?> GetProcedureWithBookingItemAsync(Guid bookingProcedureId, bool trackChanges = false);
+        Task<List<BookingProcedure>> GetActiveProceduresByArtistIdAsync(Guid artistId);
+        Task<List<BookingProcedure>> GetClaimableProceduresBySalonIdAsync(Guid salonId);
     }
 }

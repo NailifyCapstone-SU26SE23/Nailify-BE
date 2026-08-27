@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -120,6 +121,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        [HttpPost("voucherForReschedule/{bookingId}")]
+        [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AddVoucherForReschedule(Guid bookingId)
+        {
+            var result = await _promotionService.AddVoucherForRescheduleAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
         [HttpPut("{id:int}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
@@ -199,7 +209,8 @@ namespace Nailify.Capstone.Presentation.Controllers
 
         private Guid? GetCurrentUserIdOrNull()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }

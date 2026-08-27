@@ -51,6 +51,28 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy tất cả ghế của salon kèm trạng thái bận/trống tại một thời điểm.
+        /// Ghế bận sẽ trả về BookingId, CustomerId và tên khách đang ngồi.
+        /// </summary>
+        [HttpGet("api/salons/{salonId}/chairs-status")]
+        [ProducesResponseType(typeof(ApiResult<List<ChairResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetChairStatus(
+            Guid salonId,
+            [FromQuery] DateTime? atDate = null,
+            [FromQuery] TimeSpan? atTime = null)
+        {
+            var localNow = DateTime.UtcNow.AddHours(7);
+            var queryDate = atDate ?? localNow.Date;
+            var queryTime = atTime ?? localNow.TimeOfDay;
+
+            var response = await _chairService.GetChairStatusBySalonAsync(salonId, queryDate, queryTime);
+            if (!response.IsSucceeded) return NotFound(response);
+            return Ok(response);
+        }
+
+
+        /// <summary>
         /// Lấy chi tiết thông tin một ghế.
         /// </summary>
         [HttpGet("api/chairs/{id}")]

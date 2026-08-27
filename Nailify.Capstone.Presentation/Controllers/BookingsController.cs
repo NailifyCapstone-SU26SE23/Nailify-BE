@@ -1,14 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -23,11 +27,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         private readonly IBookingService _bookingService;
         private readonly CloudinaryService _cloudinaryService;
         private readonly ISlotHoldService _slotHoldService;
-        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService)
+        private readonly IBookingRescheduleService _bookingRescheduleService;
+        public BookingsController(IBookingService bookingService, CloudinaryService _cloudinary, ISlotHoldService slotHoldService, IBookingRescheduleService bookingRescheduleService)
         {
             _bookingService = bookingService;
             _cloudinaryService = _cloudinary;
             _slotHoldService = slotHoldService;
+            _bookingRescheduleService = bookingRescheduleService;
         }
 
         /// <summary>
@@ -82,7 +88,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 var customerId = GetCurrentUserId();
                 var response = await _bookingService.CreateBookingAsync(customerId, request);
-                if (!response.IsSucceeded) return BadRequest(response);
+                 if (!response.IsSucceeded) return BadRequest(response);
                 return Ok(response);
             }
             catch (UnauthorizedAccessException)
@@ -97,8 +103,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> CalculatePrice([FromBody] BookingPriceRequestDTO request)
         {
+            var customerIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var customerId = Guid.TryParse(customerIdClaim, out var parsedCustomerId)
+                ? parsedCustomerId
+                : (Guid?)null;
+
             var response = await _bookingService.CalculateBookingPriceAsync(
-                GetCurrentUserId(),
+                customerId,
                 request.BookingItems,
                 request.SelectedPromotionIds); 
 
@@ -314,6 +325,15 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Lấy thông tin chi tiết của một đơn đặt lịch hẹn cụ thể.
         /// </summary>
+        [HttpGet("by-order-code/{orderCode:long}/booking-id")]
+        [ProducesResponseType(typeof(ApiResult<BookingIdResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBookingIdByOrderCode(long orderCode)
+        {
+            var response = await _bookingService.GetBookingIdByOrderCodeAsync(orderCode);
+            return response.IsSucceeded ? Ok(response) : NotFound(response);
+        }
+
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
@@ -489,6 +509,184 @@ namespace Nailify.Capstone.Presentation.Controllers
                 return UnauthorizedResponse();
             }
         }
+        /// <summary>
+        /// Lấy đếm ngược ETA thời gian chờ 
+        /// </summary>
+        [HttpGet("{bookingId}/wait-eta")]
+        [ProducesResponseType(typeof(ApiResult<CustomerWaitEtaResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetWaitEtaAndCompensate(Guid bookingId)
+        {
+            var result = await _bookingService.GetPreBookedCustomerWaitTimeEtaAndCompensateAsync(bookingId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        /// <summary>
+        /// Khách hàng chấp nhận khung giờ mới đề xuất từ Salon/Hệ thống.
+        /// </summary>
+        [HttpPost("{id}/accept-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AcceptSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerAcceptSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng từ chối khung giờ mới đề xuất từ Salon.
+        /// </summary>
+        [HttpPost("{id}/decline-suggested-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> DeclineSuggestedTime(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerDeclineSuggestedTimeAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Khách hàng yêu cầu dời lịch sang ngày/giờ khác.
+        /// </summary>
+        [HttpPost("{id}/request-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RequestReschedule(Guid id, [FromBody] CustomerRescheduleRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.CustomerRequestRescheduleAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager đề xuất khung giờ mới cho đơn hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-suggest-time")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerSuggestTime(Guid id, [FromBody] ManagerSuggestTimeRequestDTO request)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerSuggestTimeAsync(id, request, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager duyệt yêu cầu xin dời lịch của Khách hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-approve-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerApproveReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerApproveRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manager từ chối yêu cầu xin dời lịch của Khách hàng.
+        /// </summary>
+        [HttpPost("{id}/manager-reject-reschedule")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ManagerRejectReschedule(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var result = await _bookingRescheduleService.ManagerRejectRescheduleAsync(id, currentUserId);
+            if (!result.IsSucceeded) return BadRequest(result);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Lấy chi tiết đơn đặt lịch kèm thông tin bảo hành
+        /// (đơn này đã được bảo hành chưa? đơn bảo hành là đơn nào?).
+        /// </summary>
+        [HttpGet("{id}/warranty-info")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetWarrantyInfo(Guid id)
+        {
+            var response = await _bookingService.GetBookingDetailWithWarrantyAsync(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Lấy các khung giờ có thợ rảnh trong salon (dùng khi khách hàng không chọn thợ cụ thể).
+        /// Mỗi slot 15 phút trả về IsAvailable = true nếu có ít nhất 1 thợ đủ skill đang rảnh, kèm số lượng thợ rảnh (FE ko cần hiện số lượng thợ rảnh nhé!).
+        /// </summary>
+        [HttpPost("salon-available-slots")]
+        [ProducesResponseType(typeof(ApiResult<SalonAvailabilityResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetSalonAvailableSlots([FromBody] GetSalonAvailableSlotsRequestDTO request)
+        {
+            var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Xem trước việc chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpGet("{bookingId:guid}/transfer-preview")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> PreviewTransferSalon(
+            Guid bookingId,
+            [FromQuery] Guid targetSalonId)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .PreviewTransferSalonAsync(bookingId, targetSalonId, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Thực hiện chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpPost("{bookingId:guid}/transfer-salon")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> TransferSalon(
+            Guid bookingId,
+            [FromBody] TransferSalonRequestDTO request)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .TransferSalonAsync(bookingId, request, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Lễ tân lấy danh sách các đơn đặt lịch bị tự động hủy do trễ 15 phút trong ngày của Salon.
+        /// </summary>
+        [HttpGet("salon/{salonId}/late-cancelled")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetLateCancelledBookings(Guid salonId)
+        {
+            var response = await _bookingService.GetLateCancelledBookingsBySalonAsync(salonId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Lễ tân khôi phục & Check-in cho khách đặt trước đến trễ (sau khi bị auto-cancel 15p).
+        /// </summary>
+        [HttpPost("{id}/late-checkin")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> LateCheckIn(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.LateCheckInBookingAsync(id, currentUserId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
     }
 
     public class CheckInForm

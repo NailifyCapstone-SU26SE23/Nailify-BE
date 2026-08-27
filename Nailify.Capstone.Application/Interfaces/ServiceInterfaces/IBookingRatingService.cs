@@ -11,6 +11,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingRatingResponseDTO>> GetByBookingIdAsync(Guid bookingId);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetBySalonIdAsync(Guid salonId, BookingRatingRequestParameters parameters);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters);
+        Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByNailVariantIdAsync(int nailVariantId, BookingRatingRequestParameters parameters);
         Task<ApiResult<PagedList<BookingRatingResponseDTO>>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters);
         Task<ApiResult<BookingRatingResponseDTO>> CreateAsync(Guid customerId, BookingRatingCreateRequest request, string? imageUrl);
         Task<ApiResult<BookingRatingResponseDTO>> UpdateAsync(Guid customerId, Guid id, BookingRatingUpdateRequest request, string? imageUrl);

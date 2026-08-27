@@ -14,12 +14,12 @@ namespace Nailify.Capstone.Domain.Entities
         public string? CustomColor { get; set; }
         public int? Duration { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsPublic { get; set; } = false;
         public string Status { get; set; } = "Active";
         public virtual User User { get; set; } = null!;
         public virtual NailShape NailShape { get; set; } = null!;
         public virtual NailSurface NailSurface { get; set; } = null!;
         public virtual ICollection<CustomerNailComponent> CustomerNailComponents { get; set; } = new List<CustomerNailComponent>();
         public virtual ICollection<CustomerNailRequest> CustomerNailRequests { get; set; } = new List<CustomerNailRequest>();
+        public virtual ICollection<NailProcedure> NailProcedures { get; set; } = new List<NailProcedure>();
     }
 }

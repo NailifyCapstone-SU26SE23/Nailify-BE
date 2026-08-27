@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.DTOs.RequestDTOs.MailRequestDTO;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.MailRequestDTO;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using System;
@@ -26,7 +26,7 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
         }
         public async Task CancelLateBookingsAsync()
         {
-            var nowUtc = DateTime.UtcNow;
+            var nowUtc = DateTime.UtcNow.AddHours(7);
 
             // Lấy danh sách booking trong ngày hôm nay ở trạng thái Approved (chưa Check-in)
             // và đã trễ quá 15 phút so với giờ hẹn (BookingDate + StartTime < nowUtc - 15 phút)

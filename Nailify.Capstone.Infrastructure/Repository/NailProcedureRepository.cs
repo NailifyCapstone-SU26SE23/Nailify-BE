@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -22,6 +22,22 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Where(np => np.Procedure.Status == "Active")
                 .OrderBy(np => np.StepOrder)
                 .ToListAsync();
+        }
+
+        public async Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdAsync(int customerNailId)
+        {
+            return await FindByCondition(np => np.CustomerNailId == customerNailId && np.Status == "Active")
+                .Include(np => np.Procedure)
+                .Where(np => np.IsCustomStep || (np.Procedure != null && np.Procedure.Status == "Active"))
+                .OrderBy(np => np.StepOrder)
+                .ToListAsync();
+        }
+
+        public async Task<NailProcedure?> GetNailProcedureWithProcedureAsync(Guid nailProcedureId)
+        {
+            return await FindByCondition(np => np.NailProcedureId == nailProcedureId)
+                .Include(np => np.Procedure)
+                .FirstOrDefaultAsync();
         }
     }
 }

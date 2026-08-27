@@ -28,6 +28,30 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<Booking>> GetOverdueApprovedBookingsAsync(DateTime date, TimeSpan thresholdTime, bool trackChanges = false);
         Task<int> CountServingBookingsAsync(Guid artistId, DateTime date);
         Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime);
-
+        Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId);
+        Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date);
+        /// <summary>
+        /// Lấy danh sách booking đang chiếm ghế tại thời điểm chỉ định (CheckedIn / InProgress),
+        /// bao gồm thông tin Customer để hiển thị trên dashboard ghế.
+        /// </summary>
+        Task<IEnumerable<Booking>> GetChairOccupancyBySalonAsync(Guid salonId, DateTime date, TimeSpan atTime);
+        /// <summary>
+        /// Lấy đơn đặt lịch đang được thực hiện (InProgress) của một thợ, loại trừ một đơn cụ thể.
+        /// Sử dụng để kiểm tra đè ca.
+        /// </summary>
+        Task<Booking?> GetCurrentBusyBookingWithProceduresAsync(Guid artistId, Guid excludeBookingId, DateTime todayDate);
+        
+        /// <summary>
+        /// Tìm đơn bảo hành (warranty booking) của một đơn gốc.
+        /// Trả về null nếu chưa có đơn bảo hành active.
+        /// </summary>
+        Task<Booking?> GetWarrantyBookingAsync(Guid originalBookingId);
+        /// <summary>
+        /// Đếm số booking có Status = Approved của một salon
+        /// mà thời gian thực hiện bị overlap với booking chỉ định,
+        /// loại trừ chính booking đó.
+        /// </summary>
+        Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null);
+        Task<List<Booking>> GetLateCancelledBookingsBySalonAsync(Guid salonId, DateTime date);
     }
 }

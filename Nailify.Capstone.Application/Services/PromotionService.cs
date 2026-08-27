@@ -44,7 +44,7 @@ namespace Nailify.Capstone.Application.Services
                 pageNumber,
                 pageSize);
 
-            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai thanh cong.");
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PagedList<PromotionDto>>> GetTodayPagedAsync(
@@ -61,6 +61,21 @@ namespace Nailify.Capstone.Application.Services
 
                 foreach (var promotion in promotions)
                 {
+                    var isSituationVoucher = IsSituationVoucher(promotion);
+                    UserPromotionUsage? usage = null;
+
+                    if (isSituationVoucher)
+                    {
+                        usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
+                            customerId.Value,
+                            promotion.PromotionId);
+
+                        if ((GetRemainingCount(promotion, usage) ?? 0) <= 0)
+                        {
+                            continue;
+                        }
+                    }
+
                     if (promotion.Scope == PromotionScope.FirstTimeUser &&
                         await HasUserCompletedBookingAsync(customerId.Value))
                     {
@@ -69,7 +84,7 @@ namespace Nailify.Capstone.Application.Services
 
                     if (promotion.UserLimit.HasValue)
                     {
-                        var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
+                        usage ??= await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
                             customerId.Value,
                             promotion.PromotionId);
 
@@ -84,6 +99,12 @@ namespace Nailify.Capstone.Application.Services
 
                 promotions = eligiblePromotions;
             }
+            else
+            {
+                promotions = promotions
+                    .Where(promotion => !IsSituationVoucher(promotion))
+                    .ToList();
+            }
 
             var pagedItems = promotions
                 .Skip((pageNumber - 1) * pageSize)
@@ -91,20 +112,20 @@ namespace Nailify.Capstone.Application.Services
                 .ToList();
 
             var result = new PagedList<PromotionDto>(
-                _mapper.Map<List<PromotionDto>>(pagedItems),
+                await MapPromotionsWithCustomerUsageAsync(pagedItems, customerId),
                 promotions.Count,
                 pageNumber,
                 pageSize);
 
-            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lay danh sach khuyen mai hom nay thanh cong.");
+            return new ApiSuccessResult<PagedList<PromotionDto>>(result, "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PromotionDto>> GetByIdAsync(int id)
         {
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             return promotion == null
-                ? new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.")
-                : new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Lay khuyen mai thanh cong.");
+                ? new ApiErrorResult<PromotionDto>("Không tìm thấy khuyến mãi.")
+                : new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Lấy khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByCategoryIdAsync(int categoryId)
@@ -112,7 +133,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByCategoryIdAsync(categoryId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo danh muc thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByCategoryTypeIdAsync(int categoryTypeId)
@@ -120,7 +141,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByCategoryTypeIdAsync(categoryTypeId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo loai danh muc thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<List<PromotionDto>>> GetByNailDesignIdAsync(int nailDesignId)
@@ -128,7 +149,7 @@ namespace Nailify.Capstone.Application.Services
             var promotions = await _unitOfWork.PromotionRepository.GetByNailDesignIdAsync(nailDesignId);
             return new ApiSuccessResult<List<PromotionDto>>(
                 _mapper.Map<List<PromotionDto>>(promotions),
-                "Lay danh sach khuyen mai theo mau nail thanh cong.");
+                "Lấy danh sách khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null)
@@ -154,7 +175,7 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.PromotionRepository.CreateAsync(promotion);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Tao khuyen mai thanh cong.");
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Tạo khuyến mãi thành công");
         }
 
         public async Task<ApiResult<PromotionDto>> UpdateAsync(int id, PromotionRequest request, string? imageUrl = null)
@@ -162,7 +183,7 @@ namespace Nailify.Capstone.Application.Services
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             if (promotion == null)
             {
-                return new ApiErrorResult<PromotionDto>("Khong tim thay khuyen mai.");
+                return new ApiErrorResult<PromotionDto>("Không tìm thấy khuyến mãi.");
             }
 
             var validationError = await ValidateAsync(request, id);
@@ -190,7 +211,7 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.PromotionRepository.Update(promotion);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Cap nhat khuyen mai thanh cong.");
+            return new ApiSuccessResult<PromotionDto>(_mapper.Map<PromotionDto>(promotion), "Cập nhật khuyến mãi thành công.");
         }
 
         public async Task<ApiResult<bool>> DeleteAsync(int id)
@@ -198,12 +219,77 @@ namespace Nailify.Capstone.Application.Services
             var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(id);
             if (promotion == null)
             {
-                return new ApiErrorResult<bool>("Khong tim thay khuyen mai.");
+                return new ApiErrorResult<bool>("Không tìm thấy khuyến mãi.");
             }
 
             _unitOfWork.PromotionRepository.Delete(promotion);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiSuccessResult<bool>(true, "Xoa khuyen mai thanh cong.");
+            return new ApiSuccessResult<bool>(true, "Xóa khuyến mãi thành công.");
+        }
+
+        public Task<ApiResult<PromotionDto>> AddVoucherForRescheduleAsync(Guid bookingId)
+        {
+            return AddSituationVoucherAsync(bookingId, "Reschedule");
+        }
+
+        public Task<ApiResult<PromotionDto>> AddVoucherForCancelledAsync(Guid bookingId)
+        {
+            return AddSituationVoucherAsync(bookingId, "Cancelled");
+        }
+
+        private async Task<ApiResult<PromotionDto>> AddSituationVoucherAsync(Guid bookingId, string situation)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<PromotionDto>("Không tìm thấy lịch hẹn.");
+            }
+
+            var promotion = _unitOfWork.PromotionRepository
+                .FindByCondition(p =>
+                    p.Status == "Active" &&
+                    p.Type == PromotionType.Voucher &&
+                    p.Situation == situation &&
+                    p.StartDate <= DateTime.UtcNow &&
+                    (!p.EndDate.HasValue || p.EndDate.Value >= DateTime.UtcNow),
+                    trackChanges: true)
+                .OrderByDescending(p => p.StartDate)
+                .FirstOrDefault();
+
+            if (promotion == null)
+            {
+                return new ApiErrorResult<PromotionDto>($"Không tìm thấy voucher cho tình huống {situation}.");
+            }
+
+            var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
+                booking.CustomerId,
+                promotion.PromotionId);
+
+            if (usage == null)
+            {
+                usage = new UserPromotionUsage
+                {
+                    UserId = booking.CustomerId,
+                    PromotionId = promotion.PromotionId,
+                    UsageCount = 0,
+                    ReceivedCount = 1,
+                    LastUsedDate = DateTime.UtcNow
+                };
+                await _unitOfWork.UserPromotionUsageRepository.CreateAsync(usage);
+            }
+            else
+            {
+                usage.ReceivedCount = (usage.ReceivedCount ?? 0) + 1;
+                usage.LastUsedDate = DateTime.UtcNow;
+                _unitOfWork.UserPromotionUsageRepository.Update(usage);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            var dto = _mapper.Map<PromotionDto>(promotion);
+            dto.RemainingCount = GetRemainingCount(promotion, usage);
+
+            return new ApiSuccessResult<PromotionDto>(dto, $"Đã thêm voucher {situation} cho khách hàng.");
         }
 
         public async Task<List<Promotion>> GetApplicablePromotionsAsync(
@@ -265,13 +351,21 @@ namespace Nailify.Capstone.Application.Services
                 var selectedPromotions = await SelectApplicablePromotionsAsync(item, applicablePromotions, usedPromotions);
                 if (!selectedPromotions.Any())
                 {
-                    SetFinalPriceIfMissing(item);
                     continue;
                 }
 
+                var lineAmount = GetLineAmount(item);
+                decimal itemDiscountTotal = 0;
+
                 foreach (var selectedPromotion in selectedPromotions)
                 {
-                    var discountAmount = CalculateItemDiscount(item, selectedPromotion);
+                    var remainingAmount = lineAmount - itemDiscountTotal;
+                    if (remainingAmount <= 0)
+                    {
+                        break;
+                    }
+
+                    var discountAmount = Math.Min(CalculateItemDiscount(item, selectedPromotion), remainingAmount);
                     if (discountAmount <= 0)
                     {
                         continue;
@@ -279,10 +373,7 @@ namespace Nailify.Capstone.Application.Services
 
                     usedPromotions.Add(selectedPromotion.PromotionId);
                     totalDiscount += discountAmount;
-
-                    item.DiscountAmount += discountAmount;
-                    item.FinalPrice = Math.Max(0, GetLineAmount(item) - item.DiscountAmount);
-                    item.DiscountAmount = Math.Min(item.DiscountAmount, GetLineAmount(item));
+                    itemDiscountTotal += discountAmount;
 
                     appliedDiscounts.Add(new BookingDiscount
                     {
@@ -340,20 +431,20 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<string?> ValidateAsync(PromotionRequest request, int? excludedId = null)
         {
-            if (string.IsNullOrWhiteSpace(request.Name)) return "Ten khuyen mai khong duoc de trong.";
-            if (request.DiscountValue <= 0) return "Gia tri giam gia phai lon hon 0.";
-            if (request.DiscountType == DiscountType.Percentage && request.DiscountValue > 100) return "Phan tram giam gia khong duoc lon hon 100.";
-            if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate) return "Ngay ket thuc khong duoc truoc ngay bat dau.";
-            if (request.UsageLimit < 0 || request.UserLimit < 0) return "Gioi han su dung khong duoc am.";
+            if (string.IsNullOrWhiteSpace(request.Name)) return "Tên khuyến mãi không được để trống.";
+            if (request.DiscountValue <= 0) return "Giá trị giảm giá phải lớn hơn 0";
+            if (request.DiscountType == DiscountType.Percentage && request.DiscountValue > 100) return "Phầm trăm giảm giá không được lớn hơn 100.";
+            if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate) return "Ngày kết thúc không được trước ngày bắt đầu.";
+            if (request.UsageLimit < 0 || request.UserLimit < 0) return "Giới hạn sử dụng không được lớn hơn 0";
 
             var promotion = _mapper.Map<Promotion>(request);
-            if (!promotion.IsValid()) return "Pham vi khuyen mai khong khop voi doi tuong ap dung.";
+            if (!promotion.IsValid()) return "Phạm vi khuyến mãi không khớp với đối tượng áp dụng.";
 
             var duplicate = await _unitOfWork.PromotionRepository.ExistsAsync(promotionEntity =>
                 promotionEntity.PromotionId != excludedId &&
                 promotionEntity.Name.ToLower() == request.Name.Trim().ToLower());
 
-            return duplicate ? "Ten khuyen mai da ton tai." : null;
+            return duplicate ? "Tên khuyến mãi đã tồn tại." : null;
         }
 
         private static void NormalizePromotionLimits(Promotion promotion)
@@ -381,6 +472,54 @@ namespace Nailify.Capstone.Application.Services
             return _unitOfWork.BookingRepository.ExistsAsync(booking =>
                 booking.CustomerId == customerId &&
                 booking.Status == BookingStatus.Completed);
+        }
+
+        private async Task<List<PromotionDto>> MapPromotionsWithCustomerUsageAsync(
+            IEnumerable<Promotion> promotions,
+            Guid? customerId)
+        {
+            var result = new List<PromotionDto>();
+
+            foreach (var promotion in promotions)
+            {
+                var dto = _mapper.Map<PromotionDto>(promotion);
+                if (customerId.HasValue)
+                {
+                    var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(
+                        customerId.Value,
+                        promotion.PromotionId);
+
+                    dto.RemainingCount = GetRemainingCount(promotion, usage);
+                }
+
+                result.Add(dto);
+            }
+
+            return result;
+        }
+
+        private static bool IsSituationVoucher(Promotion promotion)
+        {
+            return promotion.Type == PromotionType.Voucher
+                   && (string.Equals(promotion.Situation, "Reschedule", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(promotion.Situation, "Cancelled", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static int? GetRemainingCount(Promotion promotion, UserPromotionUsage? usage)
+        {
+            if (usage == null)
+            {
+                return promotion.UserLimit ?? 0;
+            }
+
+            if (IsSituationVoucher(promotion))
+            {
+                return Math.Max((usage.ReceivedCount ?? 0) - usage.UsageCount, 0);
+            }
+
+            return promotion.UserLimit.HasValue
+                ? Math.Max(promotion.UserLimit.Value - usage.UsageCount, 0)
+                : null;
         }
 
         private async Task<List<Promotion>> SelectApplicablePromotionsAsync(
@@ -464,14 +603,6 @@ namespace Nailify.Capstone.Application.Services
         private static decimal GetLineAmount(BookingItem item)
         {
             return item.Price * Math.Max(item.Quantity, 1);
-        }
-
-        private static void SetFinalPriceIfMissing(BookingItem item)
-        {
-            if (item.FinalPrice <= 0 && item.DiscountAmount <= 0)
-            {
-                item.FinalPrice = GetLineAmount(item);
-            }
         }
     }
 }

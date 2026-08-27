@@ -17,6 +17,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs
         public double Longitude { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
+        public decimal DepositConfig { get; set; }
 
         public List<SalonOperatingHourResponseDTO.SalonOperatingHourResponseDTO> OperatingHours { get; set; } = new();
 

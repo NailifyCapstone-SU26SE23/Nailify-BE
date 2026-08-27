@@ -11,6 +11,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<ScheduleResponseDTO>> CreateScheduleAsync(ScheduleCreateRequest request);
         Task<ApiResult<IEnumerable<ScheduleResponseDTO>>> GetSchedulesByArtistIdAsync(Guid artistId, DateTime? startDate, DateTime? endDate);
+        Task<ApiResult<IEnumerable<ScheduleResponseDTO>>> GetSchedulesBySalonIdAsync(Guid salonId, DateTime? startDate, DateTime? endDate);
         Task<ApiResult<PagedList<ScheduleResponseDTO>>> GetPagedSchedulesAsync(int pageNumber, int pageSize, Guid? artistId = null, DateTime? startDate = null, DateTime? endDate = null);
         Task<ApiResult<ScheduleResponseDTO>> UpdateScheduleAsync(Guid scheduleId, ScheduleUpdateRequest request);
         Task<ApiResult<ScheduleResponseDTO>> PatchScheduleAsync(Guid scheduleId, SchedulePatchRequest request);

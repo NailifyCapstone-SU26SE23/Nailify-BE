@@ -23,9 +23,9 @@ namespace Nailify.Capstone.Application.Services
         }
         #endregion Constructor
         #region CRUD Operations
-        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
+        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null)
         {
-            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name, isPublic);
+            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name);
             var mappedItems = _mapper.Map<List<CustomerNailDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<CustomerNailDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
@@ -97,12 +97,6 @@ namespace Nailify.Capstone.Application.Services
                 hasChanges = true;
             }
 
-            if (request.IsPublic.HasValue)
-            {
-                customerNail.IsPublic = request.IsPublic.Value;
-                hasChanges = true;
-            }
-
             if (!string.IsNullOrWhiteSpace(imageUrl))
             {
                 customerNail.ImageUrl = imageUrl;
@@ -149,8 +143,7 @@ namespace Nailify.Capstone.Application.Services
 
             var customerNail = customerNailDetail;
             customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, customerNailId);
-            customerNail.Duration = (customerNailDetail.NailShape?.Duration ?? 0)
-              + (customerNailDetail.NailSurface?.Duration ?? 0)
+            customerNail.Duration = (customerNailDetail.NailSurface?.Duration ?? 0)
               + customerNailDetail.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0);
             _unitOfWork.CustomerNailRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
@@ -158,7 +151,6 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<decimal> CalculateCustomerNailPriceAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId)
         {
-            var nailShape = nailShapeId.HasValue ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) : null;
             var nailSurface = nailSurfaceId.HasValue ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) : null;
             var componentPrice = 0m;
 
@@ -166,17 +158,20 @@ namespace Nailify.Capstone.Application.Services
             {
                 var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId.Value);
                 componentPrice = customerNail?.CustomerNailComponents.Sum(component =>
-                    (component.Component?.Price ?? 0m) + (component.CustomerComponent?.Price ?? 0m)) ?? 0m;
+                    ((component.Component?.Price ?? 0m) + (component.CustomerComponent?.Price ?? 0m))
+                    * GetFingerPriceMultiplier(component.FingerIndex)) ?? 0m;
             }
 
-            return (nailShape?.Price ?? 0m) + (nailSurface?.Price ?? 0m) + componentPrice;
+            return (nailSurface?.Price ?? 0m) + componentPrice;
+        }
+
+        private static int GetFingerPriceMultiplier(int fingerIndex)
+        {
+            return fingerIndex == -1 ? 5 : 1;
         }
 
         private async Task<int?> CalculateCustomerNailDurationAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId = null)
         {
-            var nailShape = nailShapeId.HasValue
-                ? await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value)
-                : null;
             var nailSurface = nailSurfaceId.HasValue
                 ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
                 : null;
@@ -188,22 +183,7 @@ namespace Nailify.Capstone.Application.Services
                 componentDuration = nailComponent?.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0) ?? 0;
             }
 
-            return (nailShape?.Duration ?? 0) + (nailSurface?.Duration ?? 0) + componentDuration;
-        }
-
-        private async Task<string?> ValidateReferencesAsync(int? nailShapeId, int? nailSurfaceId)
-        {
-            if (!nailShapeId.HasValue || await _unitOfWork.NailShapeRepository.GetByIdAsync(nailShapeId.Value) == null)
-            {
-                return "Không tìm thấy dáng móng.";
-            }
-
-            if (nailSurfaceId.HasValue && await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) == null)
-            {
-                return "Không tìm thấy bề mặt móng.";
-            }
-
-            return null;
+            return (nailSurface?.Duration ?? 0) + componentDuration;
         }
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> SubmitReviewAsync(CustomerNailRequestCreateRequest requestDto, Guid customerId)
@@ -231,7 +211,9 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng này đang trong quá trình duyệt tại chi nhánh này.");
             }
+            
             var request = _mapper.Map<CustomerNailRequest>(requestDto);
+            request.IsCustomerRequest = true;
             await _unitOfWork.CustomerNailRequestRepository.CreateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
@@ -261,7 +243,6 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chỉ định thợ cho mẫu móng ở chi nhánh khác.");
             }
-            //var artist = await _unitOfWork.NailArtistRepository.GetByIdAsync(request.StaffArtistId);
             var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.StaffArtistId);
             if (artist == null)
             {
@@ -301,11 +282,49 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền báo giá mẫu nail này.");
             }
+            if (request.QuotedPrice < 0 || request.QuotedDuration < 0)
+            {
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Quote price and duration cannot be negative.");
+            }
+
             nailRequest.Price = request.QuotedPrice;
             nailRequest.Duration = request.QuotedDuration;
             nailRequest.Status = CustomerNailStatus.Reviewed;
             nailRequest.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
+
+            // Xử lý lưu các bước quy trình (Procedures) nếu có
+            if (request.Procedures != null && request.Procedures.Any())
+            {
+                var existingProcedures = _unitOfWork.NailProcedureRepository
+                    .FindByCondition(np => np.CustomerNailId == nailRequest.CustomerNailId)
+                    .ToList();
+
+                foreach (var ep in existingProcedures)
+                {
+                    _unitOfWork.NailProcedureRepository.Delete(ep);
+                }
+
+                int stepOrder = 1;
+                foreach (var proc in request.Procedures)
+                {
+                    var nailProcedure = new NailProcedure
+                    {
+                        CustomerNailId = nailRequest.CustomerNailId,
+                        ProcedureId = proc.IsCustomStep ? null : proc.ProcedureId,
+                        Name = proc.IsCustomStep ? proc.Name : null,
+                        EstimatedMinutes = proc.IsCustomStep ? proc.EstimatedMinutes : null,
+                        Price = proc.IsCustomStep ? proc.Price : null,
+                        Note = proc.Note,
+                        IsCustomStep = proc.IsCustomStep,
+                        StepOrder = proc.StepOrder > 0 ? proc.StepOrder : stepOrder,
+                        Status = "Active"
+                    };
+                    await _unitOfWork.NailProcedureRepository.CreateAsync(nailProcedure);
+                    stepOrder++;
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -331,6 +350,11 @@ namespace Nailify.Capstone.Application.Services
             if (nailRequest.SalonId != manager.SalonId)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền chốt báo giá mẫu móng của chi nhánh khác.");
+            }
+
+            if (request.FinalPrice < 0 || request.FinalDuration < 0)
+            {
+                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Final quote price and duration cannot be negative.");
             }
 
             nailRequest.Price = request.FinalPrice;
@@ -384,11 +408,6 @@ namespace Nailify.Capstone.Application.Services
             if (nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy yêu cầu duyệt.");
-            }
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(nailRequest.CustomerNailId);
-            if (customerNail == null || customerNail.UserId != customerId)
-            {
-                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền phản hồi mẫu nail này.");
             }
             if (nailRequest.Status != CustomerNailStatus.Quoted)
             {

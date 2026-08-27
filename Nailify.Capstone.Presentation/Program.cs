@@ -1,4 +1,6 @@
 using Hangfire;
+using Hangfire.PostgreSql;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Configuration;
@@ -22,6 +24,31 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("ModelValidation");
+
+        var errors = context.ModelState
+            .Where(entry => entry.Value?.Errors.Count > 0)
+            .ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value!.Errors.Select(error => error.ErrorMessage).ToArray());
+
+        logger.LogWarning(
+            "Model validation failed for {Method} {Path}: {@Errors}",
+            context.HttpContext.Request.Method,
+            context.HttpContext.Request.Path,
+            errors);
+
+        return new BadRequestObjectResult(new ValidationProblemDetails(context.ModelState));
+    };
+});
+
 builder.Services.AddNailifyHangfireAndSignalR(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -67,16 +94,29 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 
-builder.Services.AddInfrastructureToApplication(builder.Configuration);
+builder.Services.AddInfrastructureToApplication(builder.Configuration, builder.Environment);
+
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("AllowReactApp", policy =>
+//    {
+//        policy.WithOrigins(
+//            "http://localhost:5173",
+//            "http://localhost:5174",
+//            "http://localhost:58887",
+//            "https://nailify.online"
+//            )
+//              .AllowAnyHeader()
+//              .AllowAnyMethod()
+//              .AllowCredentials();
+//    });
+//});
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        // policy.WithOrigins(
-        //           "http://localhost:5173",
-        //           "http://localhost:5174")
-          policy.SetIsOriginAllowed(origin => true) 
+        policy.SetIsOriginAllowed(origin => true)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -88,8 +128,8 @@ var app = builder.Build();
 app.ApplyMigrations();
 
 app.UseCors("AllowReactApp");
-
 app.UseAuthentication();
+app.UseAuthorization(); 
 app.UseMiddleware<RoleAuthorizationMiddleware>();
 
 app.UseInfrastructure();
@@ -99,9 +139,42 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
     DashboardTitle = "Nailify Background Jobs Dashboard",
     Authorization = new[] { new HangfireNoAuthFilter() } 
 });
-RegisterRecurringJobs();
+await RegisterRecurringJobsAsync();
 app.Run();
-void RegisterRecurringJobs()
+
+async Task RegisterRecurringJobsAsync()
+{
+    const int maxAttempts = 3;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            RegisterRecurringJobs();
+            return;
+        }
+        catch (PostgreSqlDistributedLockException ex) when (attempt < maxAttempts)
+        {
+            app.Logger.LogWarning(
+                ex,
+                "Could not acquire Hangfire recurring-job lock. Retrying job registration in {DelaySeconds} seconds. Attempt {Attempt}/{MaxAttempts}.",
+                10,
+                attempt,
+                maxAttempts);
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
+        }
+        catch (PostgreSqlDistributedLockException ex)
+        {
+            app.Logger.LogError(
+                ex,
+                "Could not acquire Hangfire recurring-job lock after {MaxAttempts} attempts. Continuing startup; existing recurring jobs remain in Hangfire storage.",
+                maxAttempts);
+        }
+    }
+}
+
+static void RegisterRecurringJobs()
 {
     // A. Quét và hủy lịch trễ check-in quá 15 phút (Chạy định kỳ mỗi 10 phút)
     RecurringJob.AddOrUpdate<IBookingJobExecutor>(
@@ -117,4 +190,3 @@ void RegisterRecurringJobs()
     );
 }
 
-app.Run();

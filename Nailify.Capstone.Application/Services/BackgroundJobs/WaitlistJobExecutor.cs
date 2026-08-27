@@ -43,7 +43,7 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
         }
         public async Task ClearDailyWaitlistAsync()
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow.AddHours(7).Date;
 
             // Tìm tất cả các waitlist còn tồn đọng của ngày hôm nay hoặc trước đó mà chưa hoàn thành
             var pendingWaitlists = await _unitOfWork.BookingWaitlistRepository.GetExpiredOrPastEntriesAsync(today);

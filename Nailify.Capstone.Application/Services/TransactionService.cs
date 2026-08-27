@@ -1,4 +1,4 @@
-using Nailify.Capstone.Application.Common;
+﻿using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -57,8 +57,8 @@ namespace Nailify.Capstone.Application.Services
         {
             var transaction = await _unitOfWork.TransactionRepository.GetDetailByIdAsync(id);
             return transaction == null
-                ? new ApiErrorResult<TransactionResponseDto>("Khong tim thay giao dich.")
-                : new ApiSuccessResult<TransactionResponseDto>(Map(transaction), "Lay giao dich thanh cong.");
+                ? new ApiErrorResult<TransactionResponseDto>("Không tìm thấy giao dịch.")
+                : new ApiSuccessResult<TransactionResponseDto>(Map(transaction), "Lấy giao dịch thành công.");
         }
 
         public async Task<ApiResult<IEnumerable<TransactionResponseDto>>> GetByBookingIdAsync(Guid bookingId)
@@ -66,7 +66,7 @@ namespace Nailify.Capstone.Application.Services
             var transactions = await _unitOfWork.TransactionRepository.GetByBookingIdAsync(bookingId);
             return new ApiSuccessResult<IEnumerable<TransactionResponseDto>>(
                 transactions.Select(Map),
-                "Lay giao dich theo lich hen thanh cong.");
+                "Lấy giao dịch thành công.");
         }
 
         private static ApiResult<PagedList<TransactionResponseDto>> ToPagedResult(
@@ -85,7 +85,7 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<PagedList<TransactionResponseDto>>(
                 response,
-                "Lay danh sach giao dich thanh cong.");
+                "Lấy danh sách giao dịch thành công.");
         }
 
         private static int NormalizePageNumber(int pageNumber) => pageNumber < 1 ? 1 : pageNumber;
@@ -97,7 +97,7 @@ namespace Nailify.Capstone.Application.Services
             return new TransactionResponseDto
             {
                 TransactionId = transaction.TransactionId,
-                BookingId = transaction.BookingId,
+                BookingId = (Guid)transaction.BookingId,
                 OrderCode = transaction.OrderCode,
                 Amount = transaction.Amount,
                 Reference = transaction.Reference,

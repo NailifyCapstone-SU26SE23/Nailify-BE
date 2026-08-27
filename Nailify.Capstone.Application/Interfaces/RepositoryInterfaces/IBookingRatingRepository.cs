@@ -12,6 +12,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<PagedList<BookingRating>> GetByBookingIdAsync(Guid bookingId, BookingRatingRequestParameters parameters);
         Task<PagedList<BookingRating>> GetBySalonIdAsync(Guid salonId, BookingRatingRequestParameters parameters);
         Task<PagedList<BookingRating>> GetByNailArtistIdAsync(Guid nailArtistId, BookingRatingRequestParameters parameters);
+        Task<PagedList<BookingRating>> GetByNailVariantIdAsync(int nailVariantId, BookingRatingRequestParameters parameters);
         Task<PagedList<BookingRating>> GetByCustomerIdAsync(Guid customerId, BookingRatingRequestParameters parameters);
     }
 }
