@@ -28,6 +28,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly IBookingProcedureService _bookingProcedureService;
         private readonly INotificationService _notificationService;
         private readonly IPromotionService _promotionService;
+        private readonly IOrderCodeGenerator _orderCodeGenerator;
         public BookingLifecycleService(
                                          IUnitOfWork unitOfWork,
                                          IMapper mapper,
@@ -37,7 +38,8 @@ namespace Nailify.Capstone.Application.Services
                                          ILogger<BookingService> logger,
                                          IBookingProcedureService bookingProcedureService,
                                          INotificationService notificationService,
-                                         IPromotionService promotionService)
+                                         IPromotionService promotionService,
+                                         IOrderCodeGenerator orderCodeGenerator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -48,6 +50,7 @@ namespace Nailify.Capstone.Application.Services
             _bookingProcedureService = bookingProcedureService;
             _notificationService = notificationService;
             _promotionService = promotionService;
+            _orderCodeGenerator = orderCodeGenerator;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -275,6 +278,32 @@ namespace Nailify.Capstone.Application.Services
             else
             {
                 booking.CheckOut(actorId);
+            }
+            if (booking.AmountDue.HasValue && booking.AmountDue.Value > 0)
+            {
+                var amountDue = booking.AmountDue.Value;
+                var now = DateTime.UtcNow;
+                var transaction = new Transaction
+                {
+                    BookingId = booking.BookingId,
+                    OrderCode = (await _orderCodeGenerator.GenerateUniqueOrderCodeAsync()).ToString(),
+                    Amount = amountDue,
+                    Reference = null,
+                    PaymentLinkId = null,
+                    CheckoutUrl = string.Empty,
+                    QrCode = string.Empty,
+                    Status = TransactionStatus.Paid,
+                    CreatedAt = now,
+                    PaidAt = now,
+                    ExpiresAt = now,
+                    WebhookPayload = string.Empty
+                };
+
+                await _unitOfWork.TransactionRepository.CreateAsync(transaction);
+
+                var amountPaid = (booking.AmountPaid ?? 0m) + amountDue;
+                booking.AmountPaid = amountPaid;
+                booking.AmountDue = Math.Max(0m, (booking.TotalPrice ?? amountPaid) - amountPaid);
             }
             _unitOfWork.BookingRepository.Update(booking);
             //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
