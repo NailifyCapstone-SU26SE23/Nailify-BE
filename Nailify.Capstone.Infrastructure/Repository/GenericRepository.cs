@@ -165,7 +165,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             if (statusProperty?.PropertyType == typeof(string))
             {
-                return query.Where(entity => EF.Property<string>(entity, statusProperty.Name) == "Active" || EF.Property<string>(entity, statusProperty.Name) == "Open");
+                return query.Where(entity => EF.Property<string>(entity, statusProperty.Name) == "Active"
+                                             || EF.Property<string>(entity, statusProperty.Name) == "Open"
+                                             || EF.Property<string>(entity, statusProperty.Name) == "Closed");
             }
 
             if (statusProperty?.PropertyType == typeof(bool))
@@ -192,7 +194,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
             {
                 var val = statusProperty.GetValue(entity) as string;
                 return string.Equals(val, "Active", StringComparison.OrdinalIgnoreCase) ||
-                       string.Equals(val, "Open", StringComparison.OrdinalIgnoreCase);
+                       string.Equals(val, "Open", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(val, "Closed", StringComparison.OrdinalIgnoreCase);
             }
 
             if (statusProperty?.PropertyType == typeof(bool))
