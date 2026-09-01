@@ -4,12 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using Nailify.Capstone.Presentation.Middlewares;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -85,7 +88,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             {
                 var customerId = GetCurrentUserId();
                 var response = await _bookingService.CreateBookingAsync(customerId, request);
-                if (!response.IsSucceeded) return BadRequest(response);
+                 if (!response.IsSucceeded) return BadRequest(response);
                 return Ok(response);
             }
             catch (UnauthorizedAccessException)
@@ -100,8 +103,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> CalculatePrice([FromBody] BookingPriceRequestDTO request)
         {
+            var customerIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var customerId = Guid.TryParse(customerIdClaim, out var parsedCustomerId)
+                ? parsedCustomerId
+                : (Guid?)null;
+
             var response = await _bookingService.CalculateBookingPriceAsync(
-                GetCurrentUserId(),
+                customerId,
                 request.BookingItems,
                 request.SelectedPromotionIds); 
 
@@ -596,6 +604,89 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!result.IsSucceeded) return BadRequest(result);
             return Ok(result);
         }
+        /// <summary>
+        /// Lấy chi tiết đơn đặt lịch kèm thông tin bảo hành
+        /// (đơn này đã được bảo hành chưa? đơn bảo hành là đơn nào?).
+        /// </summary>
+        [HttpGet("{id}/warranty-info")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetWarrantyInfo(Guid id)
+        {
+            var response = await _bookingService.GetBookingDetailWithWarrantyAsync(id);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Lấy các khung giờ có thợ rảnh trong salon (dùng khi khách hàng không chọn thợ cụ thể).
+        /// Mỗi slot 15 phút trả về IsAvailable = true nếu có ít nhất 1 thợ đủ skill đang rảnh, kèm số lượng thợ rảnh (FE ko cần hiện số lượng thợ rảnh nhé!).
+        /// </summary>
+        [HttpPost("salon-available-slots")]
+        [ProducesResponseType(typeof(ApiResult<SalonAvailabilityResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetSalonAvailableSlots([FromBody] GetSalonAvailableSlotsRequestDTO request)
+        {
+            var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+        /// <summary>
+        /// Xem trước việc chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpGet("{bookingId:guid}/transfer-preview")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> PreviewTransferSalon(
+            Guid bookingId,
+            [FromQuery] Guid targetSalonId)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .PreviewTransferSalonAsync(bookingId, targetSalonId, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Thực hiện chuyển booking sang chi nhánh khác
+        /// </summary>
+        [HttpPost("{bookingId:guid}/transfer-salon")]
+        [Authorize(Roles = "Receptionist,Manager")]
+        public async Task<IActionResult> TransferSalon(
+            Guid bookingId,
+            [FromBody] TransferSalonRequestDTO request)
+        {
+            var actorId = GetCurrentUserId();
+            var result = await _bookingService
+                .TransferSalonAsync(bookingId, request, actorId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Lễ tân lấy danh sách các đơn đặt lịch bị tự động hủy do trễ 15 phút trong ngày của Salon.
+        /// </summary>
+        [HttpGet("salon/{salonId}/late-cancelled")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetLateCancelledBookings(Guid salonId)
+        {
+            var response = await _bookingService.GetLateCancelledBookingsBySalonAsync(salonId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Lễ tân khôi phục & Check-in cho khách đặt trước đến trễ (sau khi bị auto-cancel 15p).
+        /// </summary>
+        [HttpPost("{id}/late-checkin")]
+        [ProducesResponseType(typeof(ApiResult<BookingResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> LateCheckIn(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            var response = await _bookingService.LateCheckInBookingAsync(id, currentUserId);
+            if (!response.IsSucceeded) return BadRequest(response);
+            return Ok(response);
+        }
+
     }
 
     public class CheckInForm

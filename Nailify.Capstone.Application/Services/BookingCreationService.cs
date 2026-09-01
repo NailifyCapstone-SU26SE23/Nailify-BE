@@ -54,16 +54,140 @@ namespace Nailify.Capstone.Application.Services
             _logger = logger;
         }
 
-        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
         {
-            throw new NotImplementedException();
+            var normalizedItems = NormalizePriceRequestItems(bookingItems);
+            var normalizedPromotionIds = selectedPromotionIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            if (!normalizedItems.Any())
+            {
+                return new ApiSuccessResult<BookingPriceResponseDTO>(
+                    new BookingPriceResponseDTO(),
+                    "Tính giá đặt lịch thành công.");
+            }
+
+            var bookingId = Guid.NewGuid();
+            var calculation = await BuildBookingItemsAsync(
+                normalizedItems,
+                bookingId,
+                salonId: null);
+
+            if (!calculation.IsSucceeded)
+            {
+                return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
+            }
+
+            var promotionDiscountAmount = 0m;
+            var loyaltyDiscountAmount = 0m;
+            var appliedPromotionDiscounts = new List<BookingDiscount>();
+
+            if (customerId.HasValue)
+            {
+                var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(customerId.Value);
+                if (!loyaltyResult.IsSucceeded)
+                {
+                    return new ApiErrorResult<BookingPriceResponseDTO>(loyaltyResult.Message);
+                }
+
+                var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                    customerId.Value,
+                    calculation.Items,
+                    normalizedPromotionIds);
+
+                (promotionDiscountAmount, appliedPromotionDiscounts) =
+                    await _promotionService.CalculateDiscountsAsync(new Booking
+                    {
+                        BookingId = bookingId,
+                        CustomerId = customerId.Value,
+                        BookingItems = calculation.Items
+                    }, applicablePromotions);
+
+                loyaltyDiscountAmount = decimal.Round(
+                    calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    0,
+                    MidpointRounding.AwayFromZero);
+
+                if (loyaltyDiscountAmount > 0)
+                {
+                    appliedPromotionDiscounts.Add(new BookingDiscount
+                    {
+                        BookingId = bookingId,
+                        Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                        DiscountAmount = loyaltyDiscountAmount,
+                        IsAutoApplied = true,
+                        AppliedDate = DateTime.UtcNow.AddHours(7),
+                        LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                    });
+                }
+            }
+
+            var discountBreakdown = appliedPromotionDiscounts
+                .Select(discount => new DiscountBreakdownDTO
+                {
+                    Name = discount.Name,
+                    Amount = discount.DiscountAmount,
+                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion"
+                })
+                .ToList();
+
+            var totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
+            var response = new BookingPriceResponseDTO
+            {
+                Price = calculation.Price,
+                Discount = -totalDiscountAmount,
+                TotalPrice = Math.Max(0, calculation.Price - totalDiscountAmount),
+                TotalDuration = calculation.Duration,
+                DiscountBreakdown = discountBreakdown
+            };
+
+            return new ApiSuccessResult<BookingPriceResponseDTO>(response, "Tính giá đặt lịch thành công.");
         }
+
+        private static List<BookingItemRequestDTO> NormalizePriceRequestItems(IEnumerable<BookingItemRequestDTO>? bookingItems)
+        {
+            return bookingItems?
+                .Select(item => new BookingItemRequestDTO
+                {
+                    NailVariantId = NormalizeNullableId(item.NailVariantId),
+                    ServiceId = NormalizeNullableGuid(item.ServiceId),
+                    ShapeMethodConfigId = NormalizeNullableId(item.ShapeMethodConfigId),
+                    CustomerNailId = NormalizeNullableId(item.CustomerNailId),
+                    CustomerNailRequestId = NormalizeNullableGuid(item.CustomerNailRequestId),
+                    Quantity = Math.Max(item.Quantity, 1)
+                })
+                .Where(item =>
+                    item.NailVariantId.HasValue
+                    || item.ServiceId.HasValue
+                    || item.ShapeMethodConfigId.HasValue
+                    || item.CustomerNailId.HasValue
+                    || item.CustomerNailRequestId.HasValue)
+                .ToList() ?? new List<BookingItemRequestDTO>();
+        }
+
+        private static int? NormalizeNullableId(int? id)
+            => id.HasValue && id.Value > 0 ? id.Value : null;
+
+        private static Guid? NormalizeNullableGuid(Guid? id)
+            => id.HasValue && id.Value != Guid.Empty && id.Value != SampleSwaggerGuid ? id.Value : null;
+
+        private static readonly Guid SampleSwaggerGuid = Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
         public async Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request)
         {
             if (request.BookingItems == null || !request.BookingItems.Any())
             {
                 return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một mẫu móng hoặc dịch vụ.");
+            }
+
+            // BR-01: Ngày đặt lịch không được là ngày trong quá khứ
+            var localToday = DateTime.UtcNow.AddHours(7).Date;
+            var requestLocalDate = (request.BookingDate.Kind == DateTimeKind.Utc ? request.BookingDate.AddHours(7) : request.BookingDate).Date;
+            if (requestLocalDate < localToday)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Ngày đặt lịch không được là ngày trong quá khứ.");
             }
 
             // Tự động kiểm tra và cưỡng chế thợ khi đặt lịch mẫu custom
@@ -509,7 +633,7 @@ namespace Nailify.Capstone.Application.Services
                     }
 
                     unitPrice += (customNail.Price ?? 0) + (customNailRequest.Price ?? 0);
-                    unitDuration += (customNail.Duration ?? 60) + (customNailRequest.Duration ?? 0);
+                    unitDuration += customNailRequest.Duration ?? customNail.Duration ?? 60;
                 }
 
                 if (item.NailVariantId.HasValue)

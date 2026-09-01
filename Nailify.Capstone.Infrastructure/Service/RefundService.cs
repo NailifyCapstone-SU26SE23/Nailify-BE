@@ -1,4 +1,4 @@
-using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
+﻿using Nailify.Capstone.Application.Interfaces.ConfigurationInterfaces;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
@@ -182,7 +182,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 return new RefundPolicy(
                     originalAmount,
-                    "Full refund because no replacement artist is available.");
+                    "Hoàn tiền toàn bộ do Salon hủy lịch.");
             }
 
             var localBookingDate = booking.BookingDate.Kind == DateTimeKind.Utc
@@ -195,12 +195,12 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 return new RefundPolicy(
                     decimal.Round(originalAmount * 0.8m, 0, MidpointRounding.AwayFromZero),
-                    "Refund requested less than 24 hours before booking time: 80% refund.");
+                    "Hoàn 80% tiền cọc cho yêu cầu hoàn tiền dưới 24 giờ trước thời gian đặt lịch.");
             }
 
             return new RefundPolicy(
                 originalAmount,
-                "Refund requested at least 24 hours before booking time: full refund.");
+                "Hoàn toàn bộ tiền cọc cho yêu cầu hoàn tiền trên 24 giờ trước thời gian đặt lịch.");
         }
 
         private string GetBankBin(string bankCode)

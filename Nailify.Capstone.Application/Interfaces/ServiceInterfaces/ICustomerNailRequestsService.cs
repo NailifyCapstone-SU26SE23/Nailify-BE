@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.CustomerNailRequestResponseDTO;
 using Nailify.Capstone.Domain.Enums;
 using System;

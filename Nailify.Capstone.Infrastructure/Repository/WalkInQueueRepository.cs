@@ -66,5 +66,21 @@ trackChanges)
                         .CountAsync();
         }
 
+        public async Task<int> GetActiveWaitingCountAsync(Guid salonId)
+        {
+            var today = DateTime.UtcNow.AddHours(7).Date;
+            return await FindByCondition(x => x.SalonId == salonId
+                                         && x.ArrivalTime.Date == today 
+                                         && (x.Status == QueueStatus.Waiting
+                                         || x.Status == QueueStatus.Called), false)
+                         .CountAsync();
+        }
+        public async Task<WalkInQueue?> GetWithChairAsync(Guid queueId)
+             => await FindByCondition(x => x.QueueId == queueId)
+                      .Include(x => x.Chair)
+                      .Include(x => x.AssignedNailArtist)
+                        .ThenInclude(a => a.Account)
+                      .FirstOrDefaultAsync();
+
     }
 }

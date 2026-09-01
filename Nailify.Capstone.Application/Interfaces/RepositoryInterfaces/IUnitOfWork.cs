@@ -54,7 +54,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         IQuizOptionRepository QuizOptionRepository { get; }
         ICustomerQuizAnswerRepository CustomerQuizAnswerRepository { get; }
         ISalonOffDateRepository SalonOffDateRepository { get; }
-
+        INailArtistTransferRepository NailArtistTransferRepository { get; }
+        IDashboardRepository DashboardRepository { get; }
 
         // Quản lý Transaction
         Task BeginTransactionAsync();

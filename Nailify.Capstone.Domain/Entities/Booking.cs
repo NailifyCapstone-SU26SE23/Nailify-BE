@@ -352,5 +352,42 @@ namespace Nailify.Capstone.Domain.Entities
                 actorId
             ));
         }
+        public void TransferToSalon(Guid newSalonId, Guid? newNailArtistId, Guid actorId, string reason)
+        {
+            var oldSalonId = SalonId;
+            var oldArtistId = NailArtistId;
+
+            SalonId = newSalonId;
+            NailArtistId = newNailArtistId;
+            ChairId = null; // Reset chair assignment when transferring
+            UpdatedAt = DateTime.UtcNow;
+
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                Status,
+                Status,
+                "SalonTransferred",
+                $"Booking chuyển từ chi nhánh {oldSalonId} -> {newSalonId}. " + $"Thợ mới: {newNailArtistId?.ToString() ?? "chưa được phân công"}. Lý do: {reason}",
+                actorId
+            ));
+
+            AddDomainEvent(new SlotFreedEvent(oldSalonId, oldArtistId, BookingDate, StartTime, TotalDuration));
+        }
+        public void ReopenAndCheckInLate(Guid actorId)
+        {
+            var oldStatus = Status;
+            Status = BookingStatus.CheckedIn;
+            IsLateArrival = true;
+            ActualCheckInTime = DateTime.UtcNow.AddHours(7);
+            UpdatedAt = DateTime.UtcNow;
+            AddDomainEvent(new BookingStatusChangedEvent(
+                BookingId,
+                oldStatus,
+                BookingStatus.CheckedIn,
+                "LateCheckIn",
+                "Lễ tân đã tiếp đón & khôi phục đơn đặt lịch trễ quá 15 phút.",
+                actorId
+            ));
+        }
     }
 }

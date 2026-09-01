@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.QuizRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;

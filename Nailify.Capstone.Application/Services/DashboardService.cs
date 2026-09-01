@@ -1,9 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.Dashboard;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
-using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 using System.Text.Json;
 
@@ -37,39 +35,21 @@ namespace Nailify.Capstone.Application.Services
 
             var dto = new AdminDashboardDto();
 
-            dto.TotalActiveSalons = await _unitOfWork.SalonRepository
-                .FindByCondition(s => s.Status == "Open")
-                .CountAsync();
+            dto.TotalActiveSalons = await _unitOfWork.DashboardRepository.GetActiveSalonsCountAsync();
 
-            dto.TotalPlatformRevenue = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
-                .SumAsync(t => t.Amount);
+            dto.TotalPlatformRevenue = await _unitOfWork.DashboardRepository.GetPlatformRevenueAsync(start, end);
 
-            dto.TotalRegisteredCustomers = await _unitOfWork.CustomerRepository
-                .FindAll()
-                .CountAsync();
+            dto.TotalRegisteredCustomers = await _unitOfWork.DashboardRepository.GetRegisteredCustomersCountAsync();
 
-            dto.TotalActiveStaff = await _unitOfWork.NailArtistRepository
-                .FindByCondition(n => n.Status == "Active")
-                .CountAsync();
+            dto.TotalActiveStaff = await _unitOfWork.DashboardRepository.GetActiveStaffCountAsync();
 
-            var platformAverageRating = await _unitOfWork.BookingRatingRepository
-                .FindAll()
-                .Select(r => (double?)r.OverallScore)
-                .AverageAsync();
+            var platformAverageRating = await _unitOfWork.DashboardRepository.GetPlatformAverageRatingAsync();
             dto.PlatformAverageRating = platformAverageRating.HasValue ? Math.Round(platformAverageRating.Value, 2) : 0;
 
             var now = DateTime.UtcNow;
-            dto.ActivePromotionsRunning = await _unitOfWork.PromotionRepository
-                .FindByCondition(p => p.Status == "Active" && p.StartDate <= now && (p.EndDate == null || p.EndDate >= now))
-                .CountAsync();
+            dto.ActivePromotionsRunning = await _unitOfWork.DashboardRepository.GetActivePromotionsCountAsync(now);
 
-            var revenueByDay = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
-                .GroupBy(t => t.CreatedAt.Date)
-                .Select(g => new { Date = g.Key, Total = g.Sum(t => t.Amount) })
-                .OrderBy(g => g.Date)
-                .ToListAsync();
+            var revenueByDay = await _unitOfWork.DashboardRepository.GetRevenueTrendAsync(start, end);
 
             dto.RevenueTrend.Labels = revenueByDay.Select(g => g.Date.ToString("dd/MM")).ToList();
             dto.RevenueTrend.Datasets.Add(new ChartDataset<decimal>
@@ -78,12 +58,7 @@ namespace Nailify.Capstone.Application.Services
                 Data = revenueByDay.Select(g => g.Total).ToList()
             });
 
-            var customerGrowth = await _unitOfWork.UserRepository
-                .FindByCondition(u => u.Role == UserRole.Customer && u.CreatedAt >= start && u.CreatedAt <= end)
-                .GroupBy(u => u.CreatedAt.Date)
-                .Select(g => new { Date = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Date)
-                .ToListAsync();
+            var customerGrowth = await _unitOfWork.DashboardRepository.GetCustomerGrowthAsync(start, end);
 
             dto.UserGrowth.Labels = customerGrowth.Select(g => g.Date.ToString("dd/MM")).ToList();
             dto.UserGrowth.Datasets.Add(new ChartDataset<int>
@@ -92,22 +67,10 @@ namespace Nailify.Capstone.Application.Services
                 Data = customerGrowth.Select(g => g.Count).ToList()
             });
 
-            var paidBookings = await _unitOfWork.BookingRepository
-                .FindByCondition(b => b.BookingDate >= start && b.BookingDate <= end)
-                .Include(b => b.Salon)
-                .Include(b => b.BookingItems)
-                    .ThenInclude(i => i.Service)
-                .Include(b => b.BookingItems)
-                    .ThenInclude(i => i.NailVariant)
-                        .ThenInclude(v => v.NailDesign)
-                .Include(b => b.BookingDiscounts)
-                    .ThenInclude(d => d.Promotion)
-                .ToListAsync();
+            var paidBookings = await _unitOfWork.DashboardRepository.GetPaidBookingsForPeriodAsync(start, end);
 
             var periodBookingIds = paidBookings.Select(b => b.BookingId).ToList();
-            var paidTransactions = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => periodBookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
-                .ToListAsync();
+            var paidTransactions = await _unitOfWork.DashboardRepository.GetPaidTransactionsForBookingsAsync(periodBookingIds);
 
             var paidBookingIds = paidTransactions.Select(t => t.BookingId).ToHashSet();
             var topSalons = paidBookings
@@ -146,11 +109,7 @@ namespace Nailify.Capstone.Application.Services
                 Data = servicePopularity.Select(g => g.Count).ToList()
             });
 
-            var salonRatings = await _unitOfWork.BookingRatingRepository
-                .FindByCondition(r => r.Booking.BookingDate >= start && r.Booking.BookingDate <= end)
-                .Include(r => r.Booking)
-                    .ThenInclude(b => b.Salon)
-                .ToListAsync();
+            var salonRatings = await _unitOfWork.DashboardRepository.GetSalonRatingsForPeriodAsync(start, end);
 
             dto.SalonRatingDistribution = salonRatings
                 .GroupBy(r => new { r.Booking.SalonId, SalonName = r.Booking.Salon.Name })
@@ -165,21 +124,28 @@ namespace Nailify.Capstone.Application.Services
                 .ToList();
 
             dto.GlobalPromotionPerformance = paidBookings
-                .SelectMany(b => b.BookingDiscounts.Select(d => new { Booking = b, Discount = d }))
-                .Where(x => x.Discount.PromotionId.HasValue || !string.IsNullOrWhiteSpace(x.Discount.Name))
-                .GroupBy(x => new { x.Discount.PromotionId, PromotionName = x.Discount.Promotion?.Name ?? x.Discount.Name })
-                .Select(g => new PromotionPerformanceDto
-                {
-                    PromotionId = g.Key.PromotionId ?? 0,
-                    PromotionName = g.Key.PromotionName,
-                    UsageCount = g.Count(),
-                    DiscountGiven = g.Sum(x => x.Discount.DiscountAmount),
-                    RevenueGenerated = paidTransactions
-                        .Where(t => g.Select(x => x.Booking.BookingId).Contains(t.BookingId))
-                        .Sum(t => t.Amount)
-                })
-                .OrderByDescending(p => p.RevenueGenerated)
-                .ToList();
+     .SelectMany(b => b.BookingDiscounts.Select(d => new { Booking = b, Discount = d }))
+     .Where(x => x.Discount.PromotionId.HasValue || !string.IsNullOrWhiteSpace(x.Discount.Name))
+     .GroupBy(x => new
+     {
+         x.Discount.PromotionId,
+         PromotionName = x.Discount.Promotion?.Name ?? x.Discount.Name
+     })
+     .Select(g => new PromotionPerformanceDto
+     {
+         PromotionId = g.Key.PromotionId ?? 0,
+         PromotionName = g.Key.PromotionName,
+         UsageCount = g.Count(),
+         DiscountGiven = g.Sum(x => x.Discount.DiscountAmount),
+         RevenueGenerated = paidTransactions
+             .Where(t =>
+                 t.BookingId.HasValue &&
+                 g.Select(x => x.Booking.BookingId)
+                     .Contains(t.BookingId.Value))
+             .Sum(t => t.Amount)
+     })
+     .OrderByDescending(p => p.RevenueGenerated)
+     .ToList();
 
             // 3. Save to Redis Cache (TTL = 15 minutes)
             var cacheOptions = new DistributedCacheEntryOptions
@@ -208,35 +174,19 @@ namespace Nailify.Capstone.Application.Services
 
             var dto = new NailArtistDashboardDto();
 
-            var periodBookings = await _unitOfWork.BookingRepository
-                .FindByCondition(b => b.NailArtistId == artistId && b.BookingDate >= start && b.BookingDate <= end)
-                .Include(b => b.Customer)
-                    .ThenInclude(c => c.User)
-                .Include(b => b.Rating)
-                .OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime)
-                .ToListAsync();
+            var periodBookings = await _unitOfWork.DashboardRepository.GetNailArtistBookingsForPeriodAsync(artistId, start, end);
 
             // KPIs
             dto.RemainingAppointmentsCount = periodBookings.Count(b => (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Approved) && b.BookingDate.Add(b.StartTime) >= now);
             dto.CompletedAppointmentsCount = periodBookings.Count(b => b.Status == BookingStatus.Completed || b.Status == BookingStatus.ServiceCompleted);
 
-            var artistRatingAverage = await _unitOfWork.BookingRatingRepository
-                .FindByCondition(r => r.Booking.NailArtistId == artistId && r.Booking.BookingDate >= start && r.Booking.BookingDate <= end)
-                .Select(r => (double?)r.OverallScore)
-                .AverageAsync();
+            var artistRatingAverage = await _unitOfWork.DashboardRepository.GetNailArtistAverageRatingAsync(artistId, start, end);
             dto.AverageRatingScore = artistRatingAverage.HasValue ? Math.Round(artistRatingAverage.Value, 2) : 0;
 
             var bookingIds = periodBookings.Select(b => b.BookingId).ToList();
-            dto.EstimatedEarnings = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => bookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
-                .SumAsync(t => t.Amount);
+            dto.EstimatedEarnings = await _unitOfWork.DashboardRepository.GetNailArtistEarningsAsync(bookingIds);
 
-            var earningsByDay = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => bookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid && t.CreatedAt >= start && t.CreatedAt <= end)
-                .GroupBy(t => t.CreatedAt.Date)
-                .Select(g => new { Date = g.Key, Total = g.Sum(t => t.Amount) })
-                .OrderBy(g => g.Date)
-                .ToListAsync();
+            var earningsByDay = await _unitOfWork.DashboardRepository.GetNailArtistEarningsTrendAsync(bookingIds, start, end);
 
             dto.EarningsTracker.Labels = earningsByDay.Select(g => g.Date.ToString("dd/MM")).ToList();
             dto.EarningsTracker.Datasets.Add(new ChartDataset<decimal>
@@ -266,9 +216,7 @@ namespace Nailify.Capstone.Application.Services
                 Data = new List<double> { averagePlannedMinutes, averageActualMinutes }
             });
 
-            var breaks = await _unitOfWork.NailArtistBreakRepository
-                .FindByCondition(b => b.NailArtistId == artistId && b.BreakDate >= start && b.BreakDate <= end)
-                .ToListAsync();
+            var breaks = await _unitOfWork.DashboardRepository.GetNailArtistBreaksForPeriodAsync(artistId, start, end);
 
             var scheduleItems = new List<ArtistScheduleItemDto>();
             foreach (var b in periodBookings.Where(x => x.Status != BookingStatus.Cancelled))
@@ -310,20 +258,11 @@ namespace Nailify.Capstone.Application.Services
                 };
             }
 
-            var skills = await _unitOfWork.NailArtistSkillRepository
-                .FindByCondition(s => s.NailArtistId == artistId)
-                .Include(s => s.SkillType)
-                .ToListAsync();
+            var skills = await _unitOfWork.DashboardRepository.GetNailArtistSkillsAsync(artistId);
 
             dto.SkillOverview = skills.Select(s => s.SkillType.Name).ToList();
 
-            var recentFeedbacks = await _unitOfWork.BookingRatingRepository
-                .FindByCondition(r => r.Booking.NailArtistId == artistId)
-                .Include(r => r.Customer)
-                    .ThenInclude(c => c.User)
-                .OrderByDescending(r => r.CreatedAt)
-                .Take(5)
-                .ToListAsync();
+            var recentFeedbacks = await _unitOfWork.DashboardRepository.GetNailArtistRecentFeedbackAsync(artistId, 5);
 
             dto.RecentFeedback = recentFeedbacks.Select(r => new FeedbackCardDto
             {
@@ -360,19 +299,9 @@ namespace Nailify.Capstone.Application.Services
             var dto = new ReceptionistDashboardDto();
 
             // Queues and Waitlists
-            var walkInQueue = await _unitOfWork.WalkInQueueRepository
-                .FindByCondition(w => w.SalonId == salonId && w.Status == QueueStatus.Waiting && w.ArrivalTime >= startOfDay && w.ArrivalTime <= endOfDay)
-                .OrderBy(w => w.QueuePosition)
-                .ToListAsync();
+            var walkInQueue = await _unitOfWork.DashboardRepository.GetWalkInQueueForDayAsync(salonId, startOfDay, endOfDay);
 
-            var waitlist = await _unitOfWork.BookingWaitlistRepository
-                .FindByCondition(w => w.SalonId == salonId && w.Status == WaitlistStatus.Waiting && w.RequestedDate >= startOfDay && w.RequestedDate <= endOfDay)
-                .Include(w => w.Customer)
-                    .ThenInclude(c => c.User)
-                .Include(w => w.PreferredNailArtist)
-                    .ThenInclude(a => a.Account)
-                .OrderBy(w => w.Position)
-                .ToListAsync();
+            var waitlist = await _unitOfWork.DashboardRepository.GetWaitlistForDayAsync(salonId, startOfDay, endOfDay);
 
             dto.CurrentWalkInQueueSize = walkInQueue.Count;
             dto.CurrentWaitlistSize = waitlist.Count;
@@ -383,28 +312,16 @@ namespace Nailify.Capstone.Application.Services
                 : 0;
 
             // Remaining Appointments Today
-            var todaysBookings = await _unitOfWork.BookingRepository
-                .FindByCondition(b => b.SalonId == salonId && b.BookingDate >= startOfDay && b.BookingDate <= endOfDay)
-                .Include(b => b.NailArtist)
-                    .ThenInclude(n => n.Account)
-                .Include(b => b.Customer)
-                    .ThenInclude(c => c.User)
-                .Include(b => b.Chair)
-                .ToListAsync();
+            var todaysBookings = await _unitOfWork.DashboardRepository.GetTodaysBookingsForSalonAsync(salonId, startOfDay, endOfDay);
 
             var pendingBookings = todaysBookings.Where(b => b.Status == BookingStatus.Pending || b.Status == BookingStatus.Approved).ToList();
             dto.RemainingAppointmentsToday = pendingBookings.Count;
 
             // Staff on Duty
-            var activeStaff = await _unitOfWork.NailArtistRepository
-                .FindByCondition(a => a.Account.SalonId == salonId && a.Status == "Active")
-                .ToListAsync();
+            var activeStaff = await _unitOfWork.DashboardRepository.GetActiveStaffForSalonAsync(salonId);
 
             var totalStaffCount = activeStaff.Count;
-            var artistsOnBreakIds = await _unitOfWork.NailArtistBreakRepository
-                .FindByCondition(b => b.BreakDate == targetDate && b.StartTime <= now.TimeOfDay && b.EndTime >= now.TimeOfDay)
-                .Select(b => b.NailArtistId)
-                .ToListAsync();
+            var artistsOnBreakIds = await _unitOfWork.DashboardRepository.GetArtistIdsOnBreakAsync(salonId, targetDate, now.TimeOfDay);
 
             var onDutyStaffCount = totalStaffCount - artistsOnBreakIds.Count;
             dto.StaffOnDutyText = $"{onDutyStaffCount} of {totalStaffCount} artists on Duty";
@@ -453,9 +370,7 @@ namespace Nailify.Capstone.Application.Services
             }).ToList();
 
             // Live Chair Status
-            var allChairs = await _unitOfWork.ChairRepository
-                .FindByCondition(c => c.SalonId == salonId)
-                .ToListAsync();
+            var allChairs = await _unitOfWork.DashboardRepository.GetChairsForSalonAsync(salonId);
 
             var occupiedChairs = todaysBookings
                 .Where(b => b.Status == BookingStatus.InProgress && b.ChairId.HasValue)
@@ -469,11 +384,7 @@ namespace Nailify.Capstone.Application.Services
                 CurrentCustomer = occupiedChairs.ContainsKey(c.ChairId) ? occupiedChairs[c.ChairId] : string.Empty
             }).ToList();
 
-            var todaysBreaks = await _unitOfWork.NailArtistBreakRepository
-                .FindByCondition(b => b.NailArtist.Account.SalonId == salonId && b.BreakDate >= startOfDay && b.BreakDate <= endOfDay)
-                .Include(b => b.NailArtist)
-                    .ThenInclude(a => a.Account)
-                .ToListAsync();
+            var todaysBreaks = await _unitOfWork.DashboardRepository.GetSalonBreaksForDayAsync(salonId, startOfDay, endOfDay);
 
             var scheduleItems = todaysBookings
                 .Where(b => b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Rejected)
@@ -549,24 +460,7 @@ namespace Nailify.Capstone.Application.Services
             var dto = new SalonManagerDashboardDto();
 
             // Bookings for the period
-            var periodBookings = await _unitOfWork.BookingRepository
-                .FindByCondition(b => b.SalonId == salonId && b.BookingDate >= start && b.BookingDate <= end)
-                .Include(b => b.NailArtist)
-                    .ThenInclude(n => n.Account)
-                .Include(b => b.Rating)
-                .Include(b => b.Customer)
-                    .ThenInclude(c => c.LoyaltyTier)
-                .Include(b => b.Customer)
-                    .ThenInclude(c => c.User)
-                .Include(b => b.Chair)
-                .Include(b => b.BookingDiscounts)
-                    .ThenInclude(d => d.Promotion)
-                .Include(b => b.BookingItems)
-                    .ThenInclude(i => i.Service)
-                .Include(b => b.BookingItems)
-                    .ThenInclude(i => i.NailVariant)
-                        .ThenInclude(v => v.NailDesign)
-                .ToListAsync();
+            var periodBookings = await _unitOfWork.DashboardRepository.GetSalonBookingsForPeriodAsync(salonId, start, end);
 
             // KPIs
             dto.TotalPendingBookings = periodBookings.Count(b => b.Status == BookingStatus.Pending);
@@ -578,9 +472,7 @@ namespace Nailify.Capstone.Application.Services
 
             // Revenue
             var bookingIds = periodBookings.Select(b => b.BookingId).ToList();
-            var periodTransactions = await _unitOfWork.TransactionRepository
-                .FindByCondition(t => bookingIds.Contains(t.BookingId) && t.Status == TransactionStatus.Paid)
-                .ToListAsync();
+            var periodTransactions = await _unitOfWork.DashboardRepository.GetPaidTransactionsForBookingsAsync(bookingIds);
 
             dto.TodaysRevenue = periodTransactions.Sum(t => t.Amount);
             dto.AverageTicketValue = dto.TotalCompletedBookings > 0 ? Math.Round(dto.TodaysRevenue / dto.TotalCompletedBookings, 2) : 0;
@@ -633,9 +525,7 @@ namespace Nailify.Capstone.Application.Services
                 Data = peakHours.Select(g => g.Count).ToList()
             });
 
-            var chairs = await _unitOfWork.ChairRepository
-                .FindByCondition(c => c.SalonId == salonId)
-                .ToListAsync();
+            var chairs = await _unitOfWork.DashboardRepository.GetChairsForSalonAsync(salonId);
 
             dto.ChairUtilization = chairs.Select(c => new ChairUtilizationDto
             {
@@ -684,7 +574,7 @@ namespace Nailify.Capstone.Application.Services
             });
 
             // Staff Utilization (Mock calculation)
-            var totalStaff = await _unitOfWork.NailArtistRepository.FindByCondition(a => a.Account.SalonId == salonId && a.Status == "Active").CountAsync();
+            var totalStaff = await _unitOfWork.DashboardRepository.GetSalonActiveStaffCountAsync(salonId);
             if (totalStaff > 0)
             {
                 // Simple mock: Total booked hours / (Total staff * 8 hours)
@@ -718,10 +608,7 @@ namespace Nailify.Capstone.Application.Services
             dto.ArtistPerformanceLeaderboard = dto.ArtistPerformanceLeaderboard.OrderByDescending(a => a.RevenueGenerated).ToList();
 
             // Staff Leave Alerts
-            var breaks = await _unitOfWork.NailArtistBreakRepository
-                .FindByCondition(b => b.NailArtist.Account.SalonId == salonId && b.BreakDate >= start && b.BreakDate <= end)
-                .Include(b => b.NailArtist.Account)
-                .ToListAsync();
+            var breaks = await _unitOfWork.DashboardRepository.GetSalonBreaksForPeriodAsync(salonId, start, end);
 
             dto.StaffLeaveAlerts = breaks.Select(b => new StaffLeaveAlertDto
             {

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.PaymentDTOs;
+using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using System.Security.Claims;
 using Nailify.Capstone.Infrastructure.Service;
 using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.BankAccountInfo;
 
@@ -36,11 +38,28 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
         }
 
+        [HttpPost("create-for-request")]
+        public async Task<IActionResult> CreatePaymentLinkFromRequest([FromBody] CreateBookingRequestDTO request)
+        {
+            var customerIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(customerIdClaim) || !Guid.TryParse(customerIdClaim, out var customerId))
+            {
+                return Unauthorized(new ApiErrorResult<object>("Không tìm thấy thông tin tài khoản."));
+            }
+
+            var result = await _paymentService.CreatePaymentLinkForBookingRequestAsync(customerId, request);
+
+            if (!result.Success)
+                return BadRequest(new ApiErrorResult<object>(result.Message));
+
+            return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
+        }
+
         [HttpPost("refund/{bookingId}")]
         public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
@@ -64,12 +83,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> FullRefund(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
                 request,
-                "Full refund because no replacement artist is available.",
+                "Hoàn toàn bộ tiền cọc do không có nhân viên thay thế.",
                 forceFullRefund: true);
 
             if (!result.Success)
@@ -92,6 +111,33 @@ namespace Nailify.Capstone.Presentation.Controllers
                 Voucher = voucherResult.IsSucceeded ? voucherResult.Data : null,
                 VoucherMessage = voucherResult.Message
             }, result.Message));
+        }
+
+        [HttpPost("refund/reject/{bookingId}")]
+        public async Task<IActionResult> RejectRefund(Guid bookingId, [FromBody] BankAccountInfo request)
+        {
+            if (request == null)
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
+
+            var result = await _refundService.CreateSinglePayoutByBookingAsync(
+                bookingId,
+                request,
+                "Full deposit refund because booking was rejected.",
+                forceFullRefund: true);
+
+            if (!result.Success)
+            {
+                return BadRequest(new
+                {
+                    IsSucceeded = false,
+                    result.Message,
+                    Data = (object?)null,
+                    result.ErrorCode,
+                    result.ErrorDescription
+                });
+            }
+
+            return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
 
         [HttpPost("webhook")]

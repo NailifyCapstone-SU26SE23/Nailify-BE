@@ -374,7 +374,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                          customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Quoted))
                     {
                         var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailRequest.CustomerNailId);
-                        itemDuration += (customerNail?.Duration ?? 60) + (customNailRequest.Duration ?? 0);
+                        itemDuration += customNailRequest.Duration ?? customerNail?.Duration ?? 60;
                     }
                 }
 
@@ -537,6 +537,17 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 await _cache.RemoveAsync(waitersKey);
             }
+        }
+        /// <summary>
+        /// Lấy toàn bộ khoảng thời gian đang bị giữ chỗ của thợ trong ngày (đọc Redis 1 lần để check nhiều slot).
+        /// </summary>
+        public async Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date)
+        {
+            var redisListKey = BuildSlotKey(artistId, date);
+            var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
+            return activeHolds
+                .Select(x => (Start: x.StartTime, End: x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes))))
+                .ToList();
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ProcedureRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.ProcedureResponseDTOs;
@@ -158,9 +158,20 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa quy trình của mẫu móng thành công.");
         }
 
-        public async Task<ApiResult<PagedList<ProcedureResponseDTO>>> GetAllProceduresAsync(PagingRequestParameters parameters)
+        public async Task<ApiResult<PagedList<ProcedureResponseDTO>>> GetAllProceduresAsync(ProcedurePagingParameters parameters)
         {
-            var pagedProcedures = await _unitOfWork.ProcedureRepository.GetPagedAsync(parameters.PageIndex, parameters.PageSize);
+            System.Linq.Expressions.Expression<Func<Procedure, bool>>? predicate = null;
+            if (parameters.ProcedureType.HasValue)
+            {
+                var procType = parameters.ProcedureType.Value;
+                predicate = p => p.ProcedureType == procType;
+            }
+
+            var pagedProcedures = await _unitOfWork.ProcedureRepository.GetPagedAsync(
+                parameters.PageIndex,
+                parameters.PageSize,
+                predicate);
+
             var mappedItems = _mapper.Map<List<ProcedureResponseDTO>>(pagedProcedures.Items);
             var response = new PagedList<ProcedureResponseDTO>(
                 mappedItems,
@@ -250,6 +261,11 @@ namespace Nailify.Capstone.Application.Services
                 NailVariantId = nailProcedure.NailVariantId,
                 CustomerNailId = nailProcedure.CustomerNailId,
                 ProcedureId = nailProcedure.ProcedureId,
+                Name = nailProcedure.Name,
+                EstimatedMinutes = nailProcedure.EstimatedMinutes,
+                Price = nailProcedure.Price,
+                Note = nailProcedure.Note,
+                IsCustomStep = nailProcedure.IsCustomStep,
                 ProcedureName = nailProcedure.Procedure?.Name ?? string.Empty,
                 ProcedureDescription = nailProcedure.Procedure?.Description,
                 ProcedureDuration = nailProcedure.Procedure?.Duration,

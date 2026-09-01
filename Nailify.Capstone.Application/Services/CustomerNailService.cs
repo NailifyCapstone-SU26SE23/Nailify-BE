@@ -23,9 +23,9 @@ namespace Nailify.Capstone.Application.Services
         }
         #endregion Constructor
         #region CRUD Operations
-        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
+        public async Task<ApiResult<PagedList<CustomerNailDto>>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null)
         {
-            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name, isPublic);
+            var pagedResult = await _unitOfWork.CustomerNailRepository.GetPagedCustomerNailsAsync(pageNumber, pageSize, userId, name);
             var mappedItems = _mapper.Map<List<CustomerNailDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<CustomerNailDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
@@ -94,12 +94,6 @@ namespace Nailify.Capstone.Application.Services
             if (!string.IsNullOrWhiteSpace(request.CustomColor))
             {
                 customerNail.CustomColor = request.CustomColor;
-                hasChanges = true;
-            }
-
-            if (request.IsPublic.HasValue)
-            {
-                customerNail.IsPublic = request.IsPublic.Value;
                 hasChanges = true;
             }
 
@@ -217,7 +211,9 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Mẫu móng này đang trong quá trình duyệt tại chi nhánh này.");
             }
+            
             var request = _mapper.Map<CustomerNailRequest>(requestDto);
+            request.IsCustomerRequest = true;
             await _unitOfWork.CustomerNailRequestRepository.CreateAsync(request);
             await _unitOfWork.SaveChangesAsync();
 
@@ -296,6 +292,39 @@ namespace Nailify.Capstone.Application.Services
             nailRequest.Status = CustomerNailStatus.Reviewed;
             nailRequest.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
+
+            // Xử lý lưu các bước quy trình (Procedures) nếu có
+            if (request.Procedures != null && request.Procedures.Any())
+            {
+                var existingProcedures = _unitOfWork.NailProcedureRepository
+                    .FindByCondition(np => np.CustomerNailId == nailRequest.CustomerNailId)
+                    .ToList();
+
+                foreach (var ep in existingProcedures)
+                {
+                    _unitOfWork.NailProcedureRepository.Delete(ep);
+                }
+
+                int stepOrder = 1;
+                foreach (var proc in request.Procedures)
+                {
+                    var nailProcedure = new NailProcedure
+                    {
+                        CustomerNailId = nailRequest.CustomerNailId,
+                        ProcedureId = proc.IsCustomStep ? null : proc.ProcedureId,
+                        Name = proc.IsCustomStep ? proc.Name : null,
+                        EstimatedMinutes = proc.IsCustomStep ? proc.EstimatedMinutes : null,
+                        Price = proc.IsCustomStep ? proc.Price : null,
+                        Note = proc.Note,
+                        IsCustomStep = proc.IsCustomStep,
+                        StepOrder = proc.StepOrder > 0 ? proc.StepOrder : stepOrder,
+                        Status = "Active"
+                    };
+                    await _unitOfWork.NailProcedureRepository.CreateAsync(nailProcedure);
+                    stepOrder++;
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync();
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -379,11 +408,6 @@ namespace Nailify.Capstone.Application.Services
             if (nailRequest == null)
             {
                 return new ApiErrorResult<CustomerNailRequestResponseDTO>("Không tìm thấy yêu cầu duyệt.");
-            }
-            var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(nailRequest.CustomerNailId);
-            if (customerNail == null || customerNail.UserId != customerId)
-            {
-                return new ApiErrorResult<CustomerNailRequestResponseDTO>("Bạn không có quyền phản hồi mẫu nail này.");
             }
             if (nailRequest.Status != CustomerNailStatus.Quoted)
             {

@@ -23,7 +23,8 @@ namespace Nailify.Capstone.Application.Services
             int pageNumber,
             int pageSize,
             string? name = null,
-            IEnumerable<int>? categoryIds = null)
+            IEnumerable<int>? categoryIds = null,
+            Guid? userId = null)
         {
             var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(
                 pageNumber,
@@ -37,11 +38,12 @@ namespace Nailify.Capstone.Application.Services
                 pageNumber,
                 pageSize
             );
+            await PopulateFavoriteStatusAsync(mappedItems, userId);
 
             return new ApiSuccessResult<PagedList<NailDesignDto>>(resultPagedList, "Lấy danh sách mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id)
+        public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id, Guid? userId = null)
         {
             var design = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             if (design == null || design.Status == "InActive")
@@ -50,6 +52,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var designDto = _mapper.Map<NailDesignDto>(design);
+            await PopulateFavoriteStatusAsync(new[] { designDto }, userId);
             return new ApiSuccessResult<NailDesignDto>(designDto, "Lấy thông tin mẫu nail thành công.");
         }
 
@@ -131,12 +134,62 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa mẫu nail thành công.");
         }
 
-        public async Task<ApiResult<List<NailDesignDto>>> GetNailDesignsByCategoryAsync(int categoryId)
+        public async Task<ApiResult<List<NailDesignDto>>> GetNailDesignsByCategoryAsync(int categoryId, Guid? userId = null)
         {
             var designs = await _unitOfWork.NailDesignRepository.GetNailDesignsByCategoryAsync(categoryId);
             var designDtos = _mapper.Map<List<NailDesignDto>>(designs);
+            await PopulateFavoriteStatusAsync(designDtos, userId);
 
             return new ApiSuccessResult<List<NailDesignDto>>(designDtos, "Lấy danh sách mẫu nail theo danh mục thành công.");
+        }
+
+        private async Task PopulateFavoriteStatusAsync(IEnumerable<NailDesignDto> designs, Guid? userId)
+        {
+            if (userId == null)
+            {
+                return;
+            }
+
+            var designList = designs.ToList();
+            var designIds = designList.Select(design => design.NailDesignId).ToHashSet();
+            var variantIds = designList
+                .SelectMany(design => design.NailVariants)
+                .Select(variant => variant.NailVariantId)
+                .ToHashSet();
+            if (!designIds.Any() && !variantIds.Any())
+            {
+                return;
+            }
+
+            var favorites = await _unitOfWork.FavoriteNailRepository
+                .GetFavoritesByDesignAndVariantIdsAsync(userId.Value, designIds, variantIds);
+
+            var favoriteByDesignId = favorites
+                .Where(favorite => favorite.NailVariantId == null && favorite.NailDesignId != null)
+                .GroupBy(favorite => favorite.NailDesignId!.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+            var favoriteByVariantId = favorites
+                .Where(favorite => favorite.NailVariantId != null)
+                .GroupBy(favorite => favorite.NailVariantId!.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            foreach (var design in designList)
+            {
+                if (favoriteByDesignId.TryGetValue(design.NailDesignId, out var favorite))
+                {
+                    design.IsFavorited = true;
+                    design.FavoriteNailId = favorite.FavoriteNailId;
+                }
+
+                foreach (var variant in design.NailVariants)
+                {
+                    if (favoriteByVariantId.TryGetValue(variant.NailVariantId, out var variantFavorite))
+                    {
+                        variant.IsFavorited = true;
+                        variant.FavoriteNailId = variantFavorite.FavoriteNailId;
+                    }
+                }
+            }
         }
 
         private async Task<List<int>> GetInvalidCategoryIdsAsync(IEnumerable<int> categoryIds)

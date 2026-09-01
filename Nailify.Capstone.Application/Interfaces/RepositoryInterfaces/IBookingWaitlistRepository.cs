@@ -58,6 +58,25 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<BookingWaitlist>> GetActiveWaitlistsByCustomerAsync(Guid customerId);
         Task<IEnumerable<BookingWaitlist>> GetActiveNotifiedWaitlistsAsync(Guid artistId, DateTime date);
         Task<BookingWaitlist?> GetWaitlistWithItemsAsync(Guid waitlistId);
-
+        /// <summary>
+        /// Đếm số lượng chờ đang waiting cho một khung giờ tại salon
+        /// </summary>
+        /// <param name="salonId"></param>
+        /// <param name="date"></param>
+        /// <param name="startTime"></param>
+        /// <returns></returns>
+        Task<int> GetActiveWailistCountAsync(Guid salonId, DateTime date, TimeSpan startTime);
+        /// <summary>
+        /// Lấy ứng viên Wailist phù hợp nhất bằng thuật toán Smart Scoring
+        /// dựa trên Continuous Availability Window, Duration Fit và Position.
+        /// </summary>
+        Task<BookingWaitlist?> GetSmartNextWaitingEntryAsync(
+                   Guid salonId,
+                   DateTime date,
+                   TimeSpan startTime,
+                   Guid? preferredNailArtistId,
+                   int freedDurationMinutes,
+                   int continuousWindowMinutes
+                   );
     }
 }

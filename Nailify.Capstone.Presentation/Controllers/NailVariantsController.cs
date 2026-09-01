@@ -6,6 +6,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
+using System.Security.Claims;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -44,7 +45,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int? nailDesignId = null,
             [FromQuery] string? name = null)
         {
-            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name);
+            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name, GetCurrentUserIdOrNull());
             return Ok(result);
         }
 
@@ -56,7 +57,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _nailVariantService.GetNailVariantByIdAsync(id);
+            var result = await _nailVariantService.GetNailVariantByIdAsync(id, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
@@ -108,7 +109,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<NailVariantDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update(int id, [FromForm] NailVariantUpdateRequest request, IFormFile? image)
+        public async Task<IActionResult> Update(int id, [FromForm] NailVariantUpdateRequest request, IFormFile? imageUrl)
         {
             var validationResult = await _updateValidator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -125,12 +126,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var uploadedImageUrl = string.Empty;
             try
             {
-                uploadedImageUrl = await UploadImageAsync(image);
-                request.ImageUrl = string.IsNullOrWhiteSpace(uploadedImageUrl)
-                    ? existingResult.Data.ImageUrl
-                    : uploadedImageUrl;
+                uploadedImageUrl = await UploadImageAsync(imageUrl);
 
-                var result = await _nailVariantService.UpdateNailVariantAsync(id, request);
+                var result = await _nailVariantService.UpdateNailVariantAsync(id, request, uploadedImageUrl);
                 if (!result.IsSucceeded)
                 {
                     await DeleteImageAsync(uploadedImageUrl);
@@ -183,12 +181,18 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetCapableNailVariants(Guid artistId)
         {
-            var result = await _nailVariantService.GetCapableNailVariantsAsync(artistId);
+            var result = await _nailVariantService.GetCapableNailVariantsAsync(artistId, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return BadRequest(result);
             }
             return Ok(result);
+        }
+
+        private Guid? GetCurrentUserIdOrNull()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
 
         private async Task<string> UploadImageAsync(IFormFile? image)

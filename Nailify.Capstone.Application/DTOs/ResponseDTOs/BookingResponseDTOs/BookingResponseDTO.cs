@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
+using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -38,6 +39,13 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         public decimal? AmountDue { get; set; }
         public decimal? AmountPaid { get; set; }
         public bool IsRefunded { get; set; }
+        public DateTime? ProposedBookingDate { get; set; }
+        public TimeSpan? ProposedStartTime { get; set; }
+        public string? ProposedBy { get; set; }
+        public string? RescheduleReason { get; set; }
+        public Guid? WarrantyForBookingId { get; set; }
+        public bool IsWarrantied { get; set; }
+        public Guid? WarrantyBookingId { get; set; }
         public List<BookingItemResponseDTO> BookingItems { get; set; } = new();
         public List<SimpleDiscountDto> Discounts { get; set; } = new();
         public void Mapping(Profile profile)
@@ -55,7 +63,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
                         Name = discount.Name,
                         Amount = discount.DiscountAmount,
                         Type = discount.PromotionId.HasValue ? "Promotion" : "Loyalty"
-                    })));
+                    })))
+                .ForMember(dest => dest.WarrantyForBookingId, opt => opt.MapFrom(src => src.WarrantyForBookingId))
+                .ForMember(dest => dest.IsWarrantied, opt => opt.Ignore())
+                .ForMember(dest => dest.WarrantyBookingId, opt => opt.Ignore());
         }
     }
 }

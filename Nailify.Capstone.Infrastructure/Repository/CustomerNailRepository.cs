@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
         }
 
-        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, bool? isPublic = null)
+        public async Task<PagedList<CustomerNail>> GetPagedCustomerNailsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null)
         {
             var query = BuildCustomerNailQuery();
 
@@ -28,10 +28,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 query = query.Where(nail => nail.Name.ToLower().Contains(normalizedName));
             }
 
-            if (isPublic.HasValue)
-            {
-                query = query.Where(nail => nail.IsPublic == isPublic.Value);
-            }
+            query = query.Where(nail => nail.Status == "Active");
 
             var count = await query.CountAsync();
             var items = await query
@@ -46,6 +43,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await BuildCustomerNailQuery()
                 .FirstOrDefaultAsync(nail => nail.CustomerNailId == customerNailId);
+        }
+
+        public async Task<List<CustomerNail>> GetAllCustomerNailsAsync()
+        {
+            return await BuildCustomerNailQuery().ToListAsync();
         }
 
         private IQueryable<CustomerNail> BuildCustomerNailQuery()

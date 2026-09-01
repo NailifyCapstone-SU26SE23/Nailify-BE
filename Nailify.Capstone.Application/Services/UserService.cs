@@ -82,10 +82,30 @@ namespace Nailify.Capstone.Application.Services
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
+            var staffArtistAccountIds = pagedResult.Items
+                .Where(u => u.Role == UserRole.Staff_Artist)
+                .Select(u => u.UserId)
+                .ToList();
+
+            var artists = new List<Nailify.Capstone.Domain.Entities.NailArtist>();
+            if (staffArtistAccountIds.Any())
+            {
+                var artistResult = await _unitOfWork.NailArtistRepository.GetPagedAsync(
+                    1, 1000, 
+                    a => staffArtistAccountIds.Contains(a.AccountId));
+                artists = artistResult.Items.ToList();
+            }
+
             foreach (var dto in mappedItems)
             {
                 var user = pagedResult.Items.First(x => x.UserId == dto.UserId);
-                await PopulateUserContextAsync(user, dto);
+                
+                dto.SalonId = user.SalonId;
+                if (user.Role == UserRole.Staff_Artist)
+                {
+                    var artist = artists.FirstOrDefault(a => a.AccountId == user.UserId);
+                    dto.StaffId = artist?.NailArtistId;
+                }
             }
 
             var response = new PagedList<UserDto>(
@@ -214,6 +234,32 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<UserDto>(user);
             await PopulateUserContextAsync(user, response);
             return new ApiSuccessResult<UserDto>(response, "Cập nhật thông tin cá nhân thành công.");
+        }
+
+        public async Task<ApiResult<bool>> UpdatePasswordAsync(Guid userId, UpdatePasswordRequest request)
+        {
+            var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
+            if (user == null || user.Status != "Active")
+            {
+                return new ApiResult<bool>(false, "Không tìm thấy tài khoản.");
+            }
+
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                return new ApiResult<bool>(false, "Mật khẩu không trùng khớp.");
+            }
+
+            if (!_passwordHasher.VerifyPassword(request.OldPassword, user.Password))
+            {
+                return new ApiResult<bool>(false, "Mật khẩu cũ không hợp lệ.");
+            }
+
+            user.Password = _passwordHasher.HashPassword(request.NewPassword);
+
+            _unitOfWork.UserRepository.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            return new ApiSuccessResult<bool>(true, "Cập nhật mật khẩu thành công.");
         }
         #endregion Account Management
         #region Customer Management

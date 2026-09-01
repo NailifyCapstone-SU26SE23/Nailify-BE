@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.Common.Helpers;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -33,7 +34,7 @@ namespace Nailify.Capstone.Application.Services
         }
         public Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request)
          => _bookingCreationService.CreateBookingAsync(customerId, request);
-        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
             => _bookingCreationService.CalculateBookingPriceAsync(customerId, bookingItems, selectedPromotionIds);
         public Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
             => _bookingLifecycleService.VerifyQrCodeAsync(qrToken, actorId);
@@ -79,6 +80,19 @@ namespace Nailify.Capstone.Application.Services
             => _bookingQueryService.GetBookingIdByOrderCodeAsync(orderCode);
         public Task<ApiResult<BookingResponseDTO>> GetBookingByIdAsync(Guid bookingId)
             => _bookingQueryService.GetBookingByIdAsync(bookingId);
+        public Task<ApiResult<BookingResponseDTO>> GetBookingDetailWithWarrantyAsync(Guid bookingId)
+           => _bookingQueryService.GetBookingDetailWithWarrantyAsync(bookingId);
+        public Task<ApiResult<SalonAvailabilityResponseDTO>> GetSalonAvailableSlotsAsync(GetSalonAvailableSlotsRequestDTO request)
+           => _bookingAssignmentService.GetSalonAvailableSlotsAsync(request);
+        public Task<ApiResult<TransferPreviewResponseDTO>> PreviewTransferSalonAsync(Guid bookingId, Guid targetSalonId, Guid actorId)
+            => _bookingAssignmentService.PreviewTransferSalonAsync(bookingId, targetSalonId, actorId);
+        public Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(Guid bookingId, TransferSalonRequestDTO request, Guid actorId)
+            => _bookingAssignmentService.TransferSalonAsync(bookingId, request, actorId);
 
+        public Task<ApiResult<List<BookingResponseDTO>>> GetLateCancelledBookingsBySalonAsync(Guid salonId)
+            => _bookingQueryService.GetLateCancelledBookingsBySalonAsync(salonId);
+
+        public Task<ApiResult<BookingResponseDTO>> LateCheckInBookingAsync(Guid bookingId, Guid actorId)
+                 => _bookingLifecycleService.LateCheckInBookingAsync(bookingId, actorId);
     }
 }

@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
                        .Include(x => x.CustomerNail)
                        .Include(x => x.Salon)
                        .Include(x => x.ApprovedArtist)
+                       .Where(x => x.IsCustomerRequest == true)
                        .AsQueryable();
             if (salonId.HasValue)
                 query = query.Where(x => x.SalonId == salonId.Value);
@@ -51,6 +52,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(r => r.CustomerNail)
                     .ThenInclude(cn => cn.CustomerNailComponents)
                         .ThenInclude(c => c.Component)
+                .Include(r => r.CustomerNail)
+                    .ThenInclude(cn => cn.NailProcedures)
+                        .ThenInclude(np => np.Procedure)
                 .Include(r => r.Salon)
                 .Include(r => r.ApprovedArtist)
                     .ThenInclude(a => a.Account)

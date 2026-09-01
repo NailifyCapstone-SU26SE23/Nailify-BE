@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Infrastructure.Service;
+using System.Security.Claims;
 
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -44,7 +45,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] string? name = null,
             [FromQuery] List<int>? categoryIds = null)
         {
-            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds);
+            var result = await _nailDesignService.GetPagedNailDesignsAsync(pageNumber, pageSize, name, categoryIds, GetCurrentUserIdOrNull());
             return Ok(result);
         }
 
@@ -56,7 +57,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _nailDesignService.GetNailDesignByIdAsync(id);
+            var result = await _nailDesignService.GetNailDesignByIdAsync(id, GetCurrentUserIdOrNull());
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
@@ -183,8 +184,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<List<NailDesignDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
-            var result = await _nailDesignService.GetNailDesignsByCategoryAsync(categoryId);
+            var result = await _nailDesignService.GetNailDesignsByCategoryAsync(categoryId, GetCurrentUserIdOrNull());
             return Ok(result);
+        }
+
+        private Guid? GetCurrentUserIdOrNull()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
 
         private async Task<string> UploadImageAsync(IFormFile? image)

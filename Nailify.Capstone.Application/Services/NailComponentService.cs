@@ -119,31 +119,11 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.NailVariantRepository.Update(variant);
             await _unitOfWork.SaveChangesAsync();
-            if (variant.NailDesignId.HasValue)
-            {
-                await UpdateNailDesignPriceRangeAsync(variant.NailDesignId.Value);
-            }
         }
 
         private static int GetFingerPriceMultiplier(int fingerIndex)
         {
             return fingerIndex == -1 ? 5 : 1;
-        }
-
-        private async Task UpdateNailDesignPriceRangeAsync(int nailDesignId)
-        {
-            var nailDesign = await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId);
-            if (nailDesign == null)
-            {
-                return;
-            }
-
-            var variants = await _unitOfWork.NailVariantRepository.GetNailVariantsByDesignIdAsync(nailDesignId);
-            nailDesign.MinPrice = variants.Any() ? variants.Min(variant => variant.Price) : 0m;
-            nailDesign.MaxPrice = variants.Any() ? variants.Max(variant => variant.Price) : 0m;
-
-            _unitOfWork.NailDesignRepository.Update(nailDesign);
-            await _unitOfWork.SaveChangesAsync();
         }
 
         private async Task<string?> ValidateReferencesAsync(int componentId, int nailVariantId)

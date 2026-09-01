@@ -94,7 +94,7 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 
-builder.Services.AddInfrastructureToApplication(builder.Configuration);
+builder.Services.AddInfrastructureToApplication(builder.Configuration, builder.Environment);
 
 //builder.Services.AddCors(options =>
 //{
@@ -116,7 +116,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true) 
+        policy.SetIsOriginAllowed(origin => true)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

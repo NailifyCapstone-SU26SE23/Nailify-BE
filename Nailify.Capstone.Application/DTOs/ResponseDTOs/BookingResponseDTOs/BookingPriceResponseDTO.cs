@@ -14,6 +14,6 @@
         public string Name { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string Type { get; set; } = string.Empty; // "Promotion" or "Loyalty"
-        public string AmountDisplay => $"-{Amount:N0}đ";
+        public string AmountDisplay => $"-{Amount:N0}";
     }
 }

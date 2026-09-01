@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Application.Services
         {
             var salon = _mapper.Map<Salon>(request);
             salon.SalonId = Guid.NewGuid();
-            salon.Status = "Active";
+            salon.Status = "Open";
             salon.ImageUrl = imageUrl;
 
             // Tự sinh 7 ca làm mặc định
@@ -63,15 +63,33 @@ namespace Nailify.Capstone.Application.Services
             var salon = await _unitOfWork.SalonRepository.GetByIdAsync(id);
             if (salon == null)
                 return new ApiResult<bool>(false, "Không tìm thấy chi nhánh để xóa.");
-            _unitOfWork.SalonRepository.Delete(salon);
-            salon.Status = "Inactive";
+            
+            // Soft Delete: Đóng cửa chi nhánh Salon (Closed / Inactive) thay vì xóa cứng khỏi DB
+            salon.Status = "Closed";
+            _unitOfWork.SalonRepository.Update(salon);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiSuccessResult<bool>(true, "Xóa chi nhánh thành công.");
+            return new ApiSuccessResult<bool>(true, "Đóng cửa (ngưng hoạt động) chi nhánh thành công.");
         }
 
         public async Task<ApiResult<PagedList<SalonResponseDTO>>> GetPagedSalonsAsync(SalonRequestParameters parameters)
         {
             var pagedSalons = await _unitOfWork.SalonRepository.GetPagedSalonsAsync(parameters);
+
+            var mappedItems = _mapper.Map<List<SalonResponseDTO>>(pagedSalons.Items);
+
+            var response = new PagedList<SalonResponseDTO>(
+                mappedItems,
+                pagedSalons.MetaData.TotalItems,
+                pagedSalons.MetaData.CurrentPage,
+                pagedSalons.MetaData.PageSize
+            );
+
+            return new ApiSuccessResult<PagedList<SalonResponseDTO>>(response, "Lấy danh sách chi nhánh phân trang thành công.");
+        }
+
+        public async Task<ApiResult<PagedList<SalonResponseDTO>>> GetPagedSalonsAdminAsync(SalonRequestParameters parameters)
+        {
+            var pagedSalons = await _unitOfWork.SalonRepository.GetPagedSalonsAdminAsync(parameters);
 
             var mappedItems = _mapper.Map<List<SalonResponseDTO>>(pagedSalons.Items);
 
@@ -96,32 +114,42 @@ namespace Nailify.Capstone.Application.Services
 
         public async Task<ApiResult<bool>> UpdateOperatingHoursAsync(Guid salonId, List<SalonOperatingHourUpdateRequest> operatingHours)
         {
-            var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(salonId);
-            if (salon == null)
+            var salonExists = await _unitOfWork.SalonRepository.ExistsAsync(x => x.SalonId == salonId && x.Status == "Open");
+            if (!salonExists)
             {
                 return new ApiErrorResult<bool>("Không tìm thấy chi nhánh để cập nhật giờ hoạt động.");
             }
-            var existingHours = salon.OperatingHours.ToList();
-            foreach(var x in existingHours)
-            {
-                _unitOfWork.SalonOperatingHourRepository.Delete(x);
-            }
 
-            foreach(var x in operatingHours)
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                var y = new SalonOperatingHour
+                // Xóa set-based toàn bộ giờ cũ, tránh DbUpdateConcurrencyException
+                await _unitOfWork.SalonOperatingHourRepository.DeleteBySalonIdAsync(salonId);
+
+                foreach (var x in operatingHours)
                 {
-                    SalonId = salonId,
-                    DayOfWeek = x.DayOfWeek,
-                    OpenTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.OpenTime),
-                    CloseTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.CloseTime),
-                    IsClosed = x.IsClosed
-                };
+                    var y = new SalonOperatingHour
+                    {
+                        OperatingHourId = Guid.NewGuid(),
+                        SalonId = salonId,
+                        DayOfWeek = x.DayOfWeek,
+                        OpenTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.OpenTime),
+                        CloseTime = x.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(x.CloseTime),
+                        IsClosed = x.IsClosed
+                    };
 
-                salon.OperatingHours.Add(y);
+                    await _unitOfWork.SalonOperatingHourRepository.CreateAsync(y);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
 
-            await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Cập nhật giờ hoạt động thành công.");
         }
 

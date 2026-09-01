@@ -37,6 +37,14 @@ namespace Nailify.Capstone.Application.Services
 
         private async Task<ApiResult<bool>> ValidateRescheduleSlotAsync(Booking booking, DateTime newDate, TimeSpan newTime)
         {
+            // BR-19: Ngày đổi lịch không được là ngày trong quá khứ
+            var localToday = DateTime.UtcNow.AddHours(7).Date;
+            var newLocalDate = (newDate.Kind == DateTimeKind.Utc ? newDate.AddHours(7) : newDate).Date;
+            if (newLocalDate < localToday)
+            {
+                return new ApiErrorResult<bool>("Ngày đổi lịch không được là ngày trong quá khứ.");
+            }
+
             var localDate = (newDate.Kind == DateTimeKind.Utc ? newDate.AddHours(7) : newDate).Date;
             var isOffDay = await _unitOfWork.SalonOffDateRepository.ExistsAsync(x =>
                 x.SalonId == booking.SalonId

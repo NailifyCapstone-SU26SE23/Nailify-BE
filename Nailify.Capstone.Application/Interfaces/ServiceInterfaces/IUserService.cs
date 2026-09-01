@@ -23,6 +23,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// <param name="avatarUrl"></param>
         /// <returns></returns>
         Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request, string? avatarUrl = null);
+        Task<ApiResult<bool>> UpdatePasswordAsync(Guid userId, UpdatePasswordRequest request);
         Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
         Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null);
         Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId);

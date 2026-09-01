@@ -18,6 +18,8 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingRatingResponseDT
         public int? Punctuality { get; set; }
         public int? Cleanliness { get; set; }
         public bool IsUpdated { get; set; }
+        public bool IsNegativeReview { get; set; }
+        public string SentimentScore { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

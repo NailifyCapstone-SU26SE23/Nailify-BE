@@ -38,5 +38,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
          /// Giải phóng hold hết hạn (chạy từ Hangfire Job) và gửi thông báo SignalR cho các khách hàng đang chờ.
          /// </summary>
         Task ReleaseHoldAndNotifyWaitersAsync(string holdToken);
+        /// <summary>
+        /// Lấy toàn bộ khoảng thời gian đang bị giữ chỗ của thợ trong ngày (đọc Redis 1 lần để check nhiều slot).
+        /// </summary>
+        Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date);
     }
 }

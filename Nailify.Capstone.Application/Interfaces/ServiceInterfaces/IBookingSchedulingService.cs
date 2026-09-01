@@ -11,6 +11,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IBookingSchedulingService
     {
+        Task HandleOverlappingOnCheckInAsync(Booking checkedInBooking);
         List<ProcedureScheduleSegment> BuildProcedureTimeline(List<BookingProcedure> procedures,TimeSpan bookingStartTime);
 
         Task<bool> HasCapacityConflictAsync(Guid artistId,DateTime bookingDate,
@@ -24,5 +25,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             List<ProcedureScheduleSegment> simulatedSegments,
             int capacity,
             Guid? excludingBookingId = null);
+        // Tối ưu hiệu năng ko query MxN
+        bool HasCapacityConflictInMemory(Guid artistId,
+                                         List<ProcedureScheduleSegment> existingSegments,
+                                         List<ProcedureScheduleSegment> newSegments,
+                                         int capacity);
     }
 }

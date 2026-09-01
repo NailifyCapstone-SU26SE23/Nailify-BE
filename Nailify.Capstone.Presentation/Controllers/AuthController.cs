@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Google.Apis.Auth;
 using System.Threading.Tasks;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.AuthRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
@@ -62,6 +63,92 @@ namespace Nailify.Capstone.Presentation.Controllers
                     token = result.Token,
                 }
             });
+        }
+
+        [HttpPost("google")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            try
+            {
+                var result = await _authService.GoogleLoginAsync(request);
+
+                if (result == null)
+                {
+                    return Unauthorized(new
+                    {
+                        isSucceeded = false,
+                        message = "Google token không hợp lệ."
+                    });
+                }
+
+                return Ok(new
+                {
+                    isSucceeded = true,
+                    message = "Đăng nhập Google thành công.",
+                    data = new
+                    {
+                        token = result.Token
+                    }
+                });
+            }
+            catch (InvalidJwtException)
+            {
+                return Unauthorized(new
+                {
+                    isSucceeded = false,
+                    message = "Google token không hợp lệ."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    isSucceeded = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var result = await _authService.ForgotPasswordAsync(request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        [HttpPost("check-reset-token")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CheckResetPasswordToken([FromBody] CheckResetPasswordTokenRequest request)
+        {
+            var result = await _authService.CheckResetPasswordTokenAsync(request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        [HttpPost("reset-password")]
+        [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            var result = await _authService.ResetPasswordAsync(request);
+            if (!result.IsSucceeded)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
         }
     }
 }
