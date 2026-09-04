@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Nailify.Capstone.Domain.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -32,5 +33,6 @@ namespace Nailify.Capstone.Application.Common
             }
         }
         public string? OrderBy { get; set; }
+        public ActiveStatusFilter? Status { get; set; }
     }
 }

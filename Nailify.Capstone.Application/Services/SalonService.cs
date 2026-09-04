@@ -86,7 +86,7 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<PagedList<SalonResponseDTO>>(response, "Lấy danh sách chi nhánh phân trang thành công.");
         }
-
+        /*
         public async Task<ApiResult<PagedList<SalonResponseDTO>>> GetPagedSalonsAdminAsync(SalonRequestParameters parameters)
         {
             var pagedSalons = await _unitOfWork.SalonRepository.GetPagedSalonsAdminAsync(parameters);
@@ -102,7 +102,7 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<PagedList<SalonResponseDTO>>(response, "Lấy danh sách chi nhánh phân trang thành công.");
         }
-
+        */
         public async Task<ApiResult<SalonResponseDTO>> GetSalonByIdAsync(Guid id)
         {
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(id);

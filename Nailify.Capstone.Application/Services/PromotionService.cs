@@ -2,6 +2,7 @@ using AutoMapper;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -155,7 +156,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<PromotionDto>> CreateAsync(PromotionRequest request, string? imageUrl = null)
         {
             var validationError = await ValidateAsync(request);
-            
+
             if (validationError != null)
             {
                 return new ApiErrorResult<PromotionDto>(validationError);
@@ -168,7 +169,9 @@ namespace Nailify.Capstone.Application.Services
             if (request.Type == PromotionType.Voucher)
             {
                 promotion.IsSelectable = true;
-            } else {
+            }
+            else
+            {
                 promotion.IsSelectable = false;
             }
 
@@ -307,7 +310,7 @@ namespace Nailify.Capstone.Application.Services
                 {
                     if (selectedPromotionIds == null || !selectedPromotionIds.Contains(promotion.PromotionId))
                     {
-                        continue; 
+                        continue;
                     }
                 }
 
@@ -603,6 +606,115 @@ namespace Nailify.Capstone.Application.Services
         private static decimal GetLineAmount(BookingItem item)
         {
             return item.Price * Math.Max(item.Quantity, 1);
+        }
+
+        public async Task<ApiResult<PagedList<PromotionDto>>> GetRedeemablePromotionsAsync(int pageNumber, int pageSize, Guid customerId)
+        {
+            var pagedList = await _unitOfWork.PromotionRepository.GetPagedAsync(pageNumber,
+               pageSize,
+               x => x.IsSelectable
+               && x.PointsRequired.HasValue &&
+               x.PointsRequired.Value > 0
+               && (x.EndDate == null || x.EndDate >= DateTime.UtcNow));
+
+            var mappedDtos = _mapper.Map<List<PromotionDto>>(pagedList.Items);
+
+            return new ApiSuccessResult<PagedList<PromotionDto>>(new PagedList<PromotionDto>(mappedDtos, pagedList.MetaData.TotalItems, pageNumber, pageSize), "Lấy danh sách khuyến mãi có thể đổi điểm thành công.");
+        }
+
+        public async Task<ApiResult<UserWalletVoucherDTO>> RedeemVoucherWithPointsAsync(Guid customerId, int promotionId)
+        {
+            var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(customerId);
+            if (customer == null)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>("Không tìm thấy thông tin khách hàng.");
+            }
+            var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(promotionId);
+            if (promotion == null || promotion.Status != "Active" || !promotion.IsSelectable)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>("Khuyến mãi không tồn tại hoặc đã ngưng hoạt động.");
+            }
+            if (!promotion.PointsRequired.HasValue || promotion.PointsRequired.Value <= 0)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>("Voucher này không hỗ trợ đổi bằng điểm.");
+            }
+
+            if (promotion.EndDate.HasValue && promotion.EndDate.Value < DateTime.UtcNow)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>("Khuyến mãi đã hết hạn.");
+            }
+
+            // Kiểm tra số dư điểm trong ví
+            if (customer.LoyaltyPoint < promotion.PointsRequired.Value)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>($"Số dư điểm không đủ ({customer.LoyaltyPoint}/{promotion.PointsRequired.Value} điểm).");
+            }
+            // Kiểm tra giới hạn tổng UsageLimit
+            if (promotion.UsageLimit.HasValue && promotion.CurrentUsageCount >= promotion.UsageLimit.Value)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>("Voucher đã hết số lượng phát hành.");
+            }
+            // Kiểm tra giới hạn người dùng UserLimit
+            var existingUsage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(customerId, promotionId);
+
+            if (promotion.UserLimit.HasValue && existingUsage != null && existingUsage.ReceivedCount >= promotion.UserLimit.Value)
+            {
+                return new ApiErrorResult<UserWalletVoucherDTO>($"Bạn đã đạt giới hạn đổi voucher này ({promotion.UserLimit.Value} lần).");
+            }
+
+            var pointsToDeduct = promotion.PointsRequired.Value;
+
+            // Tru diem tu vi
+            customer.LoyaltyPoint -= pointsToDeduct;
+            _unitOfWork.CustomerRepository.Update(customer);
+
+            if (existingUsage == null)
+            {
+                existingUsage = new UserPromotionUsage
+                {
+                    UserId = customerId,
+                    PromotionId = promotionId,
+                    UsageCount = 0,
+                    ReceivedCount = 1,
+                    LastUsedDate = DateTime.UtcNow
+                };
+                await _unitOfWork.UserPromotionUsageRepository.CreateAsync(existingUsage);
+            }
+            else
+            {
+                existingUsage.ReceivedCount = (existingUsage.ReceivedCount ?? 0) + 1;
+                existingUsage.LastUsedDate = DateTime.UtcNow;
+                _unitOfWork.UserPromotionUsageRepository.Update(existingUsage);
+            }
+
+            // Tang so luong su dung hien tai cua khuyen mai
+            promotion.CurrentUsageCount += 1;
+            _unitOfWork.PromotionRepository.Update(promotion);
+
+            // Ghi Transaction vao bang LoyaltyPointTransaction
+            var loyaltyTransaction = new LoyaltyTransaction
+            {
+                CustomerId = customerId,
+                Points = -pointsToDeduct,
+                TransactionType = LoyaltyTransactionType.Redeemed,
+                Description = $"Đổi voucher '{promotion.Name}' (Trừ {pointsToDeduct} điểm)",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.LoyaltyTransactionRepository.CreateAsync(loyaltyTransaction);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            existingUsage.Promotion = promotion;
+            var response = _mapper.Map<UserWalletVoucherDTO>(existingUsage);
+
+            return new ApiSuccessResult<UserWalletVoucherDTO>(response, $"Đổi voucher thành công! Đã trừ {pointsToDeduct} điểm. Số dư còn lại: {customer.LoyaltyPoint} điểm.");
+        }
+
+        public async Task<ApiResult<List<UserWalletVoucherDTO>>> GetUserWalletVouchersAsync(Guid customerId)
+        {
+            var usages = await _unitOfWork.UserPromotionUsageRepository.GetValidUserVouchersAsync(customerId);
+            var response = _mapper.Map<List<UserWalletVoucherDTO>>(usages);
+            return new ApiSuccessResult<List<UserWalletVoucherDTO>>(response, "Lấy danh sách voucher trong ví thành công.");
         }
     }
 }

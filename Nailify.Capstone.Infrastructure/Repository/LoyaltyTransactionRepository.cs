@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 
 namespace Nailify.Capstone.Infrastructure.Repository
@@ -9,6 +10,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
     public class LoyaltyTransactionRepository : GenericRepository<LoyaltyTransaction>, ILoyaltyTransactionRepository
     {
         public LoyaltyTransactionRepository(NailifyDbContext context) : base(context) { }
+
+        public async Task<LoyaltyTransaction?> GetEarnedTransactionByBookingIdAsync(Guid bookingId)
+        {
+            return await _dbSet
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.BookingId == bookingId && t.TransactionType == LoyaltyTransactionType.Earned);
+        }
 
         public async Task<PagedList<LoyaltyTransaction>> GetPagedAsync(
             int pageNumber,

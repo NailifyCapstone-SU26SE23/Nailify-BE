@@ -46,7 +46,20 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
 
                 if (booking != null && customer != null)
                 {
+                    /*
                     const int earnedPoints = 10;
+                    customer.LoyaltyPoint += earnedPoints;
+                    customer.LifetimePoints += earnedPoints;
+                    */
+                    // TÍNH ĐIỂM TÍCH LŨY: 10,000 VNĐ = 1 điểm 
+                    decimal amountPaid = booking.AmountPaid ?? booking.TotalPrice ?? 0;
+                    const decimal pointsConversionRate = 10000m;
+                    int earnedPoints = (int)Math.Floor(amountPaid / pointsConversionRate);
+                    if (earnedPoints < 1)
+                    {
+                        earnedPoints = 1;
+                    }
+
                     customer.LoyaltyPoint += earnedPoints;
                     customer.LifetimePoints += earnedPoints;
 
@@ -73,9 +86,11 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                         BookingId = booking.BookingId,
                         Points = earnedPoints,
                         TransactionType = LoyaltyTransactionType.Earned,
-                        LoyaltyTierIdAtTime = matchedTier?.LoyaltyTierId,
+                        Description = $"Tích điểm từ đơn hàng #{booking.BookingId} (Thanh toán {amountPaid:N0}đ)",
                         CreatedAt = DateTime.UtcNow
                     });
+
+                    await _unitOfWork.SaveChangesAsync();
                 }
             }
             if (domainEvent.NewStatus == BookingStatus.Approved)

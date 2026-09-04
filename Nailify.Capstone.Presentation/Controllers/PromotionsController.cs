@@ -1,7 +1,9 @@
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
@@ -188,6 +190,48 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
+        /// <summary>
+        /// Lấy danh sách các Voucher có thể đổi bằng điểm tích lũy của khách hàng.
+        /// </summary>
+        [HttpGet("redeemable")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<PromotionDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetRedeemablePromotions(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            var userId = GetCurrentUserIdOrNull();
+            if (!userId.HasValue) return Unauthorized();
+            var result = await _promotionService.GetRedeemablePromotionsAsync(pageNumber, pageSize, userId.Value);
+            return Ok(result);
+        }
+        /// <summary>
+        /// Đổi voucher bằng điểm ví tích lũy của khách hàng.
+        /// </summary>
+        [HttpPost("{promotionId:int}/redeem")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResult<UserWalletVoucherDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<UserWalletVoucherDTO>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RedeemVoucher(int promotionId)
+        {
+            var userId = GetCurrentUserIdOrNull();
+            if (!userId.HasValue) return Unauthorized();
+            var result = await _promotionService.RedeemVoucherWithPointsAsync(userId.Value, promotionId);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+        /// <summary>
+        /// Lấy danh sách các Voucher khả dụng trong ví cá nhân của khách hàng.
+        /// </summary>
+        [HttpGet("my-wallet-vouchers")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResult<List<UserWalletVoucherDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyWalletVouchers()
+        {
+            var userId = GetCurrentUserIdOrNull();
+            if (!userId.HasValue) return Unauthorized();
+            var result = await _promotionService.GetUserWalletVouchersAsync(userId.Value);
+            return Ok(result);
+        }
+
 
         private async Task<string> UploadImageAsync(IFormFile? image)
         {

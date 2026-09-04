@@ -10,6 +10,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<Chair?> GetChairWithSalonAsync(Guid chairId);
         Task<IEnumerable<Chair>> GetActiveChairsBySalonAsync(Guid salonId);
-        Task<PagedList<Chair>> GetPagedChairsBySalonAsync(Guid salonId, int pageNumber, int pageSize);
+        Task<PagedList<Chair>> GetPagedChairsBySalonAsync(Guid salonId, int pageNumber, int pageSize, string? statusFilter = null,
+            string? orderBy = null);
     }
 }

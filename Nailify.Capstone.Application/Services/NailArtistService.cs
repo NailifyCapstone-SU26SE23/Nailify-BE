@@ -9,6 +9,7 @@ using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -48,9 +49,11 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<NailArtistResponseDTO>(response, "Lấy thông tin thợ nail thành công.");
         }
 
-        public async Task<ApiResult<PagedList<NailArtistResponseDTO>>> GetPagedNailArtistsAsync(int pageNumber, int pageSize, Guid? salonId = null)
+        public async Task<ApiResult<PagedList<NailArtistResponseDTO>>> GetPagedNailArtistsAsync(int pageNumber, int pageSize, Guid? salonId = null, string? status = null, string? orderBy = null)
         {
-            var pagedArtists = await _unitOfWork.NailArtistRepository.GetPagedAsync(pageNumber, pageSize, salonId.HasValue ? (x => x.Account.SalonId == salonId.Value) : null, x => x.Account);
+            Expression<Func<NailArtist, bool>>? predicate = salonId.HasValue ? (x => x.Account.SalonId == salonId.Value) : null;
+
+            var pagedArtists = await _unitOfWork.NailArtistRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, orderBy, x => x.Account);
 
             var mappedItems = _mapper.Map<List<NailArtistResponseDTO>>(pagedArtists.Items);
 

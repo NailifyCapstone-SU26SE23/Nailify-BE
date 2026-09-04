@@ -53,7 +53,8 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa loại kỹ năng thành công.");
         }
 
-        public async Task<ApiResult<PagedList<SkillTypeResponseDTO>>> GetPagedSkillTypesAsync(int pageNumber, int pageSize, string? name = null)
+        public async Task<ApiResult<PagedList<SkillTypeResponseDTO>>> GetPagedSkillTypesAsync(int pageNumber, int pageSize, string? name = null, string? status = null,
+          string? orderBy = null)
         {
             var pagedResult = await _unitOfWork.SkillTypeRepository
                                                .GetPagedAsync(
@@ -61,7 +62,9 @@ namespace Nailify.Capstone.Application.Services
                                                             pageSize,
                                                             x => x.Status == "Active"
                                                             && (string.IsNullOrEmpty(name) || x.Name.ToLower().Contains(name.ToLower())
-                                                            ));
+                                                            ),
+                                                            status,
+                                                            orderBy);
 
             var mapping = _mapper.Map<List<SkillTypeResponseDTO>>(pagedResult.Items);
 

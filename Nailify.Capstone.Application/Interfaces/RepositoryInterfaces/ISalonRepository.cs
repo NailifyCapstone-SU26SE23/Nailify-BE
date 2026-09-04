@@ -13,6 +13,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     {
         Task<Salon?> GetSalonWithOperatingHoursAsync(Guid salonId);
         Task<PagedList<Salon>> GetPagedSalonsAsync(SalonRequestParameters parameters);
-        Task<PagedList<Salon>> GetPagedSalonsAdminAsync(SalonRequestParameters parameters);
+        //Task<PagedList<Salon>> GetPagedSalonsAdminAsync(SalonRequestParameters parameters);
     }
 }

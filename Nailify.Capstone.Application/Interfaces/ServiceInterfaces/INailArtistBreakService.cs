@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<NailArtistBreakResponseDTO>> UpdateBreakAsync(Guid breakId, NailArtistBreakUpdateRequestDTO request);
         Task<ApiResult<bool>> DeleteBreakAsync(Guid breakId);
         Task<ApiResult<NailArtistBreakResponseDTO>> ApproveRejectBreakAsync(Guid breakId, ApproveRejectBreakRequest request);
-        Task<ApiResult<PagedList<NailArtistBreakResponseDTO>>> GetPagedBreaksAsync(int pageNumber, int pageSize, Guid? artistId = null, DateTime? date = null);
+        Task<ApiResult<PagedList<NailArtistBreakResponseDTO>>> GetPagedBreaksAsync(int pageNumber, int pageSize, Guid? artistId = null, DateTime? date = null, string? status = null,
+          string? orderBy = null);
     }
 }

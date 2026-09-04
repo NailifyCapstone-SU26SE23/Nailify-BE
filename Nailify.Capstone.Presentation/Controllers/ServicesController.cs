@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ServiceRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.ServiceResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -29,9 +30,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetPaged(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? name = null)
+            [FromQuery] string? name = null,
+            [FromQuery] ActiveStatusFilter? status = null,
+            [FromQuery] string? orderBy = null)
         {
-            var result = await _servicesService.GetPagedServicesAsync(pageNumber, pageSize, name);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _servicesService.GetPagedServicesAsync(pageNumber, pageSize, name, statusStr, orderBy);
             return Ok(result);
         }
         /// <summary>

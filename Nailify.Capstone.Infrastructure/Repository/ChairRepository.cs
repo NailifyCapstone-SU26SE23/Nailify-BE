@@ -29,12 +29,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
         }
 
-        public async Task<PagedList<Chair>> GetPagedChairsBySalonAsync(Guid salonId, int pageNumber, int pageSize)
+        public async Task<PagedList<Chair>> GetPagedChairsBySalonAsync(Guid salonId, int pageNumber, int pageSize, string? statusFilter = null,
+          string? orderBy = null)
         {
             return await GetPagedAsync(
                 pageNumber,
                 pageSize,
                 c => c.SalonId == salonId,
+                statusFilter,
+                orderBy,
                 c => c.Salon
             );
         }

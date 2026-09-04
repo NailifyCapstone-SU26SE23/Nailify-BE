@@ -76,9 +76,12 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] Guid? artistId = null,
-            [FromQuery] DateTime? date = null)
+            [FromQuery] DateTime? date = null,
+            [FromQuery] ArtistBreakStatus? status = null,
+    [FromQuery] string? orderBy = null)
         {
-            var result = await _breakService.GetPagedBreaksAsync(pageNumber, pageSize, artistId, date);
+            var statusStr = (status == null) ? null : status.ToString();
+            var result = await _breakService.GetPagedBreaksAsync(pageNumber, pageSize, artistId, date, statusStr, orderBy);
             return Ok(result);
         }
     }
