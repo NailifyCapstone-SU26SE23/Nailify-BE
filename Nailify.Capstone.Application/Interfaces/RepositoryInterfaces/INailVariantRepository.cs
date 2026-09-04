@@ -1,5 +1,6 @@
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 
 namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
 {
@@ -10,6 +11,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<NailVariant>> GetNailVariantsByDesignIdAsync(int nailDesignId);
         Task<List<NailVariant>> GetNailVariantsByIdsAsync(IEnumerable<int> nailVariantIds);
         Task<NailVariant?> GetNailVariantDetailAsync(int nailVariantId);
+        Task<NailSummaryDto?> GetNailVariantSummaryAsync(int nailVariantId);
         List<int> GetDistinctVariantIdsAsync(IEnumerable<BookingItem> items);
         Task<List<NailVariant>> GetNailVariantsCapableByArtistAsync(Guid artistId);
     }
