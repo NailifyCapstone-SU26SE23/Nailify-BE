@@ -42,6 +42,7 @@ namespace Nailify.Capstone.Infrastructure.Extensions
             services.AddHangfireServer(options =>
             {
                 options.ServerName = "Nailify Background Server";
+                options.WorkerCount = 2;
             });
             // 4. Đăng ký SignalR
             services.AddSignalR();

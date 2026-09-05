@@ -47,15 +47,16 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Xóa dịch vụ thành công.");
         }
 
-        public async Task<ApiResult<PagedList<ServiceResponseDTO>>> GetPagedServicesAsync(int pageNumber, int pageSize, string? searchName = null)
+        public async Task<ApiResult<PagedList<ServiceResponseDTO>>> GetPagedServicesAsync(int pageNumber, int pageSize, string? searchName = null, string? status = null,
+          string? orderBy = null)
         {
             Expression<Func<Nailify.Capstone.Domain.Entities.Services, bool>> predicate = null;
             if(!string.IsNullOrEmpty(searchName))
             {
-                predicate = s => s.Name.Contains(searchName.Trim().ToLower());
+                predicate = s => s.Name.ToLower().Contains(searchName.Trim().ToLower());
             }
 
-            var pagedServices = await _unitOfWork.ServicesRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+            var pagedServices = await _unitOfWork.ServicesRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, orderBy);
 
             var mapItems = _mapper.Map<List<ServiceResponseDTO>>(pagedServices.Items);
             var response = new PagedList<ServiceResponseDTO>(mapItems, pagedServices.MetaData.TotalItems, pageNumber, pageSize);

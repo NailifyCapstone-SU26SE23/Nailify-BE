@@ -277,7 +277,6 @@ namespace Nailify.Capstone.Application.Services
                 BookingId = booking.BookingId,
                 Points = earnedPoints,
                 TransactionType = LoyaltyTransactionType.Earned,
-                LoyaltyTierIdAtTime = matchedTier?.LoyaltyTierId,
                 CreatedAt = DateTime.UtcNow
             };
 

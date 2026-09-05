@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Threading.Tasks;
 
@@ -25,9 +26,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<NailArtistResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] Guid? salonId = null)
+        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] Guid? salonId = null, [FromQuery] ActiveStatusFilter? status = null, [FromQuery] string? orderBy = null)
         {
-            var response = await _artistService.GetPagedNailArtistsAsync(pageNumber, pageSize, salonId);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var response = await _artistService.GetPagedNailArtistsAsync(pageNumber, pageSize, salonId, statusStr, orderBy);
             return Ok(response);
         }
 

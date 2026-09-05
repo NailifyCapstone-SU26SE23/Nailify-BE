@@ -381,11 +381,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasForeignKey(lt => lt.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<LoyaltyTransaction>()
-                .HasOne(lt => lt.LoyaltyTier)
-                .WithMany()
-                .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
-                .OnDelete(DeleteBehavior.SetNull);
+            // modelBuilder.Entity<LoyaltyTransaction>()
+            //     .HasOne(lt => lt.LoyaltyTier)
+            //     .WithMany()
+            //     .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
+            //     .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Booking>(entity =>
             {

@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.SalonRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using System;
 using System.Collections.Generic;
@@ -34,7 +35,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _salonService.GetPagedSalonsAsync(parameters);
             return Ok(response);
         }
-
+        /*
         /// <summary>
         /// Lấy danh sách chi nhánh (Admin).
         /// </summary>
@@ -46,7 +47,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _salonService.GetPagedSalonsAdminAsync(parameters);
             return Ok(response);
         }
-
+        */
         /// <summary>
         /// Lấy thông tin chi tiết một chi nhánh.
         /// </summary>

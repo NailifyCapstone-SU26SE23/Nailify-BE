@@ -1,6 +1,7 @@
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 
@@ -33,5 +34,13 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<List<Promotion>> GetApplicablePromotionsAsync(Guid customerId, ICollection<BookingItem> items, IEnumerable<int>? selectedPromotionIds = null);
         Task<(decimal totalDiscount, List<BookingDiscount> appliedDiscounts)> CalculateDiscountsAsync(Booking booking, List<Promotion> applicablePromotions);
         Task UpdateUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts);
+
+
+        // Wallet
+        Task<ApiResult<PagedList<PromotionDto>>> GetRedeemablePromotionsAsync(int pageNumber, int pageSize, Guid customerId);
+
+        Task<ApiResult<UserWalletVoucherDTO>> RedeemVoucherWithPointsAsync(Guid customerId, int promotionId);
+
+        Task<ApiResult<List<UserWalletVoucherDTO>>> GetUserWalletVouchersAsync(Guid customerId);
     }
 }

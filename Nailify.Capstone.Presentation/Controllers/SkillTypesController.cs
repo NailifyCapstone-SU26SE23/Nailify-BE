@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.SkillTypeRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.SkillTypeResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -21,9 +22,11 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<SkillTypeResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? name = null)
+        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? name = null, [FromQuery] ActiveStatusFilter? status = null,
+          [FromQuery] string? orderBy = null)
         {
-            var response = await _skillTypeService.GetPagedSkillTypesAsync(pageNumber, pageSize, name);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var response = await _skillTypeService.GetPagedSkillTypesAsync(pageNumber, pageSize, name, statusStr, orderBy);
             return Ok(response);
         }
         /// <summary>
