@@ -1,4 +1,5 @@
 using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
@@ -94,5 +95,8 @@ namespace Nailify.Capstone.Application.Services
 
         public Task<ApiResult<BookingResponseDTO>> LateCheckInBookingAsync(Guid bookingId, Guid actorId)
                  => _bookingLifecycleService.LateCheckInBookingAsync(bookingId, actorId);
+
+        public Task<ApiResult<string>> HandleCustomerDelayDecisionAsync(Guid bookingId, DelayResponseRequest request)
+                => _bookingLifecycleService.HandleCustomerDelayDecisionAsync(bookingId, request);
     }
 }

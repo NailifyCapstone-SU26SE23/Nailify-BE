@@ -56,6 +56,24 @@ namespace Nailify.Capstone.Domain.Entities
         public virtual ICollection<BookingHistory> BookingHistories { get; set; } = new List<BookingHistory>();
         public virtual ICollection<BookingDiscount> BookingDiscounts { get; set; } = new List<BookingDiscount>();
 
+
+        /// <summary>
+        /// Tự động cập nhật StartTime = ActualCheckInTime nếu khách check-in sớm hơn giờ đã hẹn trong cùng ngày.
+        /// </summary>
+        /// <returns>True nếu StartTime được cập nhật sớm hơn; ngược lại False.</returns>
+        public bool AdjustStartTimeIfEarlyArrival()
+        {
+            if (ActualCheckInTime.HasValue && ActualCheckInTime.Value.Date == BookingDate.Date)
+            {
+                var checkInTimeOfDay = new TimeSpan(ActualCheckInTime.Value.TimeOfDay.Hours, ActualCheckInTime.Value.TimeOfDay.Minutes, 0);
+                if (checkInTimeOfDay < StartTime)
+                {
+                    StartTime = checkInTimeOfDay;
+                    return true;
+                }
+            }
+            return false;
+        }
         public void Created(Guid customerId)
         {
             AddDomainEvent(new BookingStatusChangedEvent(
@@ -85,6 +103,10 @@ namespace Nailify.Capstone.Domain.Entities
             UpdatedAt = DateTime.UtcNow;
             ActualCheckInTime = DateTime.UtcNow.AddHours(7);
             IsLateArrival = DateTime.UtcNow.AddHours(7) > BookingDate.Date.Add(StartTime).AddMinutes(15);
+
+            // Tự động đẩy StartTime lên nếu khách đến sớm
+            AdjustStartTimeIfEarlyArrival();
+
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,
@@ -118,6 +140,9 @@ namespace Nailify.Capstone.Domain.Entities
             UpdatedAt = DateTime.UtcNow;
             ActualCheckInTime = DateTime.UtcNow.AddHours(7);
             IsLateArrival = DateTime.UtcNow.AddHours(7) > BookingDate.Date.Add(StartTime).AddMinutes(15);
+
+            AdjustStartTimeIfEarlyArrival();
+
             AddDomainEvent(new BookingStatusChangedEvent(
                 BookingId,
                 oldStatus,

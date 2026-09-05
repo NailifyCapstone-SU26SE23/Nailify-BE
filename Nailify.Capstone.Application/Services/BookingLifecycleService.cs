@@ -103,6 +103,18 @@ namespace Nailify.Capstone.Application.Services
                 */
 
                 booking.CheckInFromQr(actorId);
+                var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
+                if (procedures.Any())
+                {
+                    var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                    foreach(var segment in timeline)
+                    {
+                        var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                        procedure.EstimatedStartTime = segment.StartTime;
+                        procedure.EstimatedEndTime = segment.EndTime;
+                        _unitOfWork.BookingProcedureRepository.Update(procedure);
+                    }
+                }
 
                 _unitOfWork.BookingRepository.Update(booking);
                 //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
@@ -813,6 +825,68 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Khôi phục và Check-in đơn trễ cho khách thành công.");
+        }
+
+        public async Task<ApiResult<string>> HandleCustomerDelayDecisionAsync(Guid bookingId, DelayResponseRequest request)
+        {
+            var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
+            if (booking == null)
+            {
+                return new ApiErrorResult<string>("Không tìm thấy lịch đặt");
+            }
+            switch (request.CustomerDecision)
+            {
+                case DelayCustomerDecision.Wait:
+                    if (booking.Customer != null)
+                    {
+                        booking.Customer.LoyaltyPoint += 50;
+                        booking.Customer.LifetimePoints += 50;
+                        _unitOfWork.CustomerRepository.Update(booking.Customer);
+
+                        var pointTransaction = new LoyaltyTransaction
+                        {
+                            CustomerId = booking.Customer.UserId,
+                            BookingId = booking.BookingId,
+                            Points = 50,
+                            TransactionType = LoyaltyTransactionType.Earned,
+                            Description = "Điểm đền bù do đồng ý chờ ca trễ",
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _unitOfWork.LoyaltyTransactionRepository.CreateAsync(pointTransaction);
+                    }
+                    break;
+                case DelayCustomerDecision.Reassign:
+                    var newArtist = await _unitOfWork.NailArtistRepository
+                                                     .GetAvailableAlternativeArtistAsync(booking.SalonId, booking.NailArtistId.Value, booking.BookingDate.Date, booking.StartTime, booking.TotalDuration);
+
+                    if (newArtist == null)
+                    {
+                        return new ApiErrorResult<string>("Xin lỗi, hiện salon không còn thợ nào rảnh. Vui lòng đồng ý chờ thêm hoặc dời lịch.");
+                    }
+
+                    booking.NailArtistId = newArtist.NailArtistId;
+                    _unitOfWork.BookingRepository.Update(booking);
+
+                    await _notificationService.SendNotificationToUserAsync(
+                        newArtist.NailArtistId.ToString(), "NewAssignment", "Bạn có ca mới được assign do thợ trước bị kẹt khách."
+                    );
+                    break;
+                case DelayCustomerDecision.Reschedule:
+                    if (request.NewDate.HasValue && request.NewTime.HasValue)
+                    {
+                        booking.ProposedBookingDate = request.NewDate.Value;
+                        booking.ProposedStartTime = request.NewTime.Value;
+                    }
+                    booking.Status = BookingStatus.ReschedulePending;
+                    booking.ProposedBy = "Customer";
+                    _unitOfWork.BookingRepository.Update(booking);
+                    await _promotionService.AddVoucherForRescheduleAsync(booking.BookingId);
+                    break;
+                default:
+                    return new ApiErrorResult<string>("Lựa chọn không hợp lệ.");
+            }
+            await _unitOfWork.SaveChangesAsync();
+            return new ApiSuccessResult<string>($"Đã xử lý quyết định thành công: {request.CustomerDecision}");
         }
 
         private sealed record DiscountedPriceCalculation(

@@ -46,5 +46,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(Guid bookingId, TransferSalonRequestDTO request, Guid actorId);
         Task<ApiResult<List<BookingResponseDTO>>> GetLateCancelledBookingsBySalonAsync(Guid salonId);
         Task<ApiResult<BookingResponseDTO>> LateCheckInBookingAsync(Guid bookingId, Guid actorId);
+        Task<ApiResult<string>> HandleCustomerDelayDecisionAsync(Guid bookingId, DelayResponseRequest request);
+
     }
 }
