@@ -686,7 +686,14 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
+        [HttpPost("{id}/delay-response")]
+        public async Task<IActionResult> HandleDelayResponse(Guid id, [FromBody] DelayResponseRequest request)
+        {
+            var result = await _bookingService.HandleCustomerDelayDecisionAsync(id, request);
+            if (!result.IsSucceeded) return BadRequest(result);
 
+            return Ok(result);
+        }
     }
 
     public class CheckInForm

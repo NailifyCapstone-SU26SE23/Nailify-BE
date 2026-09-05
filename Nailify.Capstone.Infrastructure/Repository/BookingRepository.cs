@@ -105,7 +105,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return bookings.Where(b =>
             {
                 var bStart = b.StartTime;
-                var bEnd   = b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration > 0 ? b.TotalDuration : 60));
+                var bEnd = b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration > 0 ? b.TotalDuration : 60));
                 return bStart <= atTime && atTime < bEnd;
             });
         }
@@ -241,7 +241,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         }
         public Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId)
         {
-            return FindByCondition(x => x.CustomerId == customerId 
+            return FindByCondition(x => x.CustomerId == customerId
                                    && x.Status == BookingStatus.Completed)
                 .Include(b => b.BookingItems)
                     .ThenInclude(bi => bi.NailVariant)
@@ -278,12 +278,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
             var range = GetDateRangeUtc(bookingDate);
             var endTime = startTime.Add(TimeSpan.FromMinutes(durationMinutes));
 
-            var approvedBookings =  await FindByCondition(x =>
+            var approvedBookings = await FindByCondition(x =>
                                              x.SalonId == salonId
                                              && x.BookingDate >= range.start
                                              && x.BookingDate <= range.end
                                              && x.Status == BookingStatus.Approved
-                                             && (!excludeBookingId.HasValue || x.BookingId != excludeBookingId.Value))     
+                                             && (!excludeBookingId.HasValue || x.BookingId != excludeBookingId.Value))
                         .ToListAsync();
 
             return approvedBookings.Count(b =>
@@ -296,9 +296,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             var range = GetDateRangeUtc(date);
             var cancelledBookings = await FindByCondition(x =>
-                                                              x.SalonId == salonId 
-                                                              && x.BookingDate >= range.start 
-                                                              && x.BookingDate <= range.end 
+                                                              x.SalonId == salonId
+                                                              && x.BookingDate >= range.start
+                                                              && x.BookingDate <= range.end
                                                               && x.Status == BookingStatus.Cancelled)
                                         .Include(x => x.Customer)
                                             .ThenInclude(x => x.User)
@@ -333,6 +333,32 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(bi => bi.BookingProcedures)
                         .ThenInclude(bp => bp.Procedure)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<IEnumerable<Booking>> GetOverdueInProgressBookingsAsync(DateTime date, TimeSpan currentTime, bool trackChanges = false)
+        {
+            var range = GetDateRangeUtc(date);
+            var inProgressBookings = await FindByCondition(x => x.BookingDate >= range.start
+                                                                && x.BookingDate <= range.end
+                                                                && x.Status == BookingStatus.InProgress, trackChanges)
+                                            .ToListAsync();
+
+            return inProgressBookings.Where(
+                                             b => b.StartTime.Add(TimeSpan.FromMinutes(b.TotalDuration)) < currentTime
+                                           )
+                                     .ToList();
+        }
+
+        public async Task<Booking?> GetNextBookingForArtistAsync(Guid artistId, DateTime date, TimeSpan afterTime, bool trackChanges = false)
+        {
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(b => b.NailArtistId == artistId
+                                           && b.BookingDate >= range.start
+                                           && b.BookingDate <= range.end
+                                           && (b.Status == BookingStatus.Approved || b.Status == BookingStatus.Pending)
+                                           && b.StartTime >= afterTime, trackChanges)
+                .OrderBy(b => b.StartTime)
                 .FirstOrDefaultAsync();
         }
     }

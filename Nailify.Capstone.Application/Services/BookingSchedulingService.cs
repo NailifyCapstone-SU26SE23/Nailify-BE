@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -10,8 +13,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
-using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -20,15 +21,17 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notificationService;
         private readonly IPromotionService _promotionService;
-
+        private readonly IDistributedCache _cache;
         public BookingSchedulingService(
-            IUnitOfWork unitOfWork, 
+            IUnitOfWork unitOfWork,
             INotificationService notificationService,
-            IPromotionService promotionService)
+            IPromotionService promotionService,
+            IDistributedCache cache)
         {
             _unitOfWork = unitOfWork;
             _notificationService = notificationService;
             _promotionService = promotionService;
+            _cache = cache;
         }
 
         public List<ProcedureScheduleSegment> BuildProcedureTimeline(
@@ -452,15 +455,15 @@ namespace Nailify.Capstone.Application.Services
             // Nếu được overlap -> cho phép làm song song -> Không cần cảnh báo
             if (activeProcedure.CanOverlap)
             {
-                return; 
+                return;
             }
 
             // Nếu không cho phép đè ca -> Bị kẹt
             var nowTime = DateTime.UtcNow.AddHours(7).TimeOfDay;
-            int delayMinutes = activeProcedure.EstimatedEndTime.HasValue 
-                ? (int)(activeProcedure.EstimatedEndTime.Value - nowTime).TotalMinutes 
+            int delayMinutes = activeProcedure.EstimatedEndTime.HasValue
+                ? (int)(activeProcedure.EstimatedEndTime.Value - nowTime).TotalMinutes
                 : 15;
-            
+
             // Ko trễ thì thoát
             if (delayMinutes <= 0)
             {
@@ -490,11 +493,11 @@ namespace Nailify.Capstone.Application.Services
                     firstPrepStep.AssignedArtistId = availableAlternativeArtist.NailArtistId;
                     _unitOfWork.BookingProcedureRepository.Update(firstPrepStep);
                     await _unitOfWork.SaveChangesAsync();
-                    
+
 
                     await _notificationService.SendNotificationToUserAsync(
-                        checkedInBooking.CustomerId.ToString(), 
-                        "ArtistChanged", 
+                        checkedInBooking.CustomerId.ToString(),
+                        "ArtistChanged",
                         new { Message = $"Thợ phụ {availableAlternativeArtist.Account.FirstName} sẽ hỗ trợ làm sạch móng trước cho bạn." });
                     return;
                 }
@@ -509,7 +512,7 @@ namespace Nailify.Capstone.Application.Services
 
                 foreach (var artist in activeArtists)
                 {
-                    if (artist.NailArtistId == artistId) 
+                    if (artist.NailArtistId == artistId)
                     {
                         continue;
                     }
@@ -544,8 +547,8 @@ namespace Nailify.Capstone.Application.Services
 
                 // Gửi SignalR tới Manager POS & Staff (thông qua group "Salon_{salonId}")
                 await _notificationService.SendNotificationToSalonStaffAsync(
-                    checkedInBooking.SalonId.ToString(), 
-                    "SLA_VIOLATION_ALERT", 
+                    checkedInBooking.SalonId.ToString(),
+                    "SLA_VIOLATION_ALERT",
                     alertDto);
             }
 
@@ -553,23 +556,83 @@ namespace Nailify.Capstone.Application.Services
 
             if (delayMinutes >= 10)
             {
-                var voucherResult = await _promotionService.AddVoucherForRescheduleAsync(checkedInBooking.BookingId);
-                if (voucherResult != null && voucherResult.IsSucceeded)
+                string cacheKey = $"DelayWarning_{checkedInBooking.BookingId}";
+                var hasWarned = await _cache.GetStringAsync(cacheKey);
+
+                if (string.IsNullOrEmpty(hasWarned))
                 {
-                    customerMessage += " Hệ thống đã tự động gửi tặng bạn 1 Voucher đền bù vào ví vì sự chậm trễ này. Mong bạn thông cảm!";
+                    await _cache.SetStringAsync(cacheKey, "sent", new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12)
+                    });
+                    await _notificationService.SendNotificationToUserAsync(
+                                                                            checkedInBooking.CustomerId.ToString(),
+                                                                            "DelayWarningWithAutonomy",
+                                                                            new
+                                                                            {
+                                                                                Message = $"Ca của bạn lúc {checkedInBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
+                                                                                BookingId = checkedInBooking.BookingId,
+                                                                                Options = new[] { "WAIT", "REASSIGN", "RESCHEDULE" }
+                                                                            }
+                                                                          );
                 }
             }
 
             await _notificationService.SendNotificationToUserAsync(
-                checkedInBooking.CustomerId.ToString(), 
-                "DelayETA", 
+                checkedInBooking.CustomerId.ToString(),
+                "DelayETA",
                 new { Message = customerMessage });
 
             // BR-01.4: Gửi cho Màn hình Lễ tân (SalonStaff) để cập nhật ETA
             await _notificationService.SendNotificationToSalonStaffAsync(
-                checkedInBooking.SalonId.ToString(), 
-                "DelayETA", 
+                checkedInBooking.SalonId.ToString(),
+                "DelayETA",
                 new { Message = $"Khách hàng {checkedInBooking.Customer?.User?.FirstName} đang chờ. {customerMessage}" });
+        }
+
+        public async Task CheckAndNotifyDelayAsync()
+        {
+            var currentTime = DateTime.UtcNow.AddHours(7).TimeOfDay;
+
+            var currentDate = DateTime.UtcNow.AddHours(7).Date;
+            var overdueBookings = await _unitOfWork.BookingRepository.GetOverdueInProgressBookingsAsync(currentDate, currentTime);
+            foreach (var overdue in overdueBookings)
+            {
+                var endTime = overdue.StartTime.Add(TimeSpan.FromMinutes(overdue.TotalDuration));
+                var delayMinutes = (int)(currentTime - endTime).TotalMinutes;
+
+                if (delayMinutes >= 10 && overdue.NailArtistId.HasValue)
+                {
+                    var nextBooking = await _unitOfWork.BookingRepository.GetNextBookingForArtistAsync(
+                                                overdue.NailArtistId.Value, 
+                                                currentDate, 
+                                                endTime);
+                    if(nextBooking != null)
+                    {
+                        string cacheKey  = $"DelayWarning_{nextBooking.BookingId}";
+                        var hasWarned = await _cache.GetStringAsync(cacheKey);
+
+                        if (string.IsNullOrEmpty(hasWarned))
+                        {
+                            await _cache.SetStringAsync(cacheKey, "sent", new DistributedCacheEntryOptions
+                            {
+                                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12)
+                            });
+
+                            await _notificationService.SendNotificationToUserAsync(
+                                nextBooking.CustomerId.ToString(),
+                                "DelayWarningWithAutonomy",
+                                new
+                                {
+                                    Message = $"Ca của bạn lúc {nextBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
+                                    BookingId = nextBooking.BookingId,
+                                    Options = new[] { "WAIT", "REASSIGN", "RESCHEDULE" }
+                                }
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }

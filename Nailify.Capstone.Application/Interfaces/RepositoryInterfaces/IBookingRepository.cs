@@ -53,5 +53,14 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// </summary>
         Task<int> CountApprovedOverlappingAsync(Guid salonId, DateTime bookingDate, TimeSpan startTime, int durationMinutes, Guid? excludeBookingId = null);
         Task<List<Booking>> GetLateCancelledBookingsBySalonAsync(Guid salonId, DateTime date);
+
+        /// <summary>
+        /// Lấy danh sách các ca đặt lịch đang thực hiện (InProgress) trong ngày nhưng đã quá giờ kết thúc dự kiến.
+        /// </summary>
+        Task<IEnumerable<Booking>> GetOverdueInProgressBookingsAsync(DateTime date, TimeSpan currentTime, bool trackChanges = false);
+        /// <summary>
+        /// Lấy đơn đặt lịch tiếp theo (Approved/Pending) của một thợ sau một mốc thời gian cụ thể.
+        /// </summary>
+        Task<Booking?> GetNextBookingForArtistAsync(Guid artistId, DateTime date, TimeSpan afterTime, bool trackChanges = false);
     }
 }
