@@ -381,11 +381,11 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasForeignKey(lt => lt.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<LoyaltyTransaction>()
-                .HasOne(lt => lt.LoyaltyTier)
-                .WithMany()
-                .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
-                .OnDelete(DeleteBehavior.SetNull);
+            // modelBuilder.Entity<LoyaltyTransaction>()
+            //     .HasOne(lt => lt.LoyaltyTier)
+            //     .WithMany()
+            //     .HasForeignKey(lt => lt.LoyaltyTierIdAtTime)
+            //     .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Booking>(entity =>
             {
@@ -594,7 +594,6 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.Property(c => c.HandShape).HasDefaultValue(string.Empty).HasMaxLength(100);
                 entity.Property(c => c.Occupation).HasDefaultValue(string.Empty).HasMaxLength(250);
                 entity.Property(c => c.NailCondition).HasDefaultValue(string.Empty).HasMaxLength(500);
-                entity.Property(c => c.PersonaId).HasDefaultValue(string.Empty).HasMaxLength(100);
                 entity.Property(c => c.PreferredColorsJson).HasDefaultValue(string.Empty).HasMaxLength(500);
                 entity.Property(c => c.PreferredStylesJson).HasDefaultValue(string.Empty).HasMaxLength(500);
                 entity.Property(c => c.PreferredOccasionsJson).HasDefaultValue(string.Empty).HasMaxLength(500);

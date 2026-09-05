@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.SalonRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.SalonResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using System;
 using System.Collections.Generic;
@@ -33,6 +35,19 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _salonService.GetPagedSalonsAsync(parameters);
             return Ok(response);
         }
+        /*
+        /// <summary>
+        /// Lấy danh sách chi nhánh (Admin).
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpGet("admin")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<SalonResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetPagedAdmin([FromQuery] SalonRequestParameters parameters)
+        {
+            var response = await _salonService.GetPagedSalonsAdminAsync(parameters);
+            return Ok(response);
+        }
+        */
         /// <summary>
         /// Lấy thông tin chi tiết một chi nhánh.
         /// </summary>

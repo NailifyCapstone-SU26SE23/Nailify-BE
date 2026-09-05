@@ -77,8 +77,15 @@ namespace Nailify.Capstone.Infrastructure.Service
                     return (false, priceResult.Message ?? "Lỗi tính giá.", null);
                 }
 
+                var salon = await _unitOfWork.SalonRepository.GetByIdAsync(request.SalonId);
+                if (salon == null)
+                {
+                    return (false, "Khong tim thay salon.", null);
+                }
+
+                var depositRate = salon.DepositConfig;
                 var amountDue = priceResult.Data?.TotalPrice ?? 0m;
-                var finalAmountDue = amountDue * 0.2m; // 20% deposit
+                var finalAmountDue = amountDue * depositRate;
                 if (finalAmountDue <= 0)
                 {
                     // If the booking requires 0 payment (e.g. 100% discount or warranty), we shouldn't create a payment link.
@@ -152,6 +159,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
                     QrCode = GetString(data, "qrCode") ?? string.Empty,
                     Status = TransactionStatus.Pending,
+                    Policy = FormatDepositPolicy(depositRate),
                     CreatedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(15),
                     WebhookPayload = string.Empty
@@ -180,9 +188,21 @@ namespace Nailify.Capstone.Infrastructure.Service
                     return (false, "Khong tim thay lich hen.", null);
                 }
 
+                var depositRate = 1m;
+                if (booking.Status != BookingStatus.ServiceCompleted)
+                {
+                    var salon = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salon == null)
+                    {
+                        return (false, "Khong tim thay salon.", null);
+                    }
+
+                    depositRate = salon.DepositConfig;
+                }
+
                 var amountDue = booking.Status == BookingStatus.ServiceCompleted
                     ? booking.AmountDue ?? booking.TotalPrice ?? 0m
-                    : booking.TotalPrice * 0.2m ?? 0m;
+                    : booking.TotalPrice * depositRate ?? 0m;
                 if (amountDue <= 0)
                 {
                     return (false, $"So tien khong hop le: {amountDue}.", null);
@@ -256,6 +276,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
                     QrCode = GetString(data, "qrCode") ?? string.Empty,
                     Status = ParseStatus(GetString(data, "status")),
+                    Policy = booking.Status == BookingStatus.ServiceCompleted ? string.Empty : FormatDepositPolicy(depositRate),
                     CreatedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(15),
                     WebhookPayload = string.Empty
@@ -308,7 +329,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 if (transaction.Status == TransactionStatus.Paid)
                 {
                     await EnsureBookingForPaidTransactionAsync(transaction);
-                    ApplyPaidAmountToBookingAsync(transaction);
+                    await ApplyPaidAmountToBookingAsync(transaction);
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -468,6 +489,16 @@ namespace Nailify.Capstone.Infrastructure.Service
             };
         }
 
+        private static string FormatDepositPolicy(decimal depositRate)
+        {
+            var percent = depositRate * 100m;
+            var formattedPercent = decimal.Truncate(percent) == percent
+                ? percent.ToString("0", CultureInfo.InvariantCulture)
+                : percent.ToString("0.##", CultureInfo.InvariantCulture);
+
+            return $"Cọc {formattedPercent}%";
+        }
+
         private async Task SyncLocalTransactionStatusAsync(long orderCode, string? payOSStatus)
         {
             var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(
@@ -480,7 +511,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
 
             var newStatus = ParseStatus(payOSStatus);
-            if (transaction.Status == newStatus && (newStatus != TransactionStatus.Paid || transaction.PaidAt.HasValue))
+            if (transaction.Status == newStatus && newStatus != TransactionStatus.Paid)
             {
                 return;
             }
@@ -493,7 +524,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             if (newStatus == TransactionStatus.Paid)
             {
                 await EnsureBookingForPaidTransactionAsync(transaction);
-                ApplyPaidAmountToBookingAsync(transaction);
+                await ApplyPaidAmountToBookingAsync(transaction);
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);
@@ -539,15 +570,25 @@ namespace Nailify.Capstone.Infrastructure.Service
             await _cache.RemoveAsync(cacheKey);
         }
 
-        private static void ApplyPaidAmountToBookingAsync(Transaction transaction)
+        private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
-            if (transaction.Booking == null)
+            if (transaction.Booking == null || !transaction.BookingId.HasValue)
             {
                 return;
             }
 
-            transaction.Booking.AmountPaid = transaction.Amount;
-            transaction.Booking.AmountDue = transaction.Booking.TotalPrice - transaction.Booking.AmountPaid;
+            var paidAmountBeforeCurrentTransaction = await _unitOfWork.TransactionRepository
+                .FindByCondition(t =>
+                    t.BookingId == transaction.BookingId &&
+                    t.TransactionId != transaction.TransactionId &&
+                    t.Status == TransactionStatus.Paid)
+                .SumAsync(t => t.Amount);
+
+            var amountPaid = paidAmountBeforeCurrentTransaction + transaction.Amount;
+            var totalPrice = transaction.Booking.TotalPrice ?? 0m;
+
+            transaction.Booking.AmountPaid = amountPaid;
+            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - amountPaid);
             if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
             {
                 transaction.Booking.CheckOut(Guid.Empty);

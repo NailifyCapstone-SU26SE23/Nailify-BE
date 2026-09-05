@@ -59,7 +59,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
@@ -83,12 +83,12 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> FullRefund(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Thong tin tai khoan ngan hang la bat buoc."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
                 request,
-                "Full refund because no replacement artist is available.",
+                "Hoàn toàn bộ tiền cọc do không có nhân viên thay thế.",
                 forceFullRefund: true);
 
             if (!result.Success)
@@ -111,6 +111,33 @@ namespace Nailify.Capstone.Presentation.Controllers
                 Voucher = voucherResult.IsSucceeded ? voucherResult.Data : null,
                 VoucherMessage = voucherResult.Message
             }, result.Message));
+        }
+
+        [HttpPost("refund/reject/{bookingId}")]
+        public async Task<IActionResult> RejectRefund(Guid bookingId, [FromBody] BankAccountInfo request)
+        {
+            if (request == null)
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
+
+            var result = await _refundService.CreateSinglePayoutByBookingAsync(
+                bookingId,
+                request,
+                "Full deposit refund because booking was rejected.",
+                forceFullRefund: true);
+
+            if (!result.Success)
+            {
+                return BadRequest(new
+                {
+                    IsSucceeded = false,
+                    result.Message,
+                    Data = (object?)null,
+                    result.ErrorCode,
+                    result.ErrorDescription
+                });
+            }
+
+            return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
 
         [HttpPost("webhook")]

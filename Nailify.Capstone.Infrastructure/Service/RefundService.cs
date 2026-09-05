@@ -195,12 +195,12 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 return new RefundPolicy(
                     decimal.Round(originalAmount * 0.8m, 0, MidpointRounding.AwayFromZero),
-                    "Hoàn tiền 80% cho yêu cầu hoàn tiền dưới 24 giờ trước thời gian đặt lịch.");
+                    "Hoàn 80% tiền cọc cho yêu cầu hoàn tiền dưới 24 giờ trước thời gian đặt lịch.");
             }
 
             return new RefundPolicy(
                 originalAmount,
-                "Hoàn tiền toàn bộ cho yêu cầu hoàn tiền trên 24 giờ trước thời gian đặt lịch.");
+                "Hoàn toàn bộ tiền cọc cho yêu cầu hoàn tiền trên 24 giờ trước thời gian đặt lịch.");
         }
 
         private string GetBankBin(string bankCode)

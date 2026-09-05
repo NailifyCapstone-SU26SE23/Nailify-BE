@@ -89,11 +89,16 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<PagedList<ChairResponseDTO>>("Không tìm thấy chi nhánh Salon.");
             }
+            var statusStr = (parameters.Status == null || parameters.Status == ActiveStatusFilter.All)
+              ? null
+              : parameters.Status.ToString();
 
             var pagedChairs = await _unitOfWork.ChairRepository.GetPagedChairsBySalonAsync(
                 salonId,
                 parameters.PageIndex,
-                parameters.PageSize
+                parameters.PageSize,
+                statusStr,
+                parameters.OrderBy
             );
 
             var mappedItems = _mapper.Map<List<ChairResponseDTO>>(pagedChairs.Items);

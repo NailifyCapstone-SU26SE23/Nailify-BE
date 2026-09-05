@@ -17,7 +17,6 @@ namespace Nailify.Capstone.Domain.Entities
         public string? HandShape { get; set; } = string.Empty;
         public string? Occupation { get; set; } = string.Empty;
         public string? NailCondition { get; set; } = string.Empty;
-        public string? PersonaId { get; set; } = string.Empty;
         public int? LoyaltyTierId { get; set; }
 
         public string PreferredColorsJson { get; set; } = string.Empty;

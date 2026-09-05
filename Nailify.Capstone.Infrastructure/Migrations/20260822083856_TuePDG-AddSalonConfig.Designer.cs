@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    partial class NailifyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260822083856_TuePDG-AddSalonConfig")]
+    partial class TuePDGAddSalonConfig
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -995,8 +998,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
+                    b.Property<int?>("LoyaltyTierIdAtTime")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Points")
                         .HasColumnType("integer");
@@ -1013,6 +1016,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("LoyaltyTierIdAtTime");
 
                     b.ToTable("LoyaltyTransactions");
                 });
@@ -1510,9 +1515,6 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int?>("PointsRequired")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Scope")
                         .IsRequired()
@@ -2551,9 +2553,16 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTier", "LoyaltyTier")
+                        .WithMany()
+                        .HasForeignKey("LoyaltyTierIdAtTime")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Booking");
 
                     b.Navigation("Customer");
+
+                    b.Navigation("LoyaltyTier");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.NailArtist", b =>

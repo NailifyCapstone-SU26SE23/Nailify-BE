@@ -24,7 +24,7 @@ namespace Nailify.Capstone.Domain.Entities
         public int CurrentUsageCount { get; set; }
         public int? UserLimit { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
-
+        public int? PointsRequired { get; set; }
         public virtual Category? Category { get; set; }
         public virtual CategoryType? CategoryType { get; set; }
         public virtual NailDesign? NailDesign { get; set; }

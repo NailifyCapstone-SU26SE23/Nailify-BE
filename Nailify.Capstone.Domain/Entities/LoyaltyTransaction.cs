@@ -1,4 +1,5 @@
-﻿namespace Nailify.Capstone.Domain.Entities
+using Nailify.Capstone.Domain.Enums;
+namespace Nailify.Capstone.Domain.Entities
 {
     public class LoyaltyTransaction
     {
@@ -7,15 +8,15 @@
         public Guid? BookingId { get; set; }
 
         public int Points { get; set; }
-        public Enums.LoyaltyTransactionType TransactionType { get; set; } = Enums.LoyaltyTransactionType.Earned;
+        public LoyaltyTransactionType TransactionType { get; set; } = LoyaltyTransactionType.Earned;
 
-        public int? LoyaltyTierIdAtTime { get; set; } // Track which tier they were in
-
+        //public int? LoyaltyTierIdAtTime { get; set; } // Track which tier they were in
+        public string? Description { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation
         public virtual Customer Customer { get; set; } = null!;
         public virtual Booking? Booking { get; set; }
-        public virtual LoyaltyTier? LoyaltyTier { get; set; }
+        //public virtual LoyaltyTier? LoyaltyTier { get; set; }
     }
 }

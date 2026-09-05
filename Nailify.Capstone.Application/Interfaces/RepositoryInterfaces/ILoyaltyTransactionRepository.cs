@@ -6,5 +6,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface ILoyaltyTransactionRepository : IGenericRepository<LoyaltyTransaction>
     {
         Task<PagedList<LoyaltyTransaction>> GetPagedAsync(int pageNumber, int pageSize, Guid? userId = null);
+        Task<LoyaltyTransaction?> GetEarnedTransactionByBookingIdAsync(Guid bookingId);
     }
 }

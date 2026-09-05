@@ -17,5 +17,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 usage.UserId == userId &&
                 usage.PromotionId == promotionId);
         }
+
+        public async Task<List<UserPromotionUsage>> GetValidUserVouchersAsync(Guid userId)
+        {
+            return await _dbSet
+                            .AsNoTracking()
+                            .Include(u => u.Promotion)
+                            .Where(u => u.UserId == userId && (u.ReceivedCount ?? 0) > u.UsageCount)
+                            .ToListAsync();
+        }
     }
 }

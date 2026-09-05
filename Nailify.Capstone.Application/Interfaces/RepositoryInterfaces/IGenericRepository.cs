@@ -24,6 +24,8 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
             int pageNumber,
             int pageSize,
             Expression<Func<T, bool>>? predicate = null,
+            string? statusFilter = null,
+            string? orderBy = null,
             params Expression<Func<T, object>>[] includes);
     }
 }

@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.DTOs.ResponseDTOs.ProcedureResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -166,11 +167,15 @@ namespace Nailify.Capstone.Application.Services
                 var procType = parameters.ProcedureType.Value;
                 predicate = p => p.ProcedureType == procType;
             }
+            var status = (parameters.Status == null || parameters.Status == ActiveStatusFilter.All) ? null : parameters.Status.ToString();
+
 
             var pagedProcedures = await _unitOfWork.ProcedureRepository.GetPagedAsync(
                 parameters.PageIndex,
                 parameters.PageSize,
-                predicate);
+                predicate,
+                status,
+                parameters.OrderBy);
 
             var mappedItems = _mapper.Map<List<ProcedureResponseDTO>>(pagedProcedures.Items);
             var response = new PagedList<ProcedureResponseDTO>(
