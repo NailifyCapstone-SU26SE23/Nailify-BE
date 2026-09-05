@@ -30,5 +30,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
                                          List<ProcedureScheduleSegment> existingSegments,
                                          List<ProcedureScheduleSegment> newSegments,
                                          int capacity);
+        Task CheckAndNotifyDelayAsync();
     }
 }
