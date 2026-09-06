@@ -1,0 +1,87 @@
+name: Deploy BE
+
+on:
+  push:
+    branches: [ "develop", "main", "ci/cd" ]
+  pull_request:
+    branches: [ "develop", "main", "ci/cd" ]
+
+jobs:
+  build-and-test:
+    name: 🧪 Build, Test & SonarCloud Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for accurate SonarCloud analysis
+
+      - name: ⚙️ Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: ☕ Setup Java 17 (Required for SonarCloud)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: 📦 Install SonarScanner tool
+        run: dotnet tool install --global dotnet-sonarscanner || true
+
+      - name: 📦 Restore dependencies
+        run: dotnet restore NailifyCapstone.sln
+
+      - name: 🔍 Check Code Format
+        run: dotnet format --verify-no-changes --verbosity normal || true
+
+      - name: 🔎 Begin SonarCloud Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "🚀 Starting SonarCloud Analysis..."
+            dotnet-sonarscanner begin /k:"NailifyCapstone-SU26SE23_Nailify-BE" /o:"nailifycapstone-su26se23" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io"
+          else
+            echo "⚠️ SONAR_TOKEN is missing in repository secrets. Skipping SonarCloud analysis."
+          fi
+
+      - name: 🔨 Build Solution
+        run: dotnet build NailifyCapstone.sln -c Release --no-restore
+
+      - name: 🧪 Run Unit Tests
+        run: dotnet test NailifyCapstone.sln -c Release --no-build --verbosity normal
+
+      - name: 📊 End SonarCloud Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "🚀 Uploading SonarCloud analysis results..."
+            dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          else
+            echo "⚠️ SONAR_TOKEN is missing. Skipping SonarCloud end step."
+          fi
+
+  deploy-to-render:
+    name: 🚀 Trigger Render Deploy Hook
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci/cd')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📡 Call Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "❌ Error: RENDER_DEPLOY_HOOK_URL secret is not set in GitHub repository secrets!"
+            exit 1
+          fi
+          echo "🚀 Triggering Render deployment..."
+          curl -s -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "✅ Render Deploy Hook triggered successfully!"
