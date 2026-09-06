@@ -188,5 +188,10 @@ static void RegisterRecurringJobs()
         executor => executor.ClearDailyWaitlistAsync(),
         "0 0 * * *"
     );
+    RecurringJob.AddOrUpdate<IBookingSchedulingService>(
+    "proactive-delay-check",
+    service => service.CheckAndNotifyDelayAsync(),
+    "*/5 * * * *"
+    );
 }
 
