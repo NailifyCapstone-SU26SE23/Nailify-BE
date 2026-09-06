@@ -1,10 +1,12 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using System.Text.Json;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -12,11 +14,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IDistributedCache _cache;
 
-        public NailDesignService(IUnitOfWork unitOfWork, IMapper mapper)
+        public NailDesignService(IUnitOfWork unitOfWork, IMapper mapper, IDistributedCache cache)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _cache = cache;
         }
 
         public async Task<ApiResult<PagedList<NailDesignDto>>> GetPagedNailDesignsAsync(
@@ -54,6 +58,34 @@ namespace Nailify.Capstone.Application.Services
             var designDto = _mapper.Map<NailDesignDto>(design);
             await PopulateFavoriteStatusAsync(new[] { designDto }, userId);
             return new ApiSuccessResult<NailDesignDto>(designDto, "Lấy thông tin mẫu nail thành công.");
+        }
+
+        public async Task<ApiResult<NailSummaryDto>> GetNailDesignSummaryAsync(int id)
+        {
+            var cacheKey = $"NailDesignSummary_{id}";
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                var cachedSummary = JsonSerializer.Deserialize<NailSummaryDto>(cachedData);
+                if (cachedSummary != null)
+                {
+                    return new ApiSuccessResult<NailSummaryDto>(cachedSummary, "Lấy tổng quan mẫu nail thành công.");
+                }
+            }
+
+            var summary = await _unitOfWork.NailDesignRepository.GetNailDesignSummaryAsync(id);
+            if (summary == null)
+            {
+                return new ApiErrorResult<NailSummaryDto>("Không tìm thấy mẫu nail.");
+            }
+
+            var cacheOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+            };
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(summary), cacheOptions);
+
+            return new ApiSuccessResult<NailSummaryDto>(summary, "Lấy tổng quan mẫu nail thành công.");
         }
 
         public async Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, string? imageUrl = null)

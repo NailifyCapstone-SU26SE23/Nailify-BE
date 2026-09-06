@@ -1,10 +1,12 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using System.Text.Json;
 
 namespace Nailify.Capstone.Application.Services
 {
@@ -12,11 +14,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IDistributedCache _cache;
 
-        public NailVariantService(IUnitOfWork unitOfWork, IMapper mapper)
+        public NailVariantService(IUnitOfWork unitOfWork, IMapper mapper, IDistributedCache cache)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _cache = cache;
         }
 
         public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null)
@@ -40,6 +44,34 @@ namespace Nailify.Capstone.Application.Services
             var variantDto = _mapper.Map<NailVariantDto>(variant);
             await PopulateFavoriteStatusAsync(new[] { variantDto }, userId);
             return new ApiSuccessResult<NailVariantDto>(variantDto, "Lấy thông tin biến thể thành công.");
+        }
+
+        public async Task<ApiResult<NailSummaryDto>> GetNailVariantSummaryAsync(int id)
+        {
+            var cacheKey = $"NailVariantSummary_{id}";
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                var cachedSummary = JsonSerializer.Deserialize<NailSummaryDto>(cachedData);
+                if (cachedSummary != null)
+                {
+                    return new ApiSuccessResult<NailSummaryDto>(cachedSummary, "Lấy tổng quan biến thể thành công.");
+                }
+            }
+
+            var summary = await _unitOfWork.NailVariantRepository.GetNailVariantSummaryAsync(id);
+            if (summary == null)
+            {
+                return new ApiErrorResult<NailSummaryDto>("Không tìm thấy biến thể.");
+            }
+
+            var cacheOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+            };
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(summary), cacheOptions);
+
+            return new ApiSuccessResult<NailSummaryDto>(summary, "Lấy tổng quan biến thể thành công.");
         }
 
         public async Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null)

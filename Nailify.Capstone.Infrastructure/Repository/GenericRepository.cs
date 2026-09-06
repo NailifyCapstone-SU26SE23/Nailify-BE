@@ -257,7 +257,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
             {
                 var val = statusProperty.GetValue(entity) as string;
                 return string.Equals(val, "Active", StringComparison.OrdinalIgnoreCase) ||
-                       string.Equals(val, "Open", StringComparison.OrdinalIgnoreCase);
+                       string.Equals(val, "Open", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(val, "Closed", StringComparison.OrdinalIgnoreCase);
             }
 
             if (statusProperty?.PropertyType == typeof(bool))
