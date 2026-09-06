@@ -1,7 +1,8 @@
 # 💅 Nailify - Advanced Nail Virtual Try-On and Booking System
 ### *Hệ thống đặt lịch & công cụ thử móng thông minh*
 
-[![CI/CD - Build, Test & Deploy to Render](https://github.com/NailifyCapstone-SU26SE23/Nailify-BE/actions/workflows/deploy-render.yml/badge.svg)](https://github.com/NailifyCapstone-SU26SE23/Nailify-BE/actions/workflows/deploy-render.yml)
+[![CI / CD](https://github.com/NailifyCapstone-SU26SE23/Nailify-BE/actions/workflows/deploy-render.yml/badge.svg)](https://github.com/NailifyCapstone-SU26SE23/Nailify-BE/actions/workflows/deploy-render.yml)
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=NailifyCapstone-SU26SE23_Nailify-BE&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=NailifyCapstone-SU26SE23_Nailify-BE)
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)
 ![Render](https://img.shields.io/badge/Render-Deployed-46E3B7?style=flat&logo=render&logoColor=black)
