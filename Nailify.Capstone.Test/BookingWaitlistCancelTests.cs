@@ -139,7 +139,7 @@ namespace Nailify.Capstone.Test
             domainEvents.First().Should().BeOfType<SlotFreedEvent>();
 
             var freedEvent = (SlotFreedEvent)domainEvents.First();
-            freedEvent.SalonId.Should().Be(~_salonId);
+            freedEvent.SalonId.Should().Be(_salonId);
             freedEvent.BookingDate.Should().Be(waitlist.RequestedDate.Date);
             freedEvent.StartTime.Should().Be(waitlist.RequestedStartTime);
 
