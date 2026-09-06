@@ -1,0 +1,52 @@
+name: 🚀 CI/CD - Build, Test & Deploy to Render
+
+on:
+  push:
+    branches: [ "develop", "main" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  build-and-test:
+    name: 🧪 Build & Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: 📦 Restore dependencies
+        run: dotnet restore NailifyCapstone.sln
+
+      - name: 🔍 Check Code Format
+        run: dotnet format --verify-no-changes --verbosity normal || true
+
+      - name: 🔨 Build Solution
+        run: dotnet build NailifyCapstone.sln -c Release --no-restore
+
+      - name: 🧪 Run Unit Tests
+        run: dotnet test NailifyCapstone.sln -c Release --no-build --verbosity normal
+
+  deploy-to-render:
+    name: 🚀 Trigger Render Deploy Hook
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📡 Call Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "❌ Error: RENDER_DEPLOY_HOOK_URL secret is not set in GitHub repository secrets!"
+            exit 1
+          fi
+          echo "🚀 Triggering Render deployment..."
+          curl -s -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "✅ Render Deploy Hook triggered successfully!"
