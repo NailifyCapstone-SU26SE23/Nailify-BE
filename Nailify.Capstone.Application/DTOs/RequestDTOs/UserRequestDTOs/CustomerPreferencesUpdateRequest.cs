@@ -9,7 +9,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
         public string SkinTone { get; set; } = string.Empty;
         public string Occupation { get; set; } = string.Empty;
         public string NailCondition { get; set; } = string.Empty;
-        public string PersonaId { get; set; } = string.Empty;
+        public string? PersonaId { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CustomerPreferencesUpdateRequest, Customer>();

@@ -26,9 +26,7 @@ namespace Nailify.Capstone.Application.Validation.UserRequestDTOs
                 .NotEmpty().WithMessage("Họ không được để trống.");
 
             RuleFor(x => x.Role)
-                .NotEmpty().WithMessage("Vai trò (Role) không được để trống.")
-                .Must(role => role == "Customer" || role == "Staff_Artist" || role == "Manager" || role == "Admin")
-                .WithMessage("Vai trò không hợp lệ. Phải là Customer, Staff_Artist, Manager hoặc Admin.");
+                .IsInEnum().WithMessage("Vai trò không hợp lệ. Phải là Admin, Manager, Receptionist, Staff_Artist hoặc Customer.");
         }
     }
 }

@@ -16,5 +16,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await FindByCondition(u => u.Email.ToLower() == email.Trim().ToLower() && u.Status == "Active").FirstOrDefaultAsync();
         }
+
+        public async Task<User?> GetUserByPhoneAsync(string phone)
+        {
+            return await FindByCondition(u => u.Phone == phone.Trim() && u.Status == "Active").FirstOrDefaultAsync();
+        }
     }
 }

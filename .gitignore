@@ -404,5 +404,10 @@ FodyWeavers.xsd
 appsettings.json
 appsettings.Development.json
 
+# Claude AI configuration (local/personal files)
+.claude/
 AGENTS.md
 CLAUDE.md
+.agent_scratchpad.md
+ 
+ 

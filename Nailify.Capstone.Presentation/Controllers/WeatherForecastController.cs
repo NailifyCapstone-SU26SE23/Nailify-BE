@@ -6,6 +6,7 @@ using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Presentation.Middlewares;
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -15,10 +16,31 @@ namespace Nailify.Capstone.Presentation.Controllers
     public class WeatherForecastController : ControllerBase
     {
         private readonly NailifyDbContext _context;
+        private readonly HttpClient _httpClient;
 
-        public WeatherForecastController(NailifyDbContext context)
+        public WeatherForecastController(NailifyDbContext context, IHttpClientFactory httpClientFactory)
         {
             _context = context;
+            _httpClient = httpClientFactory.CreateClient();
+        }
+
+        [HttpGet("myip")]
+        public async Task<IActionResult> GetMyIp()
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://ifconfig.me");
+                request.Headers.Add("User-Agent", "curl"); 
+
+                var response = await _httpClient.SendAsync(request);
+                var ip = await response.Content.ReadAsStringAsync();
+
+                return Ok(new { outboundIp = ip.Trim() });
+            }
+            catch
+            {
+                return StatusCode(500, "Unable to fetch outbound IP");
+            }
         }
 
         /// <summary>
@@ -65,7 +87,7 @@ namespace Nailify.Capstone.Presentation.Controllers
                         LastName = target.LastName,
                         AvatarUrl = "https://res.cloudinary.com/dym0se5if/image/upload/v1780309663/khay123_a7bsjq.jpg",
                         Status = "Active",
-                        Role = target.Role // Gán đúng vai trò theo danh sách thiết lập
+                        //Role = target.Role // Gán đúng vai trò theo danh sách thiết lập
                     };
                     usersToAdd.Add(newSpamUser);
                 }

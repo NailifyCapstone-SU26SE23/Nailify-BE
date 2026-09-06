@@ -3,10 +3,12 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.SalonRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -25,6 +27,60 @@ namespace Nailify.Capstone.Infrastructure.Repository
         }
 
         public async Task<PagedList<Salon>> GetPagedSalonsAsync(SalonRequestParameters parameters)
+        {
+            Expression<Func<Salon, bool>> predicate = s =>
+            (
+                string.IsNullOrWhiteSpace(parameters.Name)
+                || (s.Name != null 
+                   && s.Name.ToLower().Contains(parameters.Name.Trim().ToLower())
+                   )
+            ) &&
+            (
+                string.IsNullOrWhiteSpace(parameters.Address) 
+                || (s.Address != null 
+                    && s.Address.ToLower().Contains(parameters.Address.Trim().ToLower())
+                   )
+            );
+
+            var statusStr = (parameters.Status == null || parameters.Status == SalonStatusFilter.All) ? "All" : parameters.Status.ToString();
+
+
+            // Sắp xếp theo khoảng cách (Gần nhất trước) nếu có truyền tọa độ
+            if (parameters.Latitude.HasValue && parameters.Longitude.HasValue)
+            {
+                double latVal = parameters.Latitude.Value;
+                double lonVal = parameters.Longitude.Value;
+                double cosFactor = Math.Cos(latVal * Math.PI / 180.0);
+                double factor = 12392.1424; // 111.32 * 111.32
+
+                var query = FindByCondition(predicate).Include(s => s.OperatingHours).AsQueryable();
+                if (!string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(s => s.Status.ToLower() == statusStr.ToLower());
+                }
+                query = query.OrderBy(s =>
+                    ((s.Latitude - latVal) * (s.Latitude - latVal) +
+                     (s.Longitude - lonVal) * (s.Longitude - lonVal) * cosFactor * cosFactor) * factor
+                );
+                var totalItems = await query.CountAsync();
+                var items = await query
+                                      .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                                      .Take(parameters.PageSize)
+                                      .ToListAsync();
+                return new PagedList<Salon>(items, totalItems, parameters.PageNumber, parameters.PageSize);
+            }
+
+            return await GetPagedAsync(
+                                        parameters.PageNumber,
+                                        parameters.PageSize,
+                                        predicate,
+                                        statusStr,
+                                        parameters.OrderBy,
+                                        s => s.OperatingHours
+            );
+        }
+        /*
+        public async Task<PagedList<Salon>> GetPagedSalonsAdminAsync(SalonRequestParameters parameters)
         {
             var query = _context.Salons
                 .Include(s => s.OperatingHours)
@@ -52,8 +108,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 double cosFactor = Math.Cos(latVal * Math.PI / 180.0);
                 double factor = 12392.1424; // 111.32 * 111.32
 
-                query = query.OrderBy(s => 
-                    ((s.Latitude - latVal) * (s.Latitude - latVal) + 
+                query = query.OrderBy(s =>
+                    ((s.Latitude - latVal) * (s.Latitude - latVal) +
                      (s.Longitude - lonVal) * (s.Longitude - lonVal) * cosFactor * cosFactor) * factor
                 );
             }
@@ -66,5 +122,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return new PagedList<Salon>(items, totalItems, parameters.PageIndex, parameters.PageSize);
         }
+       */
     }
 }

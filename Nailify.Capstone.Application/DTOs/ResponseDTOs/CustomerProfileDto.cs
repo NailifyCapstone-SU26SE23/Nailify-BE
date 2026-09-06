@@ -22,7 +22,16 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string? Occupation { get; set; } = string.Empty;
         public string? NailCondition { get; set; } = string.Empty;
         public string? PersonaId { get; set; } = string.Empty;
+        public string? SkinShade { get; set; } = string.Empty;
+        public string? HandShape { get; set; } = string.Empty;
+        public string? PreferredComplexity { get; set; } = string.Empty;
 
+        public List<string> PreferredColors { get; set; } = new();
+        public List<string> PreferredStyles { get; set; } = new();
+        public List<string> PreferredOccasions { get; set; } = new();
+
+        public int? PreferredNailShapeId { get; set; }
+        public string PreferredNailShapeName { get; set; } = string.Empty;
         // mapping
         public void Mapping(Profile profile)
         {

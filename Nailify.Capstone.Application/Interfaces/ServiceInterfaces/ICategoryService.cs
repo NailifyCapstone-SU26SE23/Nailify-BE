@@ -13,7 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             int? categoryTypeId = null);
         Task<ApiResult<CategoryDto>> GetCategoryByIdAsync(int id);
         Task<ApiResult<CategoryDto>> CreateCategoryAsync(CategoryCreateRequest request);
-        Task<ApiResult<CategoryDto>> UpdateCategoryAsync(CategoryUpdateRequest request);
+        Task<ApiResult<CategoryDto>> UpdateCategoryAsync(int id, CategoryUpdateRequest request);
         Task<ApiResult<bool>> DeleteCategoryAsync(int id);
     }
 }

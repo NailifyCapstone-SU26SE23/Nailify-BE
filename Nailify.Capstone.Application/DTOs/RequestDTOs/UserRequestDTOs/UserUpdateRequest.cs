@@ -8,6 +8,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs
     public class UserUpdateRequest : ProfileUpdateRequest
     {
         public string Status { get; set; } = "Active";
+        public Guid? SalonId { get; set; }
 
         public override void Mapping(Profile profile)
         {

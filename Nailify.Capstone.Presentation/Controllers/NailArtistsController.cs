@@ -4,6 +4,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailArtistRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Threading.Tasks;
 
@@ -25,9 +26,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<NailArtistResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] Guid? salonId = null)
+        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] Guid? salonId = null, [FromQuery] ActiveStatusFilter? status = null, [FromQuery] string? orderBy = null)
         {
-            var response = await _artistService.GetPagedNailArtistsAsync(pageNumber, pageSize, salonId);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var response = await _artistService.GetPagedNailArtistsAsync(pageNumber, pageSize, salonId, statusStr, orderBy);
             return Ok(response);
         }
 
@@ -44,18 +46,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(response);
         }
 
-        /// <summary>
-        /// Tạo mới một thợ làm móng.
-        /// </summary>
-        [HttpPost]
-        [ProducesResponseType(typeof(ApiResult<NailArtistResponseDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] NailArtistCreateRequest request)
-        {
-            var response = await _artistService.CreateNailArtistAsync(request);
-            if (!response.IsSucceeded) return BadRequest(response);
-            return Ok(response);
-        }
+ 
 
         /// <summary>
         /// Cập nhật thông tin thợ làm móng (đổi chi nhánh Salon làm việc hoặc trạng thái).

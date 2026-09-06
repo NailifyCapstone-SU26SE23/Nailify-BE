@@ -20,4 +20,16 @@
     <ProjectReference Include="..\Nailify.Capstone.Infrastructure\Nailify.Capstone.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="EmailTemplate\booking-reminder.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="EmailTemplate\waitlist-confirmation.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="EmailTemplate\forgot-password.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
