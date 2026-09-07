@@ -1,9 +1,10 @@
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using System.Security.Cryptography;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
-    public class PayOSHelper
+    public class PayOSHelper : IOrderCodeGenerator
     {
         private readonly IUnitOfWork _unitOfWork;
 
