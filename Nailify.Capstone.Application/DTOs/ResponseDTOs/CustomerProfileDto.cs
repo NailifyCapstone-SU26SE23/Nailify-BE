@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -18,6 +18,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
 
         // Thông tin đặc thù mở rộng từ bảng Customer
         public int LoyaltyPoint { get; set; }
+        public int LifetimePoints { get; set; }
         public string? SkinTone { get; set; } = string.Empty;
         public string? Occupation { get; set; } = string.Empty;
         public string? NailCondition { get; set; } = string.Empty;

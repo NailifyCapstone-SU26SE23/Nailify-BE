@@ -32,6 +32,7 @@ namespace Nailify.Capstone.Test
         private readonly Mock<IBookingProcedureService> _bookingProcedureServiceMock;
         private readonly Mock<INotificationService> _notificationServiceMock;
         private readonly Mock<IPromotionService> _promotionServiceMock;
+        private readonly Mock<IOrderCodeGenerator> _orderCodeGeneratorMock;
 
         private readonly BookingLifecycleService _service;
 
@@ -52,6 +53,7 @@ namespace Nailify.Capstone.Test
             _bookingProcedureServiceMock = new Mock<IBookingProcedureService>();
             _notificationServiceMock = new Mock<INotificationService>();
             _promotionServiceMock = new Mock<IPromotionService>();
+            _orderCodeGeneratorMock = new Mock<IOrderCodeGenerator>();
 
             _unitOfWorkMock.Setup(u => u.BookingRepository).Returns(_bookingRepoMock.Object);
             _unitOfWorkMock.Setup(u => u.BookingProcedureRepository).Returns(_bookingProcedureRepoMock.Object);
@@ -65,7 +67,8 @@ namespace Nailify.Capstone.Test
                 _loggerMock.Object,
                 _bookingProcedureServiceMock.Object,
                 _notificationServiceMock.Object,
-                _promotionServiceMock.Object
+                _promotionServiceMock.Object,
+                _orderCodeGeneratorMock.Object
             );
         }
 

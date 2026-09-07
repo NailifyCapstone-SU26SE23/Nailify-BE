@@ -20,6 +20,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs
         public DateTime? EndDate { get; set; }
         public int? UsageLimit { get; set; }
         public int? UserLimit { get; set; }
+        public int? PointsRequired { get; set; }
 
         public void Mapping(Profile profile)
         {
