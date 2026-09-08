@@ -366,8 +366,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasDefaultValue(LoyaltyTransactionType.Earned);
 
             modelBuilder.Entity<LoyaltyTransaction>()
-                .HasIndex(lt => lt.BookingId)
-                .IsUnique();
+                .HasIndex(lt => lt.BookingId);
 
             modelBuilder.Entity<LoyaltyTransaction>()
                 .HasOne(lt => lt.Customer)
