@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
@@ -44,6 +45,36 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await BuildNailVariantQuery()
                 .FirstOrDefaultAsync(nv => nv.NailVariantId == nailVariantId);
+        }
+
+        public async Task<NailSummaryDto?> GetNailVariantSummaryAsync(int nailVariantId)
+        {
+            var exists = await _dbSet.AnyAsync(nv => nv.NailVariantId == nailVariantId && nv.Status == "Active");
+            if (!exists)
+            {
+                return null;
+            }
+
+            var bookingIds = _context.BookingItems
+                .Where(item => item.NailVariantId == nailVariantId)
+                .Select(item => item.BookingId)
+                .Distinct();
+
+            var totalBookings = await bookingIds.CountAsync();
+            var totalFavorites = await _context.FavoriteNails
+                .CountAsync(favorite => favorite.NailVariantId == nailVariantId);
+            var ratingQuery = _context.BookingRatings
+                .Where(rating => rating.Status == "Active" && bookingIds.Contains(rating.BookingId));
+            var ratingCount = await ratingQuery.CountAsync();
+            var averageRating = await ratingQuery.AverageAsync(rating => (double?)rating.OverallScore);
+
+            return new NailSummaryDto
+            {
+                TotalBookings = totalBookings,
+                TotalFavorites = totalFavorites,
+                AverageRating = averageRating.HasValue ? Math.Round(averageRating.Value, 2) : 0,
+                RatingCount = ratingCount
+            };
         }
 
         public async Task<List<NailVariant>> GetNailVariantsByIdsAsync(IEnumerable<int> nailVariantIds)

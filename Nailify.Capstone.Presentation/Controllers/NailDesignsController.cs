@@ -67,6 +67,23 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy tổng quan đặt lịch, yêu thích và đánh giá của mẫu nail.
+        /// </summary>
+        [HttpGet("summary/{id}")]
+        [ProducesResponseType(typeof(ApiResult<NailSummaryDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetSummary(int id)
+        {
+            var result = await _nailDesignService.GetNailDesignSummaryAsync(id);
+            if (!result.IsSucceeded)
+            {
+                return NotFound(result);
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Tạo mẫu nail mới.
         /// </summary>
         [HttpPost]

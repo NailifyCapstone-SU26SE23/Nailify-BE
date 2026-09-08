@@ -199,6 +199,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<INailArtistEmergencyService, NailArtistEmergencyService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddHttpClient();
+            services.AddScoped<IOrderCodeGenerator, PayOSHelper>();
             services.AddScoped<PayOSHelper>();
             services.AddScoped<PayOSService>();
             services.AddScoped<RefundService>();
