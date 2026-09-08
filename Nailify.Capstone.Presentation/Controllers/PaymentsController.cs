@@ -9,6 +9,9 @@ using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.Bank
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API xử lý thanh toán và hoàn tiền.
+    /// </summary>
     [Route("api/payments")]
     [ApiController]
     public class PaymentsController : ControllerBase
@@ -27,6 +30,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             _promotionService = promotionService;
         }
 
+        /// <summary>
+        /// Tạo link thanh toán cho lịch hẹn.
+        /// </summary>
         [HttpPost("create/{bookingId}")]
         public async Task<IActionResult> CreatePaymentLink(Guid bookingId)
         {
@@ -38,6 +44,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
         }
 
+        /// <summary>
+        /// Tạo link thanh toán từ yêu cầu đặt lịch.
+        /// </summary>
         [HttpPost("create-for-request")]
         public async Task<IActionResult> CreatePaymentLinkFromRequest([FromBody] CreateBookingRequestDTO request)
         {
@@ -55,11 +64,14 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<PaymentResponseDto?>(result.Payment, result.Message));
         }
 
+        /// <summary>
+        /// Tạo yêu cầu hoàn tiền cho lịch hẹn.
+        /// </summary>
         [HttpPost("refund/{bookingId}")]
         public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
@@ -79,16 +91,19 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
 
+        /// <summary>
+        /// Hoàn toàn bộ tiền cọc cho lịch hẹn (khi không có nhân viên thay thế).
+        /// </summary>
         [HttpPost("fullRefund/{bookingId}")]
         public async Task<IActionResult> FullRefund(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
                 request,
-                "Hoàn toàn bộ tiền cọc do không có nhân viên thay thế.",
+                "Hoàn toàn bộ tiền cọc do không có nhân viên thay thế.",
                 forceFullRefund: true);
 
             if (!result.Success)
@@ -113,16 +128,19 @@ namespace Nailify.Capstone.Presentation.Controllers
             }, result.Message));
         }
 
+        /// <summary>
+        /// Hoàn tiền khi lịch hẹn bị từ chối.
+        /// </summary>
         [HttpPost("refund/reject/{bookingId}")]
         public async Task<IActionResult> RejectRefund(Guid bookingId, [FromBody] BankAccountInfo request)
         {
             if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
+                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
 
             var result = await _refundService.CreateSinglePayoutByBookingAsync(
                 bookingId,
                 request,
-                "Full deposit refund because booking was rejected.",
+                "Hoàn toàn bộ tiền cọc do lịch hẹn bị từ chối.",
                 forceFullRefund: true);
 
             if (!result.Success)
@@ -140,6 +158,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
 
+        /// <summary>
+        /// Webhook nhận thông báo kết quả thanh toán từ PayOS.
+        /// </summary>
         [HttpPost("webhook")]
         public async Task<IActionResult> HandlePaymentWebhook([FromBody] PaymentWebhookDto webhookData)
         {
@@ -151,6 +172,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
 
+        /// <summary>
+        /// Kiểm tra trạng thái thanh toán theo mã đơn hàng.
+        /// </summary>
         [HttpGet("status/{orderCode}")]
         public async Task<IActionResult> GetPaymentStatus(long orderCode)
         {
@@ -165,6 +189,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             }, result.Message));
         }
 
+        /// <summary>
+        /// Hủy link thanh toán.
+        /// </summary>
         [HttpPost("cancel/{orderCode}")]
         public async Task<IActionResult> CancelPaymentLink(long orderCode)
         {

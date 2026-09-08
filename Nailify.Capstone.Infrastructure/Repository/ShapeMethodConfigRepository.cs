@@ -12,21 +12,30 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
         }
 
-        public async Task<List<ShapeMethodConfig>> GetActiveByNailShapeIdAsync(int nailShapeId)
+        public async Task<List<ShapeMethodConfig>> GetByNailShapeIdAsync(int nailShapeId, string? status = null)
         {
-            return await _dbSet
+            var query = _dbSet
                 .Include(config => config.NailShape)
-                .Where(config => config.NailShapeId == nailShapeId && config.Status == "Active")
+                .Where(config => config.NailShapeId == nailShapeId);
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(config => config.Status == status);
+            }
+
+            return await query
                 .OrderBy(config => config.Name)
                 .ToListAsync();
         }
 
-        public async Task<PagedList<ShapeMethodConfig>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null)
+        public async Task<PagedList<ShapeMethodConfig>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null, string? status = null)
         {
             var query = _dbSet
                 .Include(config => config.NailShape)
-                .Where(config => config.Status == "Active")
                 .AsQueryable();
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(config => config.Status == status);
+            }
 
             if (nailShapeId.HasValue)
             {

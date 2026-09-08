@@ -23,9 +23,9 @@ namespace Nailify.Capstone.Application.Services
             _cache = cache;
         }
 
-        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null)
+        public async Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null, string? status = null)
         {
-            var pagedResult = await _unitOfWork.NailVariantRepository.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name);
+            var pagedResult = await _unitOfWork.NailVariantRepository.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name, status);
             var mappedItems = _mapper.Map<List<NailVariantDto>>(pagedResult.Items);
             await PopulateFavoriteStatusAsync(mappedItems, userId);
             var resultPagedList = new PagedList<NailVariantDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
@@ -179,7 +179,7 @@ namespace Nailify.Capstone.Application.Services
             var design = nailDesignId.HasValue
                 ? await _unitOfWork.NailDesignRepository.GetByIdAsync(nailDesignId.Value)
                 : null;
-            if (nailDesignId.HasValue && (design == null || design.Status == "InActive"))
+            if (nailDesignId.HasValue && (design == null || design.Status == "Inactive"))
             {
                 return "Không tìm thấy mẫu nail.";
             }

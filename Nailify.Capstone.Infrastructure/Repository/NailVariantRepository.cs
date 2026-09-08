@@ -18,9 +18,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await BuildNailVariantQuery().ToListAsync();
         }
 
-        public async Task<PagedList<NailVariant>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null)
+        public async Task<PagedList<NailVariant>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, string? status = null)
         {
-            var query = BuildNailVariantQuery();
+            var query = BuildNailVariantQuery(status);
             if (nailDesignId.HasValue)
             {
                 query = query.Where(nv => nv.NailDesignId == nailDesignId.Value);
@@ -96,10 +96,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
         }
 
-        private IQueryable<NailVariant> BuildNailVariantQuery()
+        private IQueryable<NailVariant> BuildNailVariantQuery(string? status = "Active")
         {
-            return _dbSet
-                .Where(nv => nv.Status == "Active")
+            var query = _dbSet.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(nv => nv.Status == status);
+            }
+
+            return query
                 .Include(nv => nv.NailShape)
                     .ThenInclude(ns => ns.ShapeMethodConfigs)
                 .Include(nv => nv.NailShape)

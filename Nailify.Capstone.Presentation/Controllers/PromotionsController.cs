@@ -12,6 +12,9 @@ using System.Security.Claims;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý khuyến mãi và voucher.
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class PromotionsController : ControllerBase
@@ -25,6 +28,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             _cloudinaryService = cloudinaryService;
         }
 
+        /// <summary>
+        /// Lấy danh sách khuyến mãi có phân trang.
+        /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<PromotionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPaged(
@@ -48,6 +54,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Lấy danh sách khuyến mãi đang diễn ra trong ngày hôm nay.
+        /// </summary>
         [HttpGet("today")]
         [ProducesResponseType(typeof(ApiResult<PagedList<PromotionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetTodayPaged(
@@ -63,6 +72,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Lấy chi tiết khuyến mãi theo ID.
+        /// </summary>
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status404NotFound)]
@@ -72,6 +84,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
+        /// <summary>
+        /// Lấy danh sách khuyến mãi theo ID danh mục.
+        /// </summary>
         [HttpGet("by-category/{categoryId:int}")]
         [ProducesResponseType(typeof(ApiResult<List<PromotionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCategoryId(int categoryId)
@@ -80,6 +95,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Lấy danh sách khuyến mãi theo ID loại danh mục.
+        /// </summary>
         [HttpGet("by-category-type/{categoryTypeId:int}")]
         [ProducesResponseType(typeof(ApiResult<List<PromotionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCategoryTypeId(int categoryTypeId)
@@ -88,6 +106,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Lấy danh sách khuyến mãi theo ID thiết kế móng.
+        /// </summary>
         [HttpGet("by-nail-design/{nailDesignId:int}")]
         [ProducesResponseType(typeof(ApiResult<List<PromotionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByNailDesignId(int nailDesignId)
@@ -96,6 +117,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Tạo mới khuyến mãi.
+        /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
@@ -119,10 +143,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             catch (Exception ex)
             {
                 await DeleteImageAsync(uploadedImageUrl);
-                return BadRequest(new ApiResult<object>(false, $"Tao khuyen mai that bai khi tai anh: {ex.Message}"));
+                return BadRequest(new ApiResult<object>(false, $"Tạo khuyến mãi thất bại khi tải ảnh: {ex.Message}"));
             }
         }
 
+        /// <summary>
+        /// Tạo voucher cho lịch hẹn được dời lại.
+        /// </summary>
         [HttpPost("voucherForReschedule/{bookingId}")]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status400BadRequest)]
@@ -132,6 +159,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
 
+        /// <summary>
+        /// Cập nhật khuyến mãi.
+        /// </summary>
         [HttpPut("{id:int}")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
@@ -167,10 +197,13 @@ namespace Nailify.Capstone.Presentation.Controllers
             catch (Exception ex)
             {
                 await DeleteImageAsync(uploadedImageUrl);
-                return BadRequest(new ApiResult<object>(false, $"Cap nhat khuyen mai that bai khi tai anh: {ex.Message}"));
+                return BadRequest(new ApiResult<object>(false, $"Cập nhật khuyến mãi thất bại khi tải ảnh: {ex.Message}"));
             }
         }
 
+        /// <summary>
+        /// Xóa khuyến mãi.
+        /// </summary>
         [HttpDelete("{id:int}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status404NotFound)]
@@ -190,8 +223,9 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
+
         /// <summary>
-        /// Lấy danh sách các Voucher có thể đổi bằng điểm tích lũy của khách hàng.
+        /// Lấy danh sách voucher có thể đổi bằng điểm tích lũy.
         /// </summary>
         [HttpGet("redeemable")]
         [ProducesResponseType(typeof(ApiResult<PagedList<PromotionDto>>), StatusCodes.Status200OK)]
@@ -204,8 +238,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _promotionService.GetRedeemablePromotionsAsync(pageNumber, pageSize, userId.Value);
             return Ok(result);
         }
+
         /// <summary>
-        /// Đổi voucher bằng điểm ví tích lũy của khách hàng.
+        /// Đổi voucher bằng điểm ví tích lũy.
         /// </summary>
         [HttpPost("{promotionId:int}/redeem")]
         [Authorize]
@@ -218,8 +253,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _promotionService.RedeemVoucherWithPointsAsync(userId.Value, promotionId);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
+
         /// <summary>
-        /// Lấy danh sách các Voucher khả dụng trong ví cá nhân của khách hàng.
+        /// Lấy danh sách voucher trong ví cá nhân của khách hàng.
         /// </summary>
         [HttpGet("my-wallet-vouchers")]
         [Authorize]
@@ -231,7 +267,6 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _promotionService.GetUserWalletVouchersAsync(userId.Value);
             return Ok(result);
         }
-
 
         private async Task<string> UploadImageAsync(IFormFile? image)
         {

@@ -22,8 +22,8 @@ namespace Nailify.Capstone.Application.Validation.UserRequestDTOs
 
             RuleFor(x => x.Status)
                 .NotEmpty().WithMessage("Trạng thái không được để trống.")
-                .Must(status => status == "Active" || status == "InActive")
-                .WithMessage("Trạng thái không hợp lệ. Phải là Active hoặc InActive.");
+                .Must(status => status == "Active" || status == "Inactive")
+                .WithMessage("Trạng thái không hợp lệ. Phải là Active hoặc Inactive.");
         }
     }
 }

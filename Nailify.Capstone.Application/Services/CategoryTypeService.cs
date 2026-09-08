@@ -42,7 +42,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<CategoryTypeDto>> GetCategoryTypeByIdAsync(int id)
         {
             var categoryType = await _unitOfWork.CategoryTypeRepository.GetCategoryTypeWithCategoriesAsync(id);
-            if (categoryType == null || categoryType.Status == "InActive")
+            if (categoryType == null || categoryType.Status == "Inactive")
             {
                 return new ApiErrorResult<CategoryTypeDto>("Không tìm thấy loại danh mục.");
             }

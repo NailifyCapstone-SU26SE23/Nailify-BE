@@ -6,7 +6,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface INailSurfaceService
     {
-        Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null);
+        Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null, string? status = null);
         Task<ApiResult<NailSurfaceDto>> GetNailSurfaceByIdAsync(int id);
         Task<ApiResult<NailSurfaceDto>> CreateNailSurfaceAsync(NailSurfaceCreateRequest request);
         Task<ApiResult<NailSurfaceDto>> UpdateNailSurfaceAsync(int id, NailSurfaceUpdateRequest request);

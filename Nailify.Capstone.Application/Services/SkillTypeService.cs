@@ -117,7 +117,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<bool>("Loại kỹ năng không tồn tại.");
             }
 
-            skillType.Status = "InActive"; // Soft delete
+            skillType.Status = "Inactive"; // Soft delete
             _unitOfWork.SkillTypeRepository.Update(skillType);
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Xóa loại kỹ năng thành công.");

@@ -44,7 +44,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<CategoryDto>> GetCategoryByIdAsync(int id)
         {
             var category = await _unitOfWork.CategoryRepository.GetCategoryWithDesignsAsync(id);
-            if (category == null || category.Status == "InActive")
+            if (category == null || category.Status == "Inactive")
             {
                 return new ApiErrorResult<CategoryDto>("Không tìm thấy danh mục.");
             }
@@ -56,7 +56,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<CategoryDto>> CreateCategoryAsync(CategoryCreateRequest request)
         {
             var categoryType = await _unitOfWork.CategoryTypeRepository.GetByIdAsync(request.CategoryTypeId);
-            if (categoryType == null || categoryType.Status == "InActive")
+            if (categoryType == null || categoryType.Status == "Inactive")
             {
                 return new ApiErrorResult<CategoryDto>("Không tìm thấy loại danh mục.");
             }
@@ -81,7 +81,7 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var categoryType = await _unitOfWork.CategoryTypeRepository.GetByIdAsync(request.CategoryTypeId);
-            if (categoryType == null || categoryType.Status == "InActive")
+            if (categoryType == null || categoryType.Status == "Inactive")
             {
                 return new ApiErrorResult<CategoryDto>("Không tìm thấy loại danh mục.");
             }

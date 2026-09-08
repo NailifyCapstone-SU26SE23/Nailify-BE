@@ -14,6 +14,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
             int pageNumber,
             int pageSize,
             string? name = null,
-            IEnumerable<int>? categoryIds = null);
+            IEnumerable<int>? categoryIds = null,
+            string? status = null);
     }
 }
