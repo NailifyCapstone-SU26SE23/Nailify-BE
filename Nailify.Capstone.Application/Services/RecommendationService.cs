@@ -111,6 +111,13 @@ namespace Nailify.Capstone.Application.Services
             var preferredOccasions = DeserializeList(customer.PreferredOccasionsJson);
             int? preferredNailShapeId = customer.PreferredNailShapeId;
             var preferredComplexity = customer.PreferredComplexity;
+            var preferredCategoryIds = preferredStyles
+                .Concat(preferredOccasions)
+                .Concat(ParseOptionValues(customer.SkinTone ?? string.Empty))
+                .Concat(ParseOptionValues(customer.SkinShade ?? string.Empty))
+                .Concat(ParseOptionValues(customer.HandShape ?? string.Empty))
+                .SelectMany(ParseIntValues)
+                .ToHashSet();
 
             var favorites = await _unitOfWork.FavoriteNailRepository.GetFavoritesWithDetailsAsync(userId);
             var booking = await _unitOfWork.BookingRepository.GetCompletedBookingsWithDetailsAsync(userId);
@@ -122,10 +129,14 @@ namespace Nailify.Capstone.Application.Services
             var featureList = new List<string>();
             // Lấy hết các category của các variant đang xét và gom nhóm theo ID
             var categories = variants
-                .SelectMany(x => x.NailDesign.NailCategories.Select(nc => nc.Category))
+                .Where(x => x.NailDesign != null)
+                .SelectMany(x => x.NailDesign!.NailCategories)
+                .Where(nc => nc.Category != null)
+                .Select(nc => nc.Category)
                 .GroupBy(c => c.CategoryId)
                 .Select(g => g.First())
                 .ToList();
+            var categoryNames = categories.ToDictionary(c => c.CategoryId, c => c.Name);
 
             var allColors = variants.SelectMany(x => ParseColorJson(x.ColorJson)).Distinct().ToList();
             var allShapes = variants.Select(x => $"Shape:{x.NailShapeId}").Distinct().ToList();
@@ -137,18 +148,7 @@ namespace Nailify.Capstone.Application.Services
             // Tạo tiền tố
             foreach (var cat in categories)
             {
-                var typeName = cat.CategoryType?.Name ?? "Style";
-                string prefix = typeName switch
-                {
-                    "Style" => "Style",
-                    "Occasion" => "Occasion",
-                    "SkinUndertone" => "SkinTone",
-                    "SkinTone" => "SkinTone",
-                    "SkinShade" => "SkinShade",
-                    "HandShape" => "HandShape",
-                    _ => typeName
-                };
-                featureList.Add($"{prefix}:{cat.Name}");
+                featureList.Add($"Category:{cat.CategoryId}");
             }
 
             featureList.AddRange(allColors.Select(c => $"Color:{c}"));
@@ -173,16 +173,30 @@ namespace Nailify.Capstone.Application.Services
             }
             foreach (var style in preferredStyles)
             {
-                if (featureIndex.TryGetValue($"Style:{style}", out int idx))
+                foreach (var categoryId in ParseIntValues(style))
                 {
-                    userVector[idx] += 2.0;
+                    if (featureIndex.TryGetValue($"Category:{categoryId}", out int categoryIdx))
+                    {
+                        userVector[categoryIdx] += 2.0;
+                    }
+                }
+                if (featureIndex.TryGetValue($"Style:{style}", out int styleIdx))
+                {
+                    userVector[styleIdx] += 2.0;
                 }
             }
             foreach (var occasion in preferredOccasions)
             {
-                if (featureIndex.TryGetValue($"Occasion:{occasion}", out int idx))
+                foreach (var categoryId in ParseIntValues(occasion))
                 {
-                    userVector[idx] += 2.0;
+                    if (featureIndex.TryGetValue($"Category:{categoryId}", out int categoryIdx))
+                    {
+                        userVector[categoryIdx] += 2.0;
+                    }
+                }
+                if (featureIndex.TryGetValue($"Occasion:{occasion}", out int occasionIdx))
+                {
+                    userVector[occasionIdx] += 2.0;
                 }
             }
             if (preferredNailShapeId.HasValue && featureIndex.TryGetValue($"Shape:{preferredNailShapeId}", out int x))
@@ -195,23 +209,44 @@ namespace Nailify.Capstone.Application.Services
             }
             if (!string.IsNullOrEmpty(customer.SkinTone))
             {
-                if (featureIndex.TryGetValue($"SkinTone:{customer.SkinTone}", out int idx))
+                foreach (var categoryId in ParseIntValues(customer.SkinTone))
                 {
-                    userVector[idx] += 2.0;
+                    if (featureIndex.TryGetValue($"Category:{categoryId}", out int categoryIdx))
+                    {
+                        userVector[categoryIdx] += 2.0;
+                    }
+                }
+                if (featureIndex.TryGetValue($"SkinTone:{customer.SkinTone}", out int skinToneIdx))
+                {
+                    userVector[skinToneIdx] += 2.0;
                 }
             }
             if (!string.IsNullOrEmpty(customer.SkinShade))
             {
-                if (featureIndex.TryGetValue($"SkinShade:{customer.SkinShade}", out int idx))
+                foreach (var categoryId in ParseIntValues(customer.SkinShade))
                 {
-                    userVector[idx] += 2.0;
+                    if (featureIndex.TryGetValue($"Category:{categoryId}", out int categoryIdx))
+                    {
+                        userVector[categoryIdx] += 2.0;
+                    }
+                }
+                if (featureIndex.TryGetValue($"SkinShade:{customer.SkinShade}", out int skinShadeIdx))
+                {
+                    userVector[skinShadeIdx] += 2.0;
                 }
             }
             if (!string.IsNullOrEmpty(customer.HandShape))
             {
-                if (featureIndex.TryGetValue($"HandShape:{customer.HandShape}", out int idx))
+                foreach (var categoryId in ParseIntValues(customer.HandShape))
                 {
-                    userVector[idx] += 2.0;
+                    if (featureIndex.TryGetValue($"Category:{categoryId}", out int categoryIdx))
+                    {
+                        userVector[categoryIdx] += 2.0;
+                    }
+                }
+                if (featureIndex.TryGetValue($"HandShape:{customer.HandShape}", out int handShapeIdx))
+                {
+                    userVector[handShapeIdx] += 2.0;
                 }
             }
 
@@ -238,18 +273,11 @@ namespace Nailify.Capstone.Application.Services
                 {
                     foreach (var nc in design.NailCategories)
                     {
-                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
-                        string prefix = typeName switch
+                        if (nc.Category == null)
                         {
-                            "Style" => "Style",
-                            "Occasion" => "Occasion",
-                            "SkinUndertone" => "SkinTone",
-                            "SkinTone" => "SkinTone",
-                            "SkinShade" => "SkinShade",
-                            "HandShape" => "HandShape",
-                            _ => typeName
-                        };
-                        if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idxCat))
+                            continue;
+                        }
+                        if (featureIndex.TryGetValue($"Category:{nc.CategoryId}", out int idxCat))
                         {
                             userVector[idxCat] += 0.5;
                         }
@@ -292,18 +320,11 @@ namespace Nailify.Capstone.Application.Services
                             {
                                 foreach (var nc in item.NailVariant.NailDesign.NailCategories)
                                 {
-                                    var typeName = nc.Category.CategoryType?.Name ?? "Style";
-                                    string prefix = typeName switch
+                                    if (nc.Category == null)
                                     {
-                                        "Style" => "Style",
-                                        "Occasion" => "Occasion",
-                                        "SkinUndertone" => "SkinTone",
-                                        "SkinTone" => "SkinTone",
-                                        "SkinShade" => "SkinShade",
-                                        "HandShape" => "HandShape",
-                                        _ => typeName
-                                    };
-                                    if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idx))
+                                        continue;
+                                    }
+                                    if (featureIndex.TryGetValue($"Category:{nc.CategoryId}", out int idx))
                                     {
                                         userVector[idx] += 0.3;
                                     }
@@ -337,18 +358,11 @@ namespace Nailify.Capstone.Application.Services
                 {
                     foreach (var nc in v.NailDesign.NailCategories)
                     {
-                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
-                        string prefix = typeName switch
+                        if (nc.Category == null)
                         {
-                            "Style" => "Style",
-                            "Occasion" => "Occasion",
-                            "SkinUndertone" => "SkinTone",
-                            "SkinTone" => "SkinTone",
-                            "SkinShade" => "SkinShade",
-                            "HandShape" => "HandShape",
-                            _ => typeName
-                        };
-                        if (featureIndex.TryGetValue($"{prefix}:{nc.Category.Name}", out int idx))
+                            continue;
+                        }
+                        if (featureIndex.TryGetValue($"Category:{nc.CategoryId}", out int idx))
                         {
                             variantVector[idx] = 1.0;
                         }
@@ -464,6 +478,10 @@ namespace Nailify.Capstone.Application.Services
                         {
                             reasons.Add($"Mẫu móng dáng {shapeName} theo sở thích.");
                         }
+                        else if (featureKey.StartsWith("Category:") && int.TryParse(featureKey.Replace("Category:", ""), out var categoryId) && categoryNames.TryGetValue(categoryId, out var categoryName))
+                        {
+                            reasons.Add($"Phù hợp với danh mục {categoryName} bạn đã chọn.");
+                        }
                     }
                 }
 
@@ -476,7 +494,7 @@ namespace Nailify.Capstone.Application.Services
                 }
 
                 var dto = _mapper.Map<RecommendedNailVariantResponseDTO>(v);
-                dto.Name = $"{v.NailDesign.Name} - {v.Name}";
+                dto.Name = v.NailDesign != null ? $"{v.NailDesign.Name} - {v.Name}" : v.Name;
                 dto.Score = Math.Round(finalScore, 1);
                 dto.Reasons = reasons.Distinct().Take(3).ToList();
 
@@ -501,7 +519,11 @@ namespace Nailify.Capstone.Application.Services
                 {
                     foreach (var nc in v.NailDesign.NailCategories)
                     {
-                        var typeName = nc.Category.CategoryType?.Name ?? "Style";
+                        if (nc.Category == null)
+                        {
+                            continue;
+                        }
+                        var typeName = nc.Category.CategoryType?.Name ?? "Category";
                         string prefix = typeName switch
                         {
                             "Style" => "Style",
@@ -518,17 +540,20 @@ namespace Nailify.Capstone.Application.Services
 
                         if (prefix == "Style")
                         {
-                            isMatch = preferredStyles.Any(s => string.Equals(s, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
+                            isMatch = preferredCategoryIds.Contains(nc.CategoryId)
+                                || preferredStyles.Any(s => string.Equals(s, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
                             desc = isMatch ? "Trùng khớp với phong cách thiết kế bạn yêu thích." : "Phong cách của mẫu móng.";
                         }
                         else if (prefix == "Occasion")
                         {
-                            isMatch = preferredOccasions.Any(o => string.Equals(o, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
+                            isMatch = preferredCategoryIds.Contains(nc.CategoryId)
+                                || preferredOccasions.Any(o => string.Equals(o, nc.Category.Name, StringComparison.OrdinalIgnoreCase));
                             desc = isMatch ? "Thiết kế phù hợp với dịp bạn lựa chọn." : "Dịp phù hợp cho mẫu móng.";
                         }
                         else if (prefix == "SkinTone")
                         {
-                            isMatch = !string.IsNullOrEmpty(customer.SkinTone) && string.Equals(customer.SkinTone, nc.Category.Name, StringComparison.OrdinalIgnoreCase);
+                            isMatch = preferredCategoryIds.Contains(nc.CategoryId)
+                                || !string.IsNullOrEmpty(customer.SkinTone) && string.Equals(customer.SkinTone, nc.Category.Name, StringComparison.OrdinalIgnoreCase);
                             desc = isMatch ? "Tông da phù hợp lý tưởng." : "Tông da khuyên dùng.";
                         }
                         else if (prefix == "SkinShade")
@@ -538,8 +563,14 @@ namespace Nailify.Capstone.Application.Services
                         }
                         else if (prefix == "HandShape")
                         {
-                            isMatch = !string.IsNullOrEmpty(customer.HandShape) && customer.HandShape.Contains(nc.Category.Name, StringComparison.OrdinalIgnoreCase);
+                            isMatch = preferredCategoryIds.Contains(nc.CategoryId)
+                                || !string.IsNullOrEmpty(customer.HandShape) && customer.HandShape.Contains(nc.Category.Name, StringComparison.OrdinalIgnoreCase);
                             desc = isMatch ? "Dáng tay phù hợp lý tưởng." : "Dáng tay khuyên dùng.";
+                        }
+                        else
+                        {
+                            isMatch = preferredCategoryIds.Contains(nc.CategoryId);
+                            desc = isMatch ? "Trùng khớp với danh mục bạn đã chọn." : "Danh mục của mẫu móng.";
                         }
 
                         matchedChars.Add(new MatchedCharacteristicDTO
@@ -857,6 +888,17 @@ namespace Nailify.Capstone.Application.Services
             catch
             {
                 return new List<string> { optionValueJson };
+            }
+        }
+
+        private IEnumerable<int> ParseIntValues(string value)
+        {
+            foreach (var item in ParseOptionValues(value))
+            {
+                if (int.TryParse(item, out var parsed))
+                {
+                    yield return parsed;
+                }
             }
         }
 

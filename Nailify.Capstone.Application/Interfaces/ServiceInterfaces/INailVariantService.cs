@@ -8,6 +8,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<PagedList<NailVariantDto>>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, Guid? userId = null);
         Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id, Guid? userId = null);
+        Task<ApiResult<NailSummaryDto>> GetNailVariantSummaryAsync(int id);
         Task<ApiResult<NailVariantDto>> CreateNailVariantAsync(NailVariantCreateRequest request, string? imageUrl = null);
         Task<ApiResult<NailVariantDto>> UpdateNailVariantAsync(int id, NailVariantUpdateRequest request, string? imageUrl = null);
         Task<ApiResult<bool>> DeleteNailVariantAsync(int id);
