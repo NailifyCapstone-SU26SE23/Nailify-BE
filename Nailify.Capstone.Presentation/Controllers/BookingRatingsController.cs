@@ -8,7 +8,6 @@ using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
-    [Authorize]
     [Route("api/[controller]")]
     public class BookingRatingsController : BaseApiController
     {
