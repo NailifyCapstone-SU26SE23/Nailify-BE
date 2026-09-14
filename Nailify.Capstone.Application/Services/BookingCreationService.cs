@@ -441,8 +441,44 @@ namespace Nailify.Capstone.Application.Services
                     CreatedAt = DateTime.UtcNow
                 };
                 */
-                booking.Created(customerId);
+                decimal finalTotalPrice = bookingPrice.TotalPrice;
+                decimal walletPaidAmount = 0m;
 
+                if(request.UseWalletBalance && finalTotalPrice > 0)
+                {
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
+                    if(wallet != null)
+                    {
+                        var availableBalance = wallet.Balance - wallet.FrozenBalance;
+                        if (availableBalance > 0) 
+                        {
+                            walletPaidAmount = Math.Min(availableBalance, finalTotalPrice);
+                            var balanceBefore = wallet.Balance;
+                            wallet.Balance -= walletPaidAmount;
+                            wallet.UpdatedAt = DateTime.UtcNow;
+                            _unitOfWork.CustomerWalletRepository.Update(wallet);
+
+                            var walletTx = new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                WalletId = wallet.WalletId,
+                                Amount = -walletPaidAmount,
+                                BalanceBefore = balanceBefore,
+                                BalanceAfter = wallet.Balance,
+                                Type = WalletTransactionType.BookingPayment,
+                                Status = WalletTransactionStatus.Completed,
+                                ReferenceId = bookingId.ToString(),
+                                ReferenceType = WalletReferenceType.Booking,
+                                Description = $"Thanh toán cọc/đơn đặt lịch #{bookingId}",
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                        }
+                    }
+                }
+                decimal amountDueForPayOS = finalTotalPrice - walletPaidAmount;
+                booking.AmountDue = amountDueForPayOS;
+             
 
                 await _unitOfWork.BookingRepository.CreateAsync(booking);
                 await _promotionService.UpdateUsageAsync(customerId, appliedPromotionDiscounts);

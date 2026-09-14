@@ -59,6 +59,11 @@ namespace Nailify.Capstone.Infrastructure
         private ISalonOffDateRepository _salonOffDateRepository = null!;
         private INailArtistTransferRepository _nailArtistTransferRepository = null!;
         private IDashboardRepository _dashboardRepository = null!;
+        private ICustomerWalletRepository _customerWalletRepository = null!;
+        private IWalletTransactionRepository _walletTransactionRepository;
+        private IPointConversionLogRepository _pointConversionLogRepository;
+        private IWithdrawalRequestRepository? _withdrawalRequestRepository;
+
         public UnitOfWork(NailifyDbContext context)
         {
             _context = context;
@@ -133,6 +138,13 @@ namespace Nailify.Capstone.Infrastructure
         public INailArtistTransferRepository NailArtistTransferRepository => _nailArtistTransferRepository ??= new NailArtistTransferRepository(_context);
 
         public IDashboardRepository DashboardRepository => _dashboardRepository ??= new DashboardRepository(_context);
+
+        public ICustomerWalletRepository CustomerWalletRepository => _customerWalletRepository ??= new CustomerWalletRepository(_context);
+
+        public IWalletTransactionRepository WalletTransactionRepository => _walletTransactionRepository ??= new WalletTransactionRepository(_context);
+
+        public IPointConversionLogRepository PointConversionLogRepository => _pointConversionLogRepository ??= new PointConversionLogRepository(_context);
+        public IWithdrawalRequestRepository WithdrawalRequestRepository => _withdrawalRequestRepository ??= new WithdrawalRequestRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

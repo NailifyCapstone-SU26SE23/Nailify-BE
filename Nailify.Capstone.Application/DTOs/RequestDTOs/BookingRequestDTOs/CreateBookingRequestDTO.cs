@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
 using System;
@@ -19,6 +19,10 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
         public List<int>? SelectedPromotionIds { get; set; }
         public Guid? WarrantyForBookingId { get; set; }
+        /// <summary>
+        /// Cờ cho phép tự động khấu trừ số dư Ví tiền mặt của khách hàng khi tạo đơn đặt lịch.
+        /// </summary>
+        public bool UseWalletBalance { get; set; } = false;
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CreateBookingRequestDTO, Booking>()

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Nailify.Capstone.Domain.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace Nailify.Capstone.Domain.Entities
 {
@@ -25,6 +26,9 @@ namespace Nailify.Capstone.Domain.Entities
         public int TransactionId { get; set; }
         public Guid? BookingId { get; set; }
         public Booking? Booking { get; set; }
+        public Guid? WalletId { get; set; }
+        public CustomerWallet? Wallet { get; set; }
+        public PaymentType PaymentType { get; set; } = PaymentType.BookingDeposit;
         public string OrderCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string? Reference { get; set; } 
