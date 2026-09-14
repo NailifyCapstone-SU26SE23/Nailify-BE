@@ -17,8 +17,10 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<WithdrawalRequestResponseDto>> RequestWithdrawalAsync(Guid customerId, CreateWithdrawalRequestDto request);
         Task<ApiResult<string>> ConvertMoneyToPointsAsync(Guid customerId, decimal moneyAmount);
         Task<ApiResult<PagedList<WalletTransactionResponseDto>>> GetTransactionHistoryAsync(Guid customerId, int pageNumber, int pageSize);
+        Task<ApiResult<WalletTransactionResponseDto>> GetWalletTransactionByIdAsync(Guid walletTransactionId);
         Task<ApiResult<PagedList<WithdrawalRequestResponseDto>>> GetPendingWithdrawalsAsync(int pageNumber, int pageSize);
         Task<ApiResult<PagedList<WithdrawalRequestResponseDto>>> GetAllWithdrawalsAsync(WithdrawalStatus? status, int pageNumber, int pageSize);
+        Task<ApiResult<WithdrawalRequestResponseDto>> GetWithdrawalByIdAsync(Guid requestId);
         Task<ApiResult<PagedList<WalletTransactionResponseDto>>> GetSystemTransactionHistoryAsync(WalletTransactionType? type, WalletTransactionStatus? status, DateTime? fromDate, DateTime? toDate, int pageNumber, int pageSize);
         Task<ApiResult<WithdrawalRequestResponseDto>> ApproveWithdrawalAsync(Guid adminId, Guid requestId, ApproveWithdrawalDto dto);
         Task<ApiResult<WithdrawalRequestResponseDto>> RejectWithdrawalAsync(Guid adminId, Guid requestId, RejectWithdrawalDto dto);

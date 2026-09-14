@@ -95,17 +95,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách các yêu cầu rút tiền đang chờ duyệt (Dành cho Admin).
+        /// Lấy chi tiết một giao dịch ví theo mã giao dịch.
         /// </summary>
-        /// <param name="pageNumber">Số trang (Mặc định: 1).</param>
-        /// <param name="pageSize">Kích thước trang (Mặc định: 10).</param>
-        [HttpGet("withdrawals/pending")]
-        [Authorize(Roles = "Admin")]
-        [ProducesResponseType(typeof(ApiResult<PagedList<WithdrawalRequestResponseDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPendingWithdrawals([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        /// <param name="walletTransactionId">Mã giao dịch ví (WalletTransactionId).</param>
+        [HttpGet("transactions/{walletTransactionId:guid}")]
+        [ProducesResponseType(typeof(ApiResult<WalletTransactionResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<WalletTransactionResponseDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetWalletTransactionById(Guid walletTransactionId)
         {
-            var result = await _walletService.GetPendingWithdrawalsAsync(pageNumber, pageSize);
-            return Ok(result);
+            var result = await _walletService.GetWalletTransactionByIdAsync(walletTransactionId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
         /// <summary>
@@ -121,6 +120,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _walletService.GetAllWithdrawalsAsync(status, pageNumber, pageSize);
             return Ok(result);
+        }
+
+        /// <summary>
+        /// Lấy chi tiết một yêu cầu rút tiền theo mã yêu cầu.
+        /// </summary>
+        /// <param name="requestId">Mã yêu cầu rút tiền (WithdrawalRequestId).</param>
+        [HttpGet("withdrawals/{requestId:guid}")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResult<WithdrawalRequestResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<WithdrawalRequestResponseDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetWithdrawalById(Guid requestId)
+        {
+            var result = await _walletService.GetWithdrawalByIdAsync(requestId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
         /// <summary>
