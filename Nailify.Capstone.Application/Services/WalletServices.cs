@@ -69,6 +69,19 @@ namespace Nailify.Capstone.Application.Services
             };
             return new ApiSuccessResult<CustomerWalletSummaryDto>(summary, "Lấy thông tin ví thành công.");
         }
+
+        public async Task<ApiResult<WalletSummaryDTO>> GetWalletSummaryByIdAsync(Guid walletId)
+        {
+            var wallet = await _unitOfWork.CustomerWalletRepository.GetByWalletIdWithCustomerSummaryAsync(walletId);
+            if (wallet == null)
+            {
+                return new ApiErrorResult<WalletSummaryDTO>("Không tìm thấy ví khách hàng.");
+            }
+
+            var summary = _mapper.Map<WalletSummaryDTO>(wallet.Customer);
+            return new ApiSuccessResult<WalletSummaryDTO>(summary, "Lấy thông tin ví khách hàng thành công.");
+        }
+
         public async Task<ApiResult<string>> RequestDepositAsync(Guid customerId, decimal amount)
         {
             if (amount < 10000m)

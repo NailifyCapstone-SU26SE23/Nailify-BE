@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface IWalletService
     {
         Task<ApiResult<CustomerWalletSummaryDto>> GetWalletSummaryAsync(Guid customerId);
+        Task<ApiResult<WalletSummaryDTO>> GetWalletSummaryByIdAsync(Guid customerId);
         Task<ApiResult<string>> RequestDepositAsync(Guid customerId, decimal amount);
         Task<ApiResult<WithdrawalRequestResponseDto>> RequestWithdrawalAsync(Guid customerId, CreateWithdrawalRequestDto request);
         Task<ApiResult<string>> ConvertMoneyToPointsAsync(Guid customerId, decimal moneyAmount);

@@ -39,6 +39,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy thông tin điểm thưởng của khách hàng theo mã ví (Dành cho Admin).
+        /// </summary>
+        /// <param name="walletId">Mã ví của khách hàng.</param>
+        [HttpGet("getById/{walletId:guid}")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(ApiResult<WalletSummaryDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<WalletSummaryDTO>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetById(Guid walletId)
+        {
+            var result = await _walletService.GetWalletSummaryByIdAsync(walletId);
+            return result.IsSucceeded ? Ok(result) : NotFound(result);
+        }
+
+        /// <summary>
         /// Yêu cầu tạo link nạp tiền vào ví cá nhân qua cổng thanh toán online (PayOS).
         /// </summary>
         /// <param name="amount">Số tiền nạp tối thiểu là 10,000 VNĐ.</param>
@@ -94,6 +108,31 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(result);
         }
 
+
+        /// <summary>
+        /// Lấy danh sách lịch sử giao dịch ví tiền toàn hệ thống kèm các bộ lọc nâng cao (Dành cho Admin).
+        /// </summary>
+        /// <param name="type">Loại giao dịch (Deposit, Withdraw, BookingPayment, ConvertToPoints,...).</param>
+        /// <param name="status">Trạng thái giao dịch (Pending, Completed, Failed, Cancelled).</param>
+        /// <param name="fromDate">Từ ngày.</param>
+        /// <param name="toDate">Đến ngày.</param>
+        /// <param name="pageNumber">Số trang (Mặc định: 1).</param>
+        /// <param name="pageSize">Kích thước trang (Mặc định: 10).</param>
+        [HttpGet("admin/transactions")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(ApiResult<PagedList<WalletTransactionResponseDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetSystemTransactionHistory(
+            [FromQuery] WalletTransactionType? type,
+            [FromQuery] WalletTransactionStatus? status,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            var result = await _walletService.GetSystemTransactionHistoryAsync(type, status, fromDate, toDate, pageNumber, pageSize);
+            return Ok(result);
+        }
+
         /// <summary>
         /// Lấy chi tiết một giao dịch ví theo mã giao dịch.
         /// </summary>
@@ -134,30 +173,6 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _walletService.GetWithdrawalByIdAsync(requestId);
             return result.IsSucceeded ? Ok(result) : NotFound(result);
-        }
-
-        /// <summary>
-        /// Lấy danh sách lịch sử giao dịch ví tiền toàn hệ thống kèm các bộ lọc nâng cao (Dành cho Admin).
-        /// </summary>
-        /// <param name="type">Loại giao dịch (Deposit, Withdraw, BookingPayment, ConvertToPoints,...).</param>
-        /// <param name="status">Trạng thái giao dịch (Pending, Completed, Failed, Cancelled).</param>
-        /// <param name="fromDate">Từ ngày.</param>
-        /// <param name="toDate">Đến ngày.</param>
-        /// <param name="pageNumber">Số trang (Mặc định: 1).</param>
-        /// <param name="pageSize">Kích thước trang (Mặc định: 10).</param>
-        [HttpGet("admin/transactions")]
-        [Authorize(Roles = "Admin")]
-        [ProducesResponseType(typeof(ApiResult<PagedList<WalletTransactionResponseDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetSystemTransactionHistory(
-            [FromQuery] WalletTransactionType? type,
-            [FromQuery] WalletTransactionStatus? status,
-            [FromQuery] DateTime? fromDate,
-            [FromQuery] DateTime? toDate,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10)
-        {
-            var result = await _walletService.GetSystemTransactionHistoryAsync(type, status, fromDate, toDate, pageNumber, pageSize);
-            return Ok(result);
         }
 
         /// <summary>
