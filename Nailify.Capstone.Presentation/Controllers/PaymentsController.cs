@@ -5,7 +5,6 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using System.Security.Claims;
 using Nailify.Capstone.Infrastructure.Service;
-using BankAccountInfo = Nailify.Capstone.Infrastructure.Configuration.PayOS.BankAccountInfo;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
@@ -68,14 +67,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Tạo yêu cầu hoàn tiền cho lịch hẹn.
         /// </summary>
         [HttpPost("refund/{bookingId}")]
-        public async Task<IActionResult> CreateRefundLink(Guid bookingId, [FromBody] BankAccountInfo request)
+        public async Task<IActionResult> CreateRefundLink(Guid bookingId)
         {
-            if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
-
-            var result = await _refundService.CreateSinglePayoutByBookingAsync(
-                bookingId,
-                request);
+            var result = await _refundService.RefundToWalletByBookingAsync(bookingId);
             if (!result.Success)
             {
                 return BadRequest(new
@@ -95,14 +89,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Hoàn toàn bộ tiền cọc cho lịch hẹn (khi không có nhân viên thay thế).
         /// </summary>
         [HttpPost("fullRefund/{bookingId}")]
-        public async Task<IActionResult> FullRefund(Guid bookingId, [FromBody] BankAccountInfo request)
+        public async Task<IActionResult> FullRefund(Guid bookingId)
         {
-            if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
-
-            var result = await _refundService.CreateSinglePayoutByBookingAsync(
+            var result = await _refundService.RefundToWalletByBookingAsync(
                 bookingId,
-                request,
                 "Hoàn toàn bộ tiền cọc do không có nhân viên thay thế.",
                 forceFullRefund: true);
 
@@ -132,14 +122,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Hoàn tiền khi lịch hẹn bị từ chối.
         /// </summary>
         [HttpPost("refund/reject/{bookingId}")]
-        public async Task<IActionResult> RejectRefund(Guid bookingId, [FromBody] BankAccountInfo request)
+        public async Task<IActionResult> RejectRefund(Guid bookingId)
         {
-            if (request == null)
-                return BadRequest(new ApiErrorResult<object>("Vui lòng nhập thông tin tài khoản ngân hàng."));
-
-            var result = await _refundService.CreateSinglePayoutByBookingAsync(
+            var result = await _refundService.RefundToWalletByBookingAsync(
                 bookingId,
-                request,
                 "Hoàn toàn bộ tiền cọc do lịch hẹn bị từ chối.",
                 forceFullRefund: true);
 
