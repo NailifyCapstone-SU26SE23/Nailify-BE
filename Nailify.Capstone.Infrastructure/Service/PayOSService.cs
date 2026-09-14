@@ -370,10 +370,9 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     referenceId,
                     amount = amountInt,
-                    description = $"Withdrawal {withdrawalRequestId}",
+                    description = "Wallet withdrawal",
                     toBin = GetBankBin(bankCode),
                     toAccountNumber = accountNumber,
-                    toAccountName = accountHolderName,
                     category = new[] { "withdrawal" }
                 };
 
