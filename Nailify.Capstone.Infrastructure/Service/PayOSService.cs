@@ -16,7 +16,7 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
-    public class PayOSService
+    public class PayOSService : IPayOSPaymentService
     {
         private readonly HttpClient _httpClient;
         private readonly IPayOSSettings _paymentSettings;
@@ -92,18 +92,96 @@ namespace Nailify.Capstone.Infrastructure.Service
                     // But for consistency with your flow, we handle it if needed. Let's assume there's an amount to pay.
                     if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
                 }
-
-                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
-                var amount = (int)Math.Round(finalAmountDue, MidpointRounding.AwayFromZero);
-                if (amount <= 0)
+                decimal walletPaidAmount = 0m;
+                if(request.UseWalletBalance && finalAmountDue > 0)
                 {
-                     return (false, "So tien thanh toan khong hop le.", null);
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
+                    if(wallet != null)
+                    {
+                        var availableBalance = wallet.Balance - wallet.FrozenBalance;
+                        if(availableBalance > 0)
+                        {
+                            walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
+                            var balanceBefore = wallet.Balance;
+                            wallet.Balance -= walletPaidAmount;
+                            wallet.UpdatedAt = DateTime.UtcNow;
+                            _unitOfWork.CustomerWalletRepository.Update(wallet);
+                            var walletTx = new WalletTransaction
+                            {
+                                WalletId = wallet.WalletId,
+                                Amount = -walletPaidAmount,
+                                BalanceBefore = balanceBefore,
+                                BalanceAfter = wallet.Balance,
+                                Type = WalletTransactionType.BookingPayment,
+                                Status = WalletTransactionStatus.Completed,
+                                ReferenceId = null,
+                                ReferenceType = WalletReferenceType.Booking,
+                                Description = $"Thanh toán cọc đơn đặt lịch tại {salon.Name}",
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                        }
+                    }
                 }
 
-                var description = $"Coc don {orderCode}";
-                var itemName = $"Coc don {orderCode}";
-                var signature = CreatePaymentRequestSignature(amount, description, orderCode);
+                decimal remainingAmountToPayOnline = finalAmountDue - walletPaidAmount;
 
+                if(remainingAmountToPayOnline <= 0)
+                {
+                    var createBookingResult = await bookingCreationService.CreateBookingAsync(customerId, request);
+                    if (!createBookingResult.IsSucceeded || createBookingResult.Data == null)
+                    {
+                        return (false, createBookingResult.Message ?? "Lỗi tạo đơn đặt lịch.", null);
+                    }
+
+                    var createdBookingId = createBookingResult.Data.BookingId;
+                    var booking = await _unitOfWork.BookingRepository.GetByIdAsync(createdBookingId);
+                    if (booking != null)
+                    {
+                        booking.AmountPaid = walletPaidAmount;
+                        booking.AmountDue = Math.Max(0m, amountDue - walletPaidAmount);
+                        booking.Status = BookingStatus.Pending; 
+                        _unitOfWork.BookingRepository.Update(booking);
+                    }
+                    var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                    var transactions = new Transaction
+                    {
+                        BookingId = createdBookingId,
+                        OrderCode = code.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        Amount = finalAmountDue,
+                        PaymentLinkId = "WALLET_PAYMENT",
+                        CheckoutUrl = string.Empty,
+                        QrCode = string.Empty,
+                        Status = TransactionStatus.Paid,
+                        Policy = FormatDepositPolicy(depositRate),
+                        CreatedAt = DateTime.UtcNow,
+                        ExpiresAt = DateTime.UtcNow,
+                        WebhookPayload = "Paid via Customer Wallet"
+                    };
+                    await _unitOfWork.TransactionRepository.CreateAsync(transactions);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Thanh toán cọc bằng Ví thành công! Đơn đặt lịch đã được xác nhận.", new PaymentResponseDto
+                    {
+                        OrderCode = code,
+                        Amount = (int)finalAmountDue,
+                        QrCode = string.Empty,
+                        Status = "PAID",
+                        BookingId = createdBookingId
+                    });
+                }
+
+
+                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                var amount = (int)Math.Round(remainingAmountToPayOnline, MidpointRounding.AwayFromZero);
+                if (amount <= 0)
+                {
+                     return (false, "Số tiền thanh toán không hợp lệ.", null);
+                }
+
+                var description = $"Cọc đơn {orderCode}";
+                var itemName = $"Cọc đơn {orderCode}";
+                var signature = CreatePaymentRequestSignature(amount, description, orderCode);
+                
                 var paymentRequest = new
                 {
                     orderCode,
@@ -132,12 +210,12 @@ namespace Nailify.Capstone.Infrastructure.Service
                 if (paymentResult.TryGetProperty("code", out var codeElement) && codeElement.GetString() != "00")
                 {
                     var desc = paymentResult.TryGetProperty("desc", out var descElement) ? descElement.GetString() : responseContent;
-                    return (false, $"Loi tu PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
+                    return (false, $"Lỗi từ PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
                 }
 
                 if (!paymentResult.TryGetProperty("data", out var data))
                 {
-                    return (false, $"PayOS response khong co data: {responseContent}", null);
+                    return (false, $"PayOS response không có data: {responseContent}", null);
                 }
 
                 var pendingData = new PendingBookingPaymentData
@@ -169,13 +247,111 @@ namespace Nailify.Capstone.Infrastructure.Service
                 await _unitOfWork.SaveChangesAsync();
                 StartStatusPolling(orderCode, transaction.ExpiresAt);
 
-                return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
+                return (true, "Tạo link thanh toán thành công!", ToResponse(transaction));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Loi khi tao link thanh toan cho request.");
-                return (false, $"Loi khi tao link thanh toan: {ex.Message}", null);
+                _logger.LogError(ex, "Lỗi khi tạo link thanh toán cho request.");
+                return (false, $"Lỗi khi tạo link thanh toán: {ex.Message}", null);
             }
+        }
+
+        public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateWalletDepositPaymentLinkAsync(Guid walletId, decimal amount)
+        {
+            try
+            {
+                var wallet = await _unitOfWork.CustomerWalletRepository.GetByIdAsync(walletId);
+                if (wallet == null)
+                {
+                    return (false, "Không tìm thấy ví của khách hàng.", null);
+                }
+
+                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                var amountInt = (int)Math.Round(amount, MidpointRounding.AwayFromZero);
+                if (amountInt <= 0)
+                {
+                    return (false, "Số tiền nạp không hợp lệ.", null);
+                }
+
+                var description = $"Nap vi {orderCode}";
+                var itemName = $"Nap tien vi {orderCode}";
+                var signature = CreatePaymentRequestSignature(amountInt, description, orderCode);
+
+                var paymentRequest = new
+                {
+                    orderCode,
+                    amount = amountInt,
+                    description,
+                    items = new[]
+                    {
+                        new { name = itemName, quantity = 1, price = amountInt }
+                    },
+                    cancelUrl = _paymentUrls.CancelUrl,
+                    returnUrl = _paymentUrls.ReturnUrl,
+                    signature
+                };
+
+                using var content = new StringContent(JsonSerializer.Serialize(paymentRequest, JsonOptions), Encoding.UTF8, "application/json");
+                ApplyAuthenticationHeaders();
+
+                var response = await _httpClient.PostAsync($"{PayOSBaseUrl}/v2/payment-requests", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, $"Lỗi từ PayOS: {responseContent}", null);
+                }
+
+                var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                if (paymentResult.TryGetProperty("code", out var codeElement) && codeElement.GetString() != "00")
+                {
+                    var desc = paymentResult.TryGetProperty("desc", out var descElement) ? descElement.GetString() : responseContent;
+                    return (false, $"Lỗi từ PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
+                }
+
+                if (!paymentResult.TryGetProperty("data", out var data))
+                {
+                    return (false, $"PayOS response không có data: {responseContent}", null);
+                }
+
+                var transaction = new Transaction
+                {
+                    BookingId = null,
+                    WalletId = walletId,
+                    PaymentType = PaymentType.WalletDeposit,
+                    OrderCode = orderCode.ToString(CultureInfo.InvariantCulture),
+                    Amount = amount,
+                    PaymentLinkId = GetString(data, "paymentLinkId"),
+                    CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
+                    QrCode = GetString(data, "qrCode") ?? string.Empty,
+                    Status = TransactionStatus.Pending,
+                    Policy = "Nạp tiền vào ví cá nhân",
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                    WebhookPayload = string.Empty
+                };
+
+                await _unitOfWork.TransactionRepository.CreateAsync(transaction);
+                await _unitOfWork.SaveChangesAsync();
+                StartStatusPolling(orderCode, transaction.ExpiresAt);
+
+                return (true, "Tạo link nạp tiền ví thành công!", ToResponse(transaction));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo link nạp tiền ví cho wallet {WalletId}.", walletId);
+                return (false, $"Lỗi khi tạo link nạp tiền: {ex.Message}", null);
+            }
+        }
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingPaymentLinkAsync(Guid bookingId)
+            => CreatePaymentLinkAsync(bookingId);
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingRequestPaymentLinkAsync(Guid customerId, CreateBookingRequestDTO request)
+            => CreatePaymentLinkForBookingRequestAsync(customerId, request);
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateDynamicPaymentLinkAsync(PayOSPaymentContextRequest request)
+        {
+            throw new NotImplementedException("Dynamic payment context link is not enabled.");
         }
 
         public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkAsync(Guid bookingId)
@@ -185,7 +361,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var booking = await _unitOfWork.BookingRepository.GetByIdAsync(bookingId);
                 if (booking == null)
                 {
-                    return (false, "Khong tim thay lich hen.", null);
+                    return (false, "Không tìm thấy lịch hẹn.", null);
                 }
 
                 var depositRate = 1m;
@@ -194,7 +370,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     var salon = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
                     if (salon == null)
                     {
-                        return (false, "Khong tim thay salon.", null);
+                        return (false, "Không tìm thấy salon.", null);
                     }
 
                     depositRate = salon.DepositConfig;
@@ -205,7 +381,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     : booking.TotalPrice * depositRate ?? 0m;
                 if (amountDue <= 0)
                 {
-                    return (false, $"So tien khong hop le: {amountDue}.", null);
+                    return (false, $"Số tiền không hợp lệ: {amountDue}.", null);
                 }
 
                 var existing = await _unitOfWork.TransactionRepository
@@ -214,12 +390,12 @@ namespace Nailify.Capstone.Infrastructure.Service
                     .FirstOrDefaultAsync();
                 if (existing != null && existing.ExpiresAt > DateTime.UtcNow)
                 {
-                    return (true, "Link thanh toan da ton tai.", ToResponse(existing));
+                    return (true, "Link thanh toán đã tồn tại.", ToResponse(existing));
                 }
 
                 var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
                 var amount = (int)Math.Round(amountDue, MidpointRounding.AwayFromZero);
-                var description = $"Thanh toan don {orderCode}";
+                var description = $"Thanh toán đơn {orderCode}";
                 var itemName = $"Ma don {orderCode}";
                 var signature = CreatePaymentRequestSignature(amount, description, orderCode);
 
@@ -328,8 +504,15 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
                 if (transaction.Status == TransactionStatus.Paid)
                 {
-                    await EnsureBookingForPaidTransactionAsync(transaction);
-                    await ApplyPaidAmountToBookingAsync(transaction);
+                    if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
+                    {
+                        await CreditWalletForPaidTransactionAsync(transaction);
+                    }
+                    else
+                    {
+                        await EnsureBookingForPaidTransactionAsync(transaction);
+                        await ApplyPaidAmountToBookingAsync(transaction);
+                    }
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -352,7 +535,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var responseContent = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
-                    return (false, $"Loi tu PayOS: {responseContent}", null);
+                    return (false, $"Lỗi từ PayOS: {responseContent}", null);
                 }
 
                 var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
@@ -361,11 +544,11 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await SyncLocalTransactionStatusAsync(orderCode, status);
 
-                return (true, "Lay trang thai thanh toan thanh cong!", status);
+                return (true, "Lấy trạng thái thanh toán thành công!", status);
             }
             catch (Exception ex)
             {
-                return (false, $"Loi khi lay trang thai thanh toan: {ex.Message}", null);
+                return (false, $"Lỗi khi lấy trạng thái thanh toán: {ex.Message}", null);
             }
         }
 
@@ -376,16 +559,16 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(orderCode.ToString(CultureInfo.InvariantCulture), trackChanges: true);
                 if (transaction == null)
                 {
-                    return (false, "Khong tim thay giao dich tuong ung.");
+                    return (false, "Không tìm thấy giao dịch tương ứng.");
                 }
 
                 if (transaction.Status == TransactionStatus.Paid)
                 {
-                    return (false, "Khong the huy giao dich da thanh toan.");
+                    return (false, "Không thể hủy giao dịch đã thanh toán.");
                 }
 
                 ApplyAuthenticationHeaders();
-                var cancelRequest = new { cancellationReason = "Huy boi nguoi dung" };
+                var cancelRequest = new { cancellationReason = "Hủy bởi người dùng" };
                 using var content = new StringContent(JsonSerializer.Serialize(cancelRequest), Encoding.UTF8, "application/json");
 
                 var response = await _httpClient.PostAsync($"{PayOSBaseUrl}/v2/payment-requests/{orderCode}/cancel", content);
@@ -399,11 +582,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                 _unitOfWork.TransactionRepository.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return (true, "Huy link thanh toan thanh cong!");
+                return (true, "Hủy link thanh toán thành công!");
             }
             catch (Exception ex)
             {
-                return (false, $"Loi khi huy link thanh toan: {ex.Message}");
+                return (false, $"Lỗi khi hủy link thanh toán: {ex.Message}");
             }
         }
 
@@ -523,12 +706,68 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             if (newStatus == TransactionStatus.Paid)
             {
-                await EnsureBookingForPaidTransactionAsync(transaction);
-                await ApplyPaidAmountToBookingAsync(transaction);
+                if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
+                {
+                    await CreditWalletForPaidTransactionAsync(transaction);
+                }
+                else
+                {
+                    await EnsureBookingForPaidTransactionAsync(transaction);
+                    await ApplyPaidAmountToBookingAsync(transaction);
+                }
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task CreditWalletForPaidTransactionAsync(Transaction transaction)
+        {
+            if (!transaction.WalletId.HasValue)
+            {
+                _logger.LogError("WalletDeposit transaction {OrderCode} missing WalletId.", transaction.OrderCode);
+                return;
+            }
+
+            var existingTx = await _unitOfWork.WalletTransactionRepository
+                .FindByCondition(t => t.WalletId == transaction.WalletId.Value && t.ReferenceId == transaction.OrderCode)
+                .FirstOrDefaultAsync();
+
+            if (existingTx != null)
+            {
+                return;
+            }
+
+            var wallet = await _unitOfWork.CustomerWalletRepository.GetByWalletIdForUpdateAsync(transaction.WalletId.Value);
+            if (wallet == null)
+            {
+                _logger.LogError("Wallet {WalletId} not found for deposit order {OrderCode}.", transaction.WalletId, transaction.OrderCode);
+                return;
+            }
+
+            var balanceBefore = wallet.Balance;
+            wallet.Balance += transaction.Amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            var walletTx = new WalletTransaction
+            {
+                WalletId = wallet.WalletId,
+                Amount = transaction.Amount,
+                BalanceBefore = balanceBefore,
+                BalanceAfter = wallet.Balance,
+                Type = WalletTransactionType.Deposit,
+                Status = WalletTransactionStatus.Completed,
+                ReferenceId = transaction.OrderCode,
+                ReferenceType = WalletReferenceType.PayOs,
+                Description = $"Nạp tiền vào ví qua PayOS (Mã GD: {transaction.OrderCode})",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _unitOfWork.CustomerWalletRepository.Update(wallet);
+            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+            await _unitOfWork.SaveChangesAsync();
+            _logger.LogInformation("Successfully credited {Amount} VND to Wallet {WalletId}. New Balance: {Balance}",
+                transaction.Amount, wallet.WalletId, wallet.Balance);
         }
 
         private async Task EnsureBookingForPaidTransactionAsync(Transaction transaction)
