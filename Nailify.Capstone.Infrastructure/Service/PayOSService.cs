@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
+using static Nailify.Capstone.Infrastructure.Configuration.PayOS.PayOutDto;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
@@ -343,6 +344,73 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
         }
 
+        public async Task<(bool Success, string Message, PayoutResponseDto? Payout)> CreateWalletWithdrawalPayoutAsync(
+            Guid withdrawalRequestId,
+            string bankCode,
+            string accountNumber,
+            string accountHolderName,
+            decimal amount)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_paymentSettings.PayoutClientId) ||
+                    string.IsNullOrWhiteSpace(_paymentSettings.PayoutApiKey))
+                {
+                    return (false, "PayOS payout credentials are not configured.", null);
+                }
+
+                var amountInt = (int)Math.Round(amount, MidpointRounding.AwayFromZero);
+                if (amountInt <= 0)
+                {
+                    return (false, "Số tiền rút không hợp lệ.", null);
+                }
+
+                var referenceId = $"withdrawal_{withdrawalRequestId}_{DateTime.UtcNow:yyyyMMddHHmmss}";
+                var payoutRequest = new
+                {
+                    referenceId,
+                    amount = amountInt,
+                    description = $"Withdrawal {withdrawalRequestId}",
+                    toBin = GetBankBin(bankCode),
+                    toAccountNumber = accountNumber,
+                    toAccountName = accountHolderName,
+                    category = new[] { "withdrawal" }
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"{PayOSBaseUrl}/v1/payouts");
+                request.Headers.Add("x-client-id", _paymentSettings.PayoutClientId);
+                request.Headers.Add("x-api-key", _paymentSettings.PayoutApiKey);
+                request.Headers.Add("x-idempotency-key", referenceId);
+                request.Headers.Add("x-signature", GeneratePayoutSignature(payoutRequest));
+                request.Content = new StringContent(JsonSerializer.Serialize(payoutRequest, JsonOptions), Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, $"Lỗi từ PayOS payout: {responseContent}", null);
+                }
+
+                var payoutResponse = JsonSerializer.Deserialize<PayOSPayoutResponse>(responseContent, JsonOptions);
+                if (payoutResponse?.Code == "00" && payoutResponse.Data != null)
+                {
+                    return (true, payoutResponse.Desc ?? "Tạo payout rút tiền thành công.", new PayoutResponseDto
+                    {
+                        PayoutId = payoutResponse.Data.Id,
+                        ReferenceId = payoutResponse.Data.ReferenceId,
+                        ApprovalState = payoutResponse.Data.ApprovalState
+                    });
+                }
+
+                return (false, payoutResponse?.Desc ?? "PayOS payout failed.", null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo PayOS payout cho withdrawal {WithdrawalRequestId}.", withdrawalRequestId);
+                return (false, $"Lỗi khi tạo payout rút tiền: {ex.Message}", null);
+            }
+        }
+
         public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingPaymentLinkAsync(Guid bookingId)
             => CreatePaymentLinkAsync(bookingId);
 
@@ -647,6 +715,52 @@ namespace Nailify.Capstone.Infrastructure.Service
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_paymentSettings.ChecksumKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private string GeneratePayoutSignature(object? data)
+        {
+            if (data == null)
+            {
+                return string.Empty;
+            }
+
+            var json = JsonSerializer.Serialize(data, JsonOptions);
+            var dataDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)
+                ?? new Dictionary<string, JsonElement>();
+
+            var queryString = string.Join("&", dataDict.OrderBy(kv => kv.Key).Select(kv =>
+            {
+                var key = Uri.EscapeDataString(kv.Key);
+                var value = kv.Value.ValueKind switch
+                {
+                    JsonValueKind.Array => Uri.EscapeDataString(kv.Value.ToString()),
+                    JsonValueKind.Object => Uri.EscapeDataString(kv.Value.ToString()),
+                    JsonValueKind.String => Uri.EscapeDataString(kv.Value.GetString() ?? string.Empty),
+                    _ => Uri.EscapeDataString(kv.Value.ToString())
+                };
+                return $"{key}={value}";
+            }));
+
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_paymentSettings.PayoutChecksumKey));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(queryString));
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private static string GetBankBin(string bankCode)
+        {
+            var bankBins = new Dictionary<string, string>
+            {
+                { "VCB", "970436" }, { "BIDV", "970418" }, { "VIB", "970441" },
+                { "MB", "970422" }, { "TCB", "970407" }, { "ACB", "970416" },
+                { "VPB", "970432" }, { "TPB", "970423" }, { "HDB", "970437" },
+                { "MSB", "970426" }, { "SCB", "970429" }, { "OCB", "970448" },
+                { "SHB", "970443" }, { "EIB", "970431" }, { "VAB", "970425" },
+                { "NAB", "970428" }, { "BAB", "970409" }, { "PGB", "970430" },
+                { "GPB", "970408" }, { "AGB", "970405" }, { "LVB", "970434" },
+                { "KLB", "970452" }, { "VBSP", "970427" }
+            };
+
+            return bankBins.GetValueOrDefault(bankCode.ToUpperInvariant(), "970436");
         }
 
         private void ApplyAuthenticationHeaders()
