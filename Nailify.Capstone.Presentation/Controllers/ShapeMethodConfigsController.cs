@@ -102,7 +102,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _shapeMethodConfigService.UpdateShapeMethodConfigAsync(id, request);
             if (!result.IsSucceeded)
             {
-                if (result.Message.Contains("không tìm thấy"))
+                if (result.Message.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase) ||
+                    result.Message.Contains("khong tim thay", StringComparison.OrdinalIgnoreCase) ||
+                    result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
                 {
                     return NotFound(result);
                 }
