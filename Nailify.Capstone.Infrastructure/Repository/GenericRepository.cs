@@ -115,17 +115,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public async Task<T?> GetByIdAsync(Guid id)
-        {
-            var entity = await _dbSet.FindAsync(id);
-            return IsActiveEntity(entity) ? entity : null;
-        }
+        public async Task<T?> GetByIdAsync(Guid id) => await _dbSet.FindAsync(id);
 
-        public async Task<T?> GetByIdAsync(int id)
-        {
-            var entity = await _dbSet.FindAsync(id);
-            return IsActiveEntity(entity) ? entity : null;
-        }
+        public async Task<T?> GetByIdAsync(int id) => await _dbSet.FindAsync(id);
 
         public async Task<PagedList<T>> GetPagedAsync(int pageNumber, int pageSize,
        Expression<Func<T, bool>>? predicate = null,
@@ -241,6 +233,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
             }
             return query;
         }
+        /*
         private static bool IsActiveEntity(T? entity)
         {
             if (entity == null)
@@ -268,5 +261,6 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return true;
         }
+        */
     }
 }

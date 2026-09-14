@@ -56,13 +56,17 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<PagedList<SkillTypeResponseDTO>>> GetPagedSkillTypesAsync(int pageNumber, int pageSize, string? name = null, string? status = null,
           string? orderBy = null)
         {
+            System.Linq.Expressions.Expression<Func<SkillType, bool>>? predicate = null;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                predicate = x => x.Name.ToLower().Contains(name.Trim().ToLower());
+            }
+
             var pagedResult = await _unitOfWork.SkillTypeRepository
                                                .GetPagedAsync(
                                                             pageNumber,
                                                             pageSize,
-                                                            x => x.Status == "Active"
-                                                            && (string.IsNullOrEmpty(name) || x.Name.ToLower().Contains(name.ToLower())
-                                                            ),
+                                                            predicate,
                                                             status,
                                                             orderBy);
 
@@ -117,7 +121,7 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<bool>("Loại kỹ năng không tồn tại.");
             }
 
-            skillType.Status = "InActive"; // Soft delete
+            skillType.Status = "Inactive"; // Soft delete
             _unitOfWork.SkillTypeRepository.Update(skillType);
             await _unitOfWork.SaveChangesAsync();
             return new ApiSuccessResult<bool>(true, "Xóa loại kỹ năng thành công.");

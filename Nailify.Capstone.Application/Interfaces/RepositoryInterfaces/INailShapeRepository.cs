@@ -6,6 +6,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface INailShapeRepository : IGenericRepository<NailShape>
     {
         Task<List<NailShape>> GetAllNailShapesAsync();
-        Task<PagedList<NailShape>> GetPagedNailShapesAsync(int pageNumber, int pageSize, string? name = null);
+        Task<PagedList<NailShape>> GetPagedNailShapesAsync(int pageNumber, int pageSize, string? name = null, string? status = null);
     }
 }

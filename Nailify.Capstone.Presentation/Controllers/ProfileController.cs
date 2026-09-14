@@ -54,7 +54,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
 
             // Kiểm tra tài khoản còn Active không
-            if (result.Data?.Status == "InActive")
+            if (result.Data?.Status == "Inactive")
             {
                 return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa." });
             }

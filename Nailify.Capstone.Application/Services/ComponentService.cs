@@ -19,9 +19,9 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null)
+        public async Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null, string? status = null)
         {
-            var pagedResult = await _unitOfWork.ComponentRepository.GetPagedComponentsAsync(pageNumber, pageSize, name, componentType);
+            var pagedResult = await _unitOfWork.ComponentRepository.GetPagedComponentsAsync(pageNumber, pageSize, name, componentType, status);
             var mappedItems = _mapper.Map<List<ComponentDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<ComponentDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 

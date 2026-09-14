@@ -66,6 +66,10 @@ namespace Nailify.Capstone.Infrastructure.DBContext
         public DbSet<CustomerQuizAnswer> CustomerQuizAnswers { get; set; }
         public DbSet<SalonOffDate> SalonOffDates { get; set; }
         public DbSet<StaffTransfer> StaffTransfers { get; set; }
+        public DbSet<CustomerWallet> CustomerWallets { get; set; }
+        public DbSet<WalletTransaction> WalletTransactions { get; set; }
+        public DbSet<WithdrawalRequest> WithdrawalRequests { get; set; }
+        public DbSet<PointConversionLog> PointConversionLogs { get; set; }
         #endregion initial DBSet
 
         public static string GetConnectionString(string connectionStringName)
@@ -366,8 +370,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .HasDefaultValue(LoyaltyTransactionType.Earned);
 
             modelBuilder.Entity<LoyaltyTransaction>()
-                .HasIndex(lt => lt.BookingId)
-                .IsUnique();
+                .HasIndex(lt => lt.BookingId);
 
             modelBuilder.Entity<LoyaltyTransaction>()
                 .HasOne(lt => lt.Customer)
@@ -853,6 +856,39 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .WithMany(s => s.OffDates)
                       .HasForeignKey(s => s.SalonId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<CustomerWallet>(entity =>
+            {
+                entity.HasKey(e => e.WalletId);
+                entity.Property(e => e.Balance).HasPrecision(18, 2);
+                entity.Property(e => e.FrozenBalance).HasPrecision(18, 2);
+                entity.HasOne(e => e.Customer)
+                      .WithOne()
+                      .HasForeignKey<CustomerWallet>(e => e.CustomerId);
+            });
+            modelBuilder.Entity<WalletTransaction>(entity =>
+            {
+                entity.HasKey(e => e.WalletTransactionId);
+                entity.Property(e => e.Amount).HasPrecision(18, 2);
+                entity.Property(e => e.BalanceBefore).HasPrecision(18, 2);
+                entity.Property(e => e.BalanceAfter).HasPrecision(18, 2);
+                entity.HasOne(e => e.Wallet)
+                      .WithMany(w => w.WalletTransactions)
+                      .HasForeignKey(e => e.WalletId);
+            });
+            modelBuilder.Entity<WithdrawalRequest>(entity =>
+            {
+                entity.HasKey(e => e.WithdrawalRequestId);
+                entity.Property(e => e.Amount).HasPrecision(18, 2);
+                entity.HasOne(e => e.Wallet)
+                      .WithMany(w => w.WithdrawalRequests)
+                      .HasForeignKey(e => e.WalletId);
+            });
+            modelBuilder.Entity<PointConversionLog>(entity =>
+            {
+                entity.HasKey(e => e.ConversionLogId);
+                entity.Property(e => e.MoneyAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ConversionRate).HasPrecision(18, 2);
             });
             modelBuilder.Entity<Booking>()
                 .HasOne(b => b.WarrantyForBooking)

@@ -12,7 +12,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public Guid? BookingId { get; set; }
         public int Points { get; set; }
         public LoyaltyTransactionType TransactionType { get; set; }
-        public int? LoyaltyTierIdAtTime { get; set; }
+        //public int? LoyaltyTierIdAtTime { get; set; }
         public DateTime CreatedAt { get; set; }
 
         public void Mapping(Profile profile) => profile.CreateMap<LoyaltyTransaction, LoyaltyTransactionDto>();

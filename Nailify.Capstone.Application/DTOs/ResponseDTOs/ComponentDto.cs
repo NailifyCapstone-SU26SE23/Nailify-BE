@@ -11,5 +11,6 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public ComponentType ComponentType { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 }

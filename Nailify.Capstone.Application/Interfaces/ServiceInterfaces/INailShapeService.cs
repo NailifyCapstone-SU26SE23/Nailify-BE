@@ -6,7 +6,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface INailShapeService
     {
-        Task<ApiResult<PagedList<NailShapeDto>>> GetPagedNailShapesAsync(int pageNumber, int pageSize, string? name = null);
+        Task<ApiResult<PagedList<NailShapeDto>>> GetPagedNailShapesAsync(int pageNumber, int pageSize, string? name = null, string? status = null);
         Task<ApiResult<NailShapeDto>> GetNailShapeByIdAsync(int id);
         Task<ApiResult<NailShapeDto>> CreateNailShapeAsync(NailShapeCreateRequest request, string? imageUrl = null);
         Task<ApiResult<NailShapeDto>> UpdateNailShapeAsync(int id, NailShapeUpdateRequest request, string? imageUrl = null);
