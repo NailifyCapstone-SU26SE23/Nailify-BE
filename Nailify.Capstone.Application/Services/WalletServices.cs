@@ -266,7 +266,6 @@ namespace Nailify.Capstone.Application.Services
 
                 request.Status = WithdrawalStatus.Approved;
                 request.AdminNote = dto.AdminNote;
-                request.TransactionReference = dto.TransactionReference;
                 request.ProcessedAt = DateTime.UtcNow;
                 request.ApprovedByUserId = adminId;
                 _unitOfWork.WithdrawalRequestRepository.Update(request);
@@ -284,6 +283,20 @@ namespace Nailify.Capstone.Application.Services
                     CreatedAt = DateTime.UtcNow
                 };
                 await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                var payoutResult = await _payOSPaymentService.CreateWalletWithdrawalPayoutAsync(
+                    request.WithdrawalRequestId,
+                    request.BankCode,
+                    request.AccountNumber,
+                    request.AccountHolderName,
+                    request.Amount);
+                if (!payoutResult.Success || payoutResult.Payout == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return new ApiErrorResult<WithdrawalRequestResponseDto>(payoutResult.Message);
+                }
+
+                request.TransactionReference = payoutResult.Payout.PayoutId ?? payoutResult.Payout.ReferenceId;
+                _unitOfWork.WithdrawalRequestRepository.Update(request);
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransactionAsync();
                 var responseDto = _mapper.Map<WithdrawalRequestResponseDto>(request);

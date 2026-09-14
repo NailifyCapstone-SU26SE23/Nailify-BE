@@ -19,11 +19,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
         }
 
-        public async Task<PagedList<NailSurface>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null)
+        public async Task<PagedList<NailSurface>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null, string? status = null)
         {
             var query = _dbSet
-                .Where(ns => ns.Status == "Active")
                 .AsQueryable();
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(ns => ns.Status == status);
+            }
+
             if (!string.IsNullOrWhiteSpace(name))
             {
                 var normalizedName = name.Trim().ToLower();

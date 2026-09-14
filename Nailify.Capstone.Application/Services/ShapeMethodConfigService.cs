@@ -19,9 +19,9 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<PagedList<ShapeMethodConfigDto>>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null)
+        public async Task<ApiResult<PagedList<ShapeMethodConfigDto>>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null, string? status = null)
         {
-            var pagedConfigs = await _unitOfWork.ShapeMethodConfigRepository.GetPagedShapeMethodConfigsAsync(pageNumber, pageSize, nailShapeId, name);
+            var pagedConfigs = await _unitOfWork.ShapeMethodConfigRepository.GetPagedShapeMethodConfigsAsync(pageNumber, pageSize, nailShapeId, name, status);
             var response = new PagedList<ShapeMethodConfigDto>(
                 _mapper.Map<List<ShapeMethodConfigDto>>(pagedConfigs.Items),
                 pagedConfigs.MetaData.TotalItems,
@@ -42,14 +42,14 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<ShapeMethodConfigDto>(_mapper.Map<ShapeMethodConfigDto>(config), "Lấy cấu hình thành công.");
         }
 
-        public async Task<ApiResult<List<ShapeMethodConfigDto>>> GetShapeMethodConfigsByNailShapeIdAsync(int nailShapeId)
+        public async Task<ApiResult<List<ShapeMethodConfigDto>>> GetShapeMethodConfigsByNailShapeIdAsync(int nailShapeId, string? status = null)
         {
             if (!await _unitOfWork.NailShapeRepository.ExistsAsync(shape => shape.NailShapeId == nailShapeId && shape.Status == "Active"))
             {
                 return new ApiErrorResult<List<ShapeMethodConfigDto>>("Không tìm thấy dáng móng.");
             }
 
-            var configs = await _unitOfWork.ShapeMethodConfigRepository.GetActiveByNailShapeIdAsync(nailShapeId);
+            var configs = await _unitOfWork.ShapeMethodConfigRepository.GetByNailShapeIdAsync(nailShapeId, status);
             return new ApiSuccessResult<List<ShapeMethodConfigDto>>(_mapper.Map<List<ShapeMethodConfigDto>>(configs), "Lấy cấu hình thành công.");
         }
 

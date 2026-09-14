@@ -19,9 +19,9 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null)
+        public async Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null, string? status = null)
         {
-            var pagedResult = await _unitOfWork.NailSurfaceRepository.GetPagedNailSurfacesAsync(pageNumber, pageSize, name);
+            var pagedResult = await _unitOfWork.NailSurfaceRepository.GetPagedNailSurfacesAsync(pageNumber, pageSize, name, status);
             var mappedItems = _mapper.Map<List<NailSurfaceDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<NailSurfaceDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 

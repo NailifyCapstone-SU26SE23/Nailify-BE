@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingPaymentLinkAsync(Guid bookingId);
         Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingRequestPaymentLinkAsync(Guid customerId, CreateBookingRequestDTO request);
         Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateWalletDepositPaymentLinkAsync(Guid walletId, decimal amount);
+        Task<(bool Success, string Message, PayoutResponseDto? Payout)> CreateWalletWithdrawalPayoutAsync(Guid withdrawalRequestId, string bankCode, string accountNumber, string accountHolderName, decimal amount);
         Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateDynamicPaymentLinkAsync(PayOSPaymentContextRequest request);
         Task<(bool Success, string Message)> HandlePaymentWebhookAsync(PaymentWebhookDto webhookDto);
         Task<(bool Success, string Message, string? Status)> GetPaymentStatusAsync(long orderCode);

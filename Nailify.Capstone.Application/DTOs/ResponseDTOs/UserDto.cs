@@ -39,7 +39,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs
         public string? AvatarUrl { get; set; }
 
         /// <summary>
-        /// Trạng thái hoạt động (Active, InActive...).
+        /// Trạng thái hoạt động (Active, Inactive...).
         /// </summary>
         public string Status { get; set; }
 

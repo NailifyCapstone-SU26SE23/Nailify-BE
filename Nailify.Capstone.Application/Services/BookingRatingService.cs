@@ -194,7 +194,7 @@ namespace Nailify.Capstone.Application.Services
             var rating = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(id, true);
             if (rating == null) return new ApiErrorResult<bool>("Không tìm thấy đánh giá.");
 
-            rating.Status = "InActive";
+            rating.Status = "Inactive";
             rating.DeletedAt = DateTime.UtcNow;
             rating.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRatingRepository.Update(rating);

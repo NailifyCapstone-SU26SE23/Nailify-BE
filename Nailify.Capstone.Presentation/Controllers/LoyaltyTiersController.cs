@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.LoyaltyTierRequestDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -7,6 +7,9 @@ using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý các hạng thành viên (Loyalty Tiers).
+    /// </summary>
     [Route("api/[controller]")]
     public class LoyaltyTiersController : BaseApiController
     {
@@ -21,10 +24,16 @@ namespace Nailify.Capstone.Presentation.Controllers
             _cloudinaryService = cloudinaryService;
         }
 
+        /// <summary>
+        /// Lấy danh sách tất cả các hạng thành viên.
+        /// </summary>
         [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
 
+        /// <summary>
+        /// Lấy chi tiết hạng thành viên theo ID.
+        /// </summary>
         [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
@@ -33,6 +42,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
+        /// <summary>
+        /// Lấy thông tin hạng thành viên hiện tại của người dùng đang đăng nhập.
+        /// </summary>
         [Authorize]
         [HttpGet("/api/Loyalty/me")]
         public async Task<IActionResult> GetMyLoyalty()
@@ -41,6 +53,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
+        /// <summary>
+        /// Tạo mới hạng thành viên.
+        /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Create(
@@ -75,6 +90,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        /// <summary>
+        /// Cập nhật hạng thành viên.
+        /// </summary>
         [HttpPut("{id:int}")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Update(
@@ -129,6 +147,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             }
         }
 
+        /// <summary>
+        /// Xóa hạng thành viên.
+        /// </summary>
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

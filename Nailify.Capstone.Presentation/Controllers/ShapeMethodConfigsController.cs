@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ShapeMethodConfigRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
     /// <summary>
-    /// API quan ly cau hinh cach lam theo dang mong.
+    /// API quản lý cấu hình cách làm theo dạng móng.
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -22,7 +22,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lay danh sach cau hinh cach lam phan trang, ho tro loc theo dang mong va ten.
+        /// Lấy danh sách cấu hình cách làm có phân trang, hỗ trợ lọc theo dạng móng và tên.
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<ShapeMethodConfigDto>>), StatusCodes.Status200OK)]
@@ -30,14 +30,16 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] int? nailShapeId = null,
-            [FromQuery] string? name = null)
+            [FromQuery] string? name = null,
+            [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _shapeMethodConfigService.GetPagedShapeMethodConfigsAsync(pageNumber, pageSize, nailShapeId, name);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _shapeMethodConfigService.GetPagedShapeMethodConfigsAsync(pageNumber, pageSize, nailShapeId, name, statusStr);
             return Ok(result);
         }
 
         /// <summary>
-        /// Lay chi tiet cau hinh cach lam theo ID.
+        /// Lấy chi tiết cấu hình cách làm theo ID.
         /// </summary>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResult<ShapeMethodConfigDto>), StatusCodes.Status200OK)]
@@ -54,14 +56,15 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Lay danh sach cau hinh cach lam theo dang mong.
+        /// Lấy danh sách cấu hình cách làm theo dạng móng.
         /// </summary>
         [HttpGet("nail-shape/{nailShapeId}")]
         [ProducesResponseType(typeof(ApiResult<List<ShapeMethodConfigDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetByNailShapeId(int nailShapeId)
+        public async Task<IActionResult> GetByNailShapeId(int nailShapeId, [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _shapeMethodConfigService.GetShapeMethodConfigsByNailShapeIdAsync(nailShapeId);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _shapeMethodConfigService.GetShapeMethodConfigsByNailShapeIdAsync(nailShapeId, statusStr);
             if (!result.IsSucceeded)
             {
                 return NotFound(result);
@@ -71,7 +74,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Tao cau hinh cach lam moi.
+        /// Tạo mới cấu hình cách làm.
         /// </summary>
         [HttpPost]
         [ProducesResponseType(typeof(ApiResult<ShapeMethodConfigDto>), StatusCodes.Status200OK)]
@@ -88,7 +91,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Cap nhat cau hinh cach lam.
+        /// Cập nhật cấu hình cách làm.
         /// </summary>
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(ApiResult<ShapeMethodConfigDto>), StatusCodes.Status200OK)]
@@ -99,7 +102,7 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _shapeMethodConfigService.UpdateShapeMethodConfigAsync(id, request);
             if (!result.IsSucceeded)
             {
-                if (result.Message.Contains("Khong tim thay"))
+                if (result.Message.Contains("không tìm thấy"))
                 {
                     return NotFound(result);
                 }
@@ -111,7 +114,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xoa cau hinh cach lam.
+        /// Xóa cấu hình cách làm.
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]

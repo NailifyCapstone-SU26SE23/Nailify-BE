@@ -7,7 +7,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IComponentService
     {
-        Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null);
+        Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null, string? status = null);
         Task<ApiResult<ComponentDto>> GetComponentByIdAsync(int id);
         Task<ApiResult<ComponentDto>> CreateComponentAsync(ComponentCreateRequest request, string? imageUrl = null);
         Task<ApiResult<ComponentDto>> UpdateComponentAsync(int id, ComponentUpdateRequest request, string? imageUrl = null);
