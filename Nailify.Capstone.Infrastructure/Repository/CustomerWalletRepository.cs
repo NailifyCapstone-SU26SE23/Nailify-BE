@@ -37,6 +37,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
              .FirstOrDefaultAsync();
         }
 
+        public async Task<CustomerWallet?> GetByWalletIdWithCustomerSummaryAsync(Guid walletId)
+        {
+            return await _dbSet
+                .AsNoTracking()
+                .Include(w => w.Customer)
+                    .ThenInclude(c => c.User)
+                .Include(w => w.Customer)
+                    .ThenInclude(c => c.LoyaltyTier)
+                .FirstOrDefaultAsync(w => w.WalletId == walletId);
+        }
+
         public async Task<SystemWalletSummaryDto> GetSystemSummaryAsync()
         {
             var totalUserBalance = await _dbSet.SumAsync(w => w.Balance);
