@@ -53,8 +53,8 @@ namespace Nailify.Capstone.Application.Services
             => _bookingLifecycleService.ConfirmBookingAsync(bookingId, actorId);
         public Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
             => _bookingLifecycleService.RejectBookingAsync(bookingId, actorId, request);
-        public Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
-            => _bookingLifecycleService.CancelBookingAsync(bookingId, customerId, request);
+        public Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid actorId, CancelBookingRequestDTO request, bool isCustomerActor = false)
+            => _bookingLifecycleService.CancelBookingAsync(bookingId, actorId, request, isCustomerActor);
         public Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request, Guid actorId)
             => _bookingLifecycleService.UpdateBookingAsync(bookingId, request, actorId);
         public Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request)
