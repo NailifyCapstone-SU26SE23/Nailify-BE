@@ -29,6 +29,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IPromotionService _promotionService;
         private readonly IOrderCodeGenerator _orderCodeGenerator;
+        private readonly IRefundService _refundService;
         public BookingLifecycleService(
                                          IUnitOfWork unitOfWork,
                                          IMapper mapper,
@@ -39,7 +40,8 @@ namespace Nailify.Capstone.Application.Services
                                          IBookingProcedureService bookingProcedureService,
                                          INotificationService notificationService,
                                          IPromotionService promotionService,
-                                         IOrderCodeGenerator orderCodeGenerator)
+                                         IOrderCodeGenerator orderCodeGenerator,
+                                         IRefundService refundService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -51,6 +53,7 @@ namespace Nailify.Capstone.Application.Services
             _notificationService = notificationService;
             _promotionService = promotionService;
             _orderCodeGenerator = orderCodeGenerator;
+            _refundService = refundService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -408,6 +411,15 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
+            var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                bookingId,
+                "Hoàn toàn bộ tiền cọc do lịch hẹn bị từ chối.",
+                forceFullRefund: true);
+            if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+            {
+                return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+
             booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();

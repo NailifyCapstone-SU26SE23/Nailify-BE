@@ -209,6 +209,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IPayOSPaymentService, PayOSService>();
             services.AddScoped<IWalletService, WalletService>();
             services.AddScoped<RefundService>();
+            services.AddScoped<IRefundService>(provider => provider.GetRequiredService<RefundService>());
             services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")

@@ -1,14 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
-using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using System.Text.Json;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
-    public class RefundService
+    public class RefundService : IRefundService
     {
         private readonly IUnitOfWork _unitOfWork;
 
