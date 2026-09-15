@@ -69,6 +69,19 @@ namespace Nailify.Capstone.Application.Services
             };
             return new ApiSuccessResult<CustomerWalletSummaryDto>(summary, "Lấy thông tin ví thành công.");
         }
+
+        public async Task<ApiResult<WalletSummaryDTO>> GetWalletSummaryByIdAsync(Guid walletId)
+        {
+            var wallet = await _unitOfWork.CustomerWalletRepository.GetByWalletIdWithCustomerSummaryAsync(walletId);
+            if (wallet == null)
+            {
+                return new ApiErrorResult<WalletSummaryDTO>("Không tìm thấy ví khách hàng.");
+            }
+
+            var summary = _mapper.Map<WalletSummaryDTO>(wallet.Customer);
+            return new ApiSuccessResult<WalletSummaryDTO>(summary, "Lấy thông tin ví khách hàng thành công.");
+        }
+
         public async Task<ApiResult<string>> RequestDepositAsync(Guid customerId, decimal amount)
         {
             if (amount < 10000m)
@@ -214,6 +227,17 @@ namespace Nailify.Capstone.Application.Services
             var response = new PagedList<WalletTransactionResponseDto>(dtos, pagedTx.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<WalletTransactionResponseDto>>(response, "Lấy lịch sử giao dịch ví thành công.");
         }
+        public async Task<ApiResult<WalletTransactionResponseDto>> GetWalletTransactionByIdAsync(Guid walletTransactionId)
+        {
+            var transaction = await _unitOfWork.WalletTransactionRepository.GetByIdAsync(walletTransactionId);
+            if (transaction == null)
+            {
+                return new ApiErrorResult<WalletTransactionResponseDto>("Giao dịch ví không tồn tại.");
+            }
+
+            var response = _mapper.Map<WalletTransactionResponseDto>(transaction);
+            return new ApiSuccessResult<WalletTransactionResponseDto>(response, "Lấy chi tiết giao dịch ví thành công.");
+        }
         public async Task<ApiResult<PagedList<WithdrawalRequestResponseDto>>> GetPendingWithdrawalsAsync(int pageNumber, int pageSize)
         {
             var pagedRequests = await _unitOfWork.WithdrawalRequestRepository.GetPagedPendingAsync(pageNumber, pageSize);
@@ -227,6 +251,17 @@ namespace Nailify.Capstone.Application.Services
             var dtos = _mapper.Map<List<WithdrawalRequestResponseDto>>(pagedRequests.Items);
             var response = new PagedList<WithdrawalRequestResponseDto>(dtos, pagedRequests.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<WithdrawalRequestResponseDto>>(response, "Lấy danh sách yêu cầu rút tiền toàn hệ thống thành công.");
+        }
+        public async Task<ApiResult<WithdrawalRequestResponseDto>> GetWithdrawalByIdAsync(Guid requestId)
+        {
+            var request = await _unitOfWork.WithdrawalRequestRepository.GetByIdAsync(requestId);
+            if (request == null)
+            {
+                return new ApiErrorResult<WithdrawalRequestResponseDto>("Yêu cầu rút tiền không tồn tại.");
+            }
+
+            var response = _mapper.Map<WithdrawalRequestResponseDto>(request);
+            return new ApiSuccessResult<WithdrawalRequestResponseDto>(response, "Lấy chi tiết yêu cầu rút tiền thành công.");
         }
         public async Task<ApiResult<PagedList<WalletTransactionResponseDto>>> GetSystemTransactionHistoryAsync(
             WalletTransactionType? type,
