@@ -197,8 +197,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelBookingRequestDTO request)
         {
-            var customerId = GetCurrentUserId();
-            var response = await _bookingService.CancelBookingAsync(id, customerId, request);
+            var actorId = GetCurrentUserId();
+            var isCustomerActor = User.IsInRole(nameof(UserRole.Customer));
+            if (isCustomerActor)
+            {
+                request.CustomerRequest = true;
+            }
+
+            var response = await _bookingService.CancelBookingAsync(id, actorId, request, isCustomerActor);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }

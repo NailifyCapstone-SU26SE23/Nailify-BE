@@ -19,7 +19,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingResponseDTO>> CheckOutBookingAsync(CheckOutRequestDTO request, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> ConfirmBookingAsync(Guid bookingId, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request);
-        Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request);
+        Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid actorId, CancelBookingRequestDTO request, bool isCustomerActor = false);
         Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request, Guid actorId);
         Task<ApiResult<BookingResponseDTO>> LateCheckInBookingAsync(Guid bookingId, Guid actorId);
         Task<ApiResult<string>> HandleCustomerDelayDecisionAsync(Guid bookingId, DelayResponseRequest request);
