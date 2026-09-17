@@ -88,5 +88,17 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .OrderByDescending(r => r.CreatedAt)
                 .FirstOrDefaultAsync();
         }
+
+        public async Task<List<CustomerNailRequest>> GetCustomerNailRequestsByIdsAsync(IEnumerable<Guid> requestIds)
+        {
+            var idList = requestIds.Distinct().ToList();
+            if (!idList.Any())
+            {
+                return new List<CustomerNailRequest>();
+            }
+            return await FindByCondition(x => idList.Contains(x.CustomerNailRequestId))
+                         .Include(x => x.CustomerNail)
+                         .ToListAsync();
+        }
     }
 }

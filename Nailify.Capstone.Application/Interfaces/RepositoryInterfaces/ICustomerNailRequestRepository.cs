@@ -18,5 +18,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<CustomerNailRequest?> GetByCustomerNailAndSalonAsync(int customerNailId, Guid salonId);
         Task<CustomerNailRequest?> GetApprovedRequestAsync(int customerNailId, Guid salonId);
         Task<CustomerNailRequest?> GetAnyApprovedRequestAsync(int customerNailId);
+        Task<List<CustomerNailRequest>> GetCustomerNailRequestsByIdsAsync(IEnumerable<Guid> requestIds);
     }
 }

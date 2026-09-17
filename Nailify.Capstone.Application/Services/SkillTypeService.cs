@@ -84,10 +84,12 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<SkillTypeResponseDTO>> GetSkillTypeByIdAsync(Guid skillTypeId)
         {
             var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(skillTypeId);
-            if (skillType == null || skillType.Status != "Active")
+            /*
+              if (skillType == null || skillType.Status != "Active")
             {
                 return new ApiErrorResult<SkillTypeResponseDTO>("Loại kỹ năng không tồn tại.");
             }
+            */
             var response = _mapper.Map<SkillTypeResponseDTO>(skillType);
             return new ApiSuccessResult<SkillTypeResponseDTO>(response, "Lấy loại kỹ năng thành công.");
         }
