@@ -55,7 +55,9 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Vui lòng chọn mẫu nail trước khi tìm thợ.");
             }
             var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
-            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue && !item.CustomerNailRequestId.HasValue))
+            if (bookingItems.Any(item => !item.NailVariantId.HasValue 
+                                         && !item.ServiceId.HasValue 
+                                         && !item.CustomerNailRequestId.HasValue))
             {
                 return new ApiErrorResult<List<SuggestedArtistResponseDTO>>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
             }
@@ -74,10 +76,13 @@ namespace Nailify.Capstone.Application.Services
             if (customNailItem != null)
             {
                 var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(customNailItem.CustomerNailRequestId!.Value);
-                if (customNailRequest != null &&
-                    customNailRequest.SalonId == request.SalonId &&
-                    (customNailRequest.Status == CustomerNailStatus.Approved || customNailRequest.Status == CustomerNailStatus.Quoted) &&
-                    customNailRequest.ApprovedArtistId.HasValue)
+                if (customNailRequest != null 
+                        && customNailRequest.SalonId == request.SalonId 
+                        && (
+                            customNailRequest.Status == CustomerNailStatus.Approved 
+                            || customNailRequest.Status == CustomerNailStatus.Quoted
+                           ) 
+                        && customNailRequest.ApprovedArtistId.HasValue)
                 {
                     var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
                     if (approvedArtist != null && approvedArtist.Status == "Active")
@@ -113,7 +118,9 @@ namespace Nailify.Capstone.Application.Services
             }
 
             var bookingItems = _mapper.Map<List<BookingItem>>(request.BookingItems);
-            if (bookingItems.Any(item => !item.NailVariantId.HasValue && !item.ServiceId.HasValue && !item.CustomerNailRequestId.HasValue))
+            if (bookingItems.Any(item => !item.NailVariantId.HasValue 
+                                         && !item.ServiceId.HasValue 
+                                         && !item.CustomerNailRequestId.HasValue))
             {
                 return new ApiErrorResult<SuggestedArtistResponseDTO>("Mỗi mục đặt lịch phải chứa ít nhất một dịch vụ, một mẫu nail hoặc một mẫu custom.");
             }
@@ -127,39 +134,54 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<SuggestedArtistResponseDTO>("Salon đóng cửa nghỉ lễ vào ngày này.");
             }
             int totalDuration = 0;
+            var variantIds = bookingItems.Where(x => x.NailVariantId.HasValue)
+                                         .Select(x => x.NailVariantId!.Value)
+                                         .Distinct()
+                                         .ToList();
+            var serviceIds = bookingItems.Where(x => x.ServiceId.HasValue)
+                                         .Select(x => x.ServiceId!.Value)
+                                         .Distinct()
+                                         .ToList();
+            var customRequestIds = bookingItems.Where(x => x.CustomerNailRequestId.HasValue)
+                                               .Select(x => x.CustomerNailRequestId!.Value)
+                                               .Distinct()
+                                               .ToList();
 
+            var variantsMap = variantIds.Any()
+                                               ? (await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(variantIds)).ToDictionary(x => x.NailVariantId)
+                                               : new Dictionary<int, NailVariant>();
+
+            var servicesMap = serviceIds.Any() 
+                                               ? (await _unitOfWork.ServicesRepository.GetServicesByIdsAsync(serviceIds)).ToDictionary(x => x.ServiceId) 
+                                               : new Dictionary<Guid, Domain.Entities.Services>();
+
+            var customRequestList = customRequestIds.Any() 
+                                                            ? await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestsByIdsAsync(customRequestIds) 
+                                                            : new List<CustomerNailRequest>();
+
+            var customRequestsMap = customRequestList.ToDictionary(x => x.CustomerNailRequestId);
             foreach (var item in bookingItems)
             {
-                if (item.NailVariantId.HasValue)
+                if (item.NailVariantId.HasValue && variantsMap.TryGetValue(item.NailVariantId.Value, out var variant))
                 {
-                    var variant = await _nailVariantService.GetNailVariantByIdAsync(item.NailVariantId.Value);
-                    if (variant?.Data != null)
-                    {
-                        totalDuration += (variant.Data.Duration ?? 60);
-                    }
+                    totalDuration += (variant.Duration ?? 60);
                 }
 
-                if (item.ServiceId.HasValue)
+                if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
                 {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if (service != null)
-                    {
-                        totalDuration += service.Duration;
-                    }
+                    totalDuration += service.Duration;
                 }
 
-                if (item.CustomerNailRequestId.HasValue)
+                if (item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var customNailRequest))
                 {
-                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
-                    if (customNailRequest != null &&
-                        customNailRequest.SalonId == request.SalonId &&
-                        (customNailRequest.Status == CustomerNailStatus.Approved || customNailRequest.Status == CustomerNailStatus.Quoted))
+                    if (customNailRequest.SalonId == request.SalonId &&
+                            (
+                                customNailRequest.Status == CustomerNailStatus.Approved 
+                                || customNailRequest.Status == CustomerNailStatus.Quoted
+                            )
+                       )
                     {
-                        var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
-                        if (customNail != null)
-                        {
-                            totalDuration += (customNail.Duration ?? 60) + (customNailRequest.Duration ?? 0);
-                        }
+                        totalDuration += (customNailRequest.CustomerNail?.Duration ?? 60) + (customNailRequest.Duration ?? 0);
                     }
                 }
             }
@@ -169,11 +191,20 @@ namespace Nailify.Capstone.Application.Services
 
             if (customNailItem != null)
             {
+                /*
                 var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(customNailItem.CustomerNailRequestId!.Value);
                 if (customNailRequest != null &&
                     customNailRequest.SalonId == request.SalonId &&
                     (customNailRequest.Status == CustomerNailStatus.Approved || customNailRequest.Status == CustomerNailStatus.Quoted) &&
                     customNailRequest.ApprovedArtistId.HasValue)
+                */
+                if (customRequestsMap.TryGetValue(customNailItem.CustomerNailRequestId!.Value, out var customNailRequest) 
+                            && customNailRequest.SalonId == request.SalonId 
+                            && (
+                                    customNailRequest.Status == CustomerNailStatus.Approved 
+                                    || customNailRequest.Status == CustomerNailStatus.Quoted
+                               ) 
+                            && customNailRequest.ApprovedArtistId.HasValue)
                 {
                     var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
                     if (approvedArtist != null && approvedArtist.Status == "Active")
@@ -192,10 +223,10 @@ namespace Nailify.Capstone.Application.Services
             }
             else
             {
-                var variantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
-                if (variantIds.Any())
+                var distinctVariantIds = _unitOfWork.NailVariantRepository.GetDistinctVariantIdsAsync(bookingItems);
+                if (distinctVariantIds.Any())
                 {
-                    qualifiedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, variantIds);
+                    qualifiedArtists = await _unitOfWork.NailArtistRepository.GetSuggestedArtistsAsync(request.SalonId, distinctVariantIds);
                 }
                 else
                 {
@@ -204,7 +235,6 @@ namespace Nailify.Capstone.Application.Services
                 }
             }
 
-            var availableArtists = new List<NailArtist>();
             var targetEndTime = request.StartTime.Add(TimeSpan.FromMinutes(totalDuration));
 
             var dayOfWeek = (int)localDate.DayOfWeek;
@@ -216,42 +246,67 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<SuggestedArtistResponseDTO>("Thời gian đặt lịch không nằm trong giờ hoạt động của Salon.");
             }
 
-            foreach (var artist in qualifiedArtists)
+            var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), request.SalonId);
+            var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
+            var qualifiedArtistIds = qualifiedArtists.Select(x => x.NailArtistId).ToList();
+            var availableArtists = new List<NailArtist>();
+            if (qualifiedArtistIds.Any())
             {
-                var salonId = artist.Account.SalonId ?? Guid.Empty;
+                var schedules = await _unitOfWork.ScheduleRepository.GetSchedulesBySalonIdAsync(request.SalonId, localDate, localDate);
+                var schedulesMap = schedules.Where(x => qualifiedArtistIds.Contains(x.NailArtistId))
+                                            .ToDictionary(x => x.NailArtistId);
+                var breaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistIdsAndDateAsync(qualifiedArtistIds, request.BookingDate);
+                var breaksMap = breaks.GroupBy(x => x.NailArtistId)
+                                      .ToDictionary(g => g.Key, g => g.ToList());
 
-                var artistBreaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
-                bool overlapsBreak = artistBreaks.Any(x => request.StartTime < x.EndTime && targetEndTime > x.StartTime);
-                if (overlapsBreak)
+                var allBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync(qualifiedArtistIds, request.BookingDate);
+                var busySegmentsMap = allBusySegments.Where(s => s.AssignedArtistId.HasValue)
+                                                     .GroupBy(s => s.AssignedArtistId!.Value)
+                                                     .ToDictionary(g => g.Key, g => g.ToList());
+
+                foreach (var artist in qualifiedArtists)
                 {
-                    continue;
+                    if (!schedulesMap.TryGetValue(artist.NailArtistId, out var schedule) || schedule == null)
+                    {
+                        continue;
+                    }
+                    if (request.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd)
+                    {
+                        continue;
+                    }
+                    var artistBreaks = breaksMap.GetValueOrDefault(artist.NailArtistId) ?? new List<NailArtistBreak>();
+                    if (artistBreaks.Any(x => request.StartTime < x.EndTime && targetEndTime > x.StartTime))
+                    {
+                        continue;
+                    }
+                    var artistBusySegments = busySegmentsMap.GetValueOrDefault(artist.NailArtistId) ?? new List<ProcedureScheduleSegment>();
+                    var isConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                                                                            artist.NailArtistId,
+                                                                                            artistBusySegments,
+                                                                                            timeline, 
+                                                                                            artist.ConcurrentCapacity
+                                                                                          );
+                    if (isConflict)
+                    {
+                        continue;
+                    }
+                    availableArtists.Add(artist);
                 }
-                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
-                if (schedule == null) continue;
-
-                if (request.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd) continue;
-
-                var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), request.SalonId);
-                var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
-                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                artist.NailArtistId, request.BookingDate, timeline, artist.ConcurrentCapacity);
-                if (isConflict) continue;
-
-                availableArtists.Add(artist);
             }
-
             if (!availableArtists.Any())
             {
                 return new ApiErrorResult<SuggestedArtistResponseDTO>("Không có thợ nào có đủ trình độ và thời gian trống trong khung giờ này.");
             }
+            var availableArtistIds = availableArtists.Select(x => x.NailArtistId)
+                                                     .ToList();
+            var bookingCountsMap = await _unitOfWork.BookingRepository.GetBookingCountsByArtistIdsAndDateAsync(availableArtistIds, request.BookingDate);
 
             NailArtist? bestArtist = null;
             int minBookings = int.MaxValue;
 
             foreach (var artist in availableArtists)
             {
-                var bookingsOnDay = await _unitOfWork.BookingRepository.GetBookingsByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
-                int count = bookingsOnDay.Count();
+                int count = bookingCountsMap.GetValueOrDefault(artist.NailArtistId, 0);
                 if (count < minBookings)
                 {
                     minBookings = count;
@@ -299,13 +354,40 @@ namespace Nailify.Capstone.Application.Services
             }
             var mockProcedures = new List<BookingProcedure>();
             int tempStepOrder = 1;
-            if (request.BookingItems != null)
+            if (request.BookingItems != null && request.BookingItems.Any())
             {
+                var variantIds = request.BookingItems.Where(x => x.NailVariantId.HasValue)
+                                                     .Select(x => x.NailVariantId!.Value)
+                                                     .Distinct()
+                                                     .ToList();
+                var serviceIds = request.BookingItems.Where(x => x.ServiceId.HasValue)
+                                                     .Select(x => x.ServiceId!.Value)
+                                                     .Distinct()
+                                                     .ToList();
+                var customRequestIds = request.BookingItems.Where(x => x.CustomerNailRequestId.HasValue)
+                                                           .Select(x => x.CustomerNailRequestId!.Value)
+                                                           .Distinct()
+                                                           .ToList();
+
+                var activeProcsList = variantIds.Any() ?
+                                                         await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdsAsync(variantIds)
+                                                       : new List<NailProcedure>();
+
+                var servicesList = serviceIds.Any() ?
+                                                      _unitOfWork.ServicesRepository.FindByCondition(x => serviceIds.Contains(x.ServiceId))
+                                                                                    .ToList()
+                                                    : new List<Domain.Entities.Services>();
+
+                var customRequestsList = customRequestIds.Any() ? _unitOfWork.CustomerNailRequestRepository.FindByCondition(x => customRequestIds.Contains(x.CustomerNailRequestId)).ToList() : new List<CustomerNailRequest>();
+
+                var proceduresMap = activeProcsList.GroupBy(x => x.NailVariantId).ToDictionary(g => g.Key, g => g.ToList());
+                var servicesMap = servicesList.ToDictionary(x => x.ServiceId);
+                var customRequestsMap = customRequestsList.ToDictionary(x => x.CustomerNailRequestId);
+
                 foreach (var item in request.BookingItems)
                 {
-                    if (item.NailVariantId.HasValue)
+                    if (item.NailVariantId.HasValue && proceduresMap.TryGetValue(item.NailVariantId.Value, out var activeNailProcedures))
                     {
-                        var activeNailProcedures = await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdAsync(item.NailVariantId.Value);
                         foreach (var x in activeNailProcedures)
                         {
                             mockProcedures.Add(new BookingProcedure
@@ -321,40 +403,22 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
                     // 3.2. Nếu là dịch vụ lẻ
-                    if (item.ServiceId.HasValue)
+                    if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
                     {
-                        var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                        if (service != null)
+                        mockProcedures.Add(new BookingProcedure
                         {
-                            mockProcedures.Add(new BookingProcedure
-                            {
-                                BookingProcedureId = Guid.NewGuid(),
-                                StepOrder = tempStepOrder++,
-                                Duration = service.Duration,
-                                ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
-                                PassiveDuration = 0,
-                                CanOverlap = false
-                            });
-                        }
+                            BookingProcedureId = Guid.NewGuid(),
+                            StepOrder = tempStepOrder++,
+                            Duration = service.Duration,
+                            ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
+                            PassiveDuration = 0,
+                            CanOverlap = false
+                        });
                     }
-                    if (item.CustomerNailRequestId.HasValue)
+                    if (item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var customNailRequest))
                     {
-                        // Tìm yêu cầu đã được duyệt báo giá để lấy thời gian thi công thực tế tại chi nhánh
-                        var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(item.CustomerNailRequestId.Value);
-                        int duration = 60; // Thời gian mặc định
 
-                        if (customNailRequest != null && customNailRequest.SalonId == salonId && customNailRequest.Duration.HasValue)
-                        {
-                            duration = customNailRequest.Duration.Value;
-                        }
-                        else if (customNailRequest != null)
-                        {
-                            var customNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customNailRequest.CustomerNailId);
-                            if (customNail != null)
-                            {
-                                duration = customNail.Duration ?? 60;
-                            }
-                        }
+                        int duration = customNailRequest.Duration ?? 60; // Thời gian mặc định
                         mockProcedures.Add(new BookingProcedure
                         {
                             BookingProcedureId = Guid.NewGuid(),
@@ -383,8 +447,8 @@ namespace Nailify.Capstone.Application.Services
             }
             var existingBusySegments = await _unitOfWork.BookingProcedureRepository
                                                         .GetArtistBusySegmentsByDateAsync(request.NailArtistId, request.BookingDate);
-
-
+            // Lấy danh sách các khoảng thời gian giữ chỗ tạm thời của thợ
+            var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(request.NailArtistId, request.BookingDate);
             var dayOfWeek = (int)localDate.DayOfWeek;
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(salonId);
             var operatingHours = salon?.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
@@ -411,9 +475,10 @@ namespace Nailify.Capstone.Application.Services
                     var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcedures, candidateStart);
 
                     // B. Check conflict trên các khoảng ActiveDuration > 0 của thợ
-                    var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                    // In memory
+                    var isConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
                         request.NailArtistId,
-                        request.BookingDate,
+                        existingBusySegments,
                         timeline,
                         artist.ConcurrentCapacity
                     );
@@ -422,12 +487,7 @@ namespace Nailify.Capstone.Application.Services
                     // C. Nếu không conflict lịch trong DB, kiểm tra tiếp trạng thái giữ chỗ tạm thời (Redis Hold)
                     if (isAvailable)
                     {
-                        isHeld = await _slotHoldService.IsSlotHeldAsync(
-                            request.NailArtistId,
-                            request.BookingDate,
-                            candidateStart,
-                            targetEndTime
-                        );
+                        isHeld = holdRanges.Any(x => candidateStart < x.End && targetEndTime > x.Start);
                     }
                 }
                 timeSlots.Add(new TimeSlotResponseDTO
@@ -471,8 +531,7 @@ namespace Nailify.Capstone.Application.Services
             }
             var bookingItems = booking.BookingItems.ToList();
             var targetEndTime = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
-            var procedures = await _unitOfWork.BookingProcedureRepository
-                                              .GetProceduresByBookingIdAsync(bookingId);
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId);
             if (!procedures.Any())
             {
                 var itemRequests = bookingItems.Select(x => new BookingItemRequestDTO
@@ -486,19 +545,22 @@ namespace Nailify.Capstone.Application.Services
                 procedures = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(itemRequests, booking.SalonId);
             }
 
-            var timeline = _bookingSchedulingService.BuildProcedureTimeline(
-                procedures, booking.StartTime);
+            var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
 
             // Custom: Chỉ cho phép thợ duyệt mẫu custom nhận làm
             var customNailItem = bookingItems.FirstOrDefault(x => x.CustomerNailRequestId.HasValue);
             if (customNailItem != null)
             {
                 var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(customNailItem.CustomerNailRequestId!.Value);
-                if (customNailRequest != null &&
-                    customNailRequest.SalonId == booking.SalonId &&
-                    (customNailRequest.Status == CustomerNailStatus.Approved || customNailRequest.Status == CustomerNailStatus.Quoted))
+                if (customNailRequest != null
+                        && customNailRequest.SalonId == booking.SalonId 
+                        && (
+                                customNailRequest.Status == CustomerNailStatus.Approved 
+                                || customNailRequest.Status == CustomerNailStatus.Quoted
+                           )
+                   )
                 {
-                    if (customNailRequest != null && customNailRequest.ApprovedArtistId.HasValue)
+                    if (customNailRequest.ApprovedArtistId.HasValue)
                     {
                         var approvedArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(customNailRequest.ApprovedArtistId.Value);
                         if (approvedArtist != null && approvedArtist.Status == "Active")
@@ -506,12 +568,13 @@ namespace Nailify.Capstone.Application.Services
                             var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(approvedArtist.NailArtistId, booking.BookingDate);
                             if (schedule != null && booking.StartTime >= schedule.ShiftStart && targetEndTime <= schedule.ShiftEnd)
                             {
-                                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                                  approvedArtist.NailArtistId,
-                                  booking.BookingDate,
-                                  timeline,
-                                  approvedArtist.ConcurrentCapacity,
-                                  bookingId);
+                                var approvedArtistBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsByDateAsync(approvedArtist.NailArtistId, booking.BookingDate, excludingBookingId: bookingId);
+                                var isConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                                                                                        approvedArtist.NailArtistId,
+                                                                                                        approvedArtistBusySegments,
+                                                                                                        timeline,
+                                                                                                        approvedArtist.ConcurrentCapacity
+                                                                                                      );
                                 if (!isConflict)
                                 {
                                     var singleArtistDto = _mapper.Map<List<SuggestedArtistResponseDTO>>(new List<NailArtist> { approvedArtist });
@@ -526,7 +589,10 @@ namespace Nailify.Capstone.Application.Services
             }
             var artists = await _unitOfWork.NailArtistRepository.GetNailArtistsBySalonIdAsync(booking.SalonId);
             var activeArtists = artists.Where(x => x.Status == "Active").ToList();
-            var variantIds = bookingItems.Where(x => x.NailVariantId.HasValue).Select(x => x.NailVariantId!.Value).Distinct().ToList();
+            var variantIds = bookingItems.Where(x => x.NailVariantId.HasValue)
+                                         .Select(x => x.NailVariantId!.Value)
+                                         .Distinct()
+                                         .ToList();
             List<NailArtist> qualifiedArtists;
             if (variantIds.Any())
             {
@@ -536,21 +602,45 @@ namespace Nailify.Capstone.Application.Services
             {
                 qualifiedArtists = activeArtists;
             }
+            var localDate = (booking.BookingDate.Kind == DateTimeKind.Utc ? booking.BookingDate.AddHours(7) : booking.BookingDate).Date;
+            var qualifiedArtistIds = qualifiedArtists.Select(x => x.NailArtistId).ToList();
             var availableArtists = new List<NailArtist>();
-            foreach (var artist in qualifiedArtists)
+            if (qualifiedArtistIds.Any())
             {
-                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, booking.BookingDate);
-                if (schedule == null) continue;
-                if (booking.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd) continue;
-                if (!await _skillMatchingService.HasRequiredSkillsAsync(artist, booking, booking.NailArtistId)) continue;
-                var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                                         artist.NailArtistId,
-                                         booking.BookingDate,
-                                         timeline,
-                                         artist.ConcurrentCapacity,
-                                         bookingId);
-                if (isConflict) continue;
-                availableArtists.Add(artist);
+                var schedules = await _unitOfWork.ScheduleRepository.GetSchedulesBySalonIdAsync(booking.SalonId, localDate, localDate);
+                var schedulesMap = schedules.Where(x => qualifiedArtistIds.Contains(x.NailArtistId))
+                                            .ToDictionary(x => x.NailArtistId);
+                var allBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync(qualifiedArtistIds, booking.BookingDate, excludingBookingId: bookingId);
+                var busySegmentsMap = allBusySegments.Where(x => x.AssignedArtistId.HasValue)
+                                                     .GroupBy(x => x.AssignedArtistId!.Value)
+                                                     .ToDictionary(g => g.Key, g => g.ToList());
+                foreach (var artist in qualifiedArtists)
+                {
+                    if (!schedulesMap.TryGetValue(artist.NailArtistId, out var schedule) || schedule == null)
+                    {
+                        continue;
+                    }
+                    if (booking.StartTime < schedule.ShiftStart || targetEndTime > schedule.ShiftEnd)
+                    {
+                        continue;
+                    }
+                    if (!await _skillMatchingService.HasRequiredSkillsAsync(artist, booking, booking.NailArtistId))
+                    {
+                        continue;
+                    }
+                    var artistBusySegments = busySegmentsMap.GetValueOrDefault(artist.NailArtistId) ?? new List<ProcedureScheduleSegment>();
+                    var isConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                                                                             artist.NailArtistId,
+                                                                                             artistBusySegments,
+                                                                                             timeline,
+                                                                                             artist.ConcurrentCapacity
+                                                                                          );
+                    if (isConflict)
+                    {
+                        continue;
+                    }
+                    availableArtists.Add(artist);
+                }
             }
             var response = _mapper.Map<List<SuggestedArtistResponseDTO>>(availableArtists);
             return new ApiSuccessResult<List<SuggestedArtistResponseDTO>>(response, "Lấy danh sách thợ rảnh cho đơn đặt lịch thành công.");
@@ -835,20 +925,29 @@ namespace Nailify.Capstone.Application.Services
                     qualifiedArtists = activeArtists.Where(x => x.Status == "Active");
                 }
             }
+            var artistIds = qualifiedArtists.Select(x => x.NailArtistId).ToList();
+
+            var schedules = await _unitOfWork.ScheduleRepository.GetSchedulesBySalonIdAsync(request.SalonId, localDate, localDate);
+            var schedulesMap = schedules.ToDictionary(x => x.NailArtistId);
+
+            var breaks = _unitOfWork.NailArtistBreakRepository.FindByCondition(b => artistIds.Contains(b.NailArtistId) && b.BreakDate.Date == localDate && b.Status == ArtistBreakStatus.Approved).ToList();
+            var breaksMap = breaks.GroupBy(x => x.NailArtistId).ToDictionary(g => g.Key, g => g.ToList());
+
+            var busySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync(artistIds, request.BookingDate);
+            var busySegmentsMap = busySegments.Where(x => x.AssignedArtistId.HasValue).GroupBy(x => x.AssignedArtistId!.Value).ToDictionary(g => g.Key, g => g.ToList());
             // Pre-load dữ liệu 1 lần cho mỗi thợ (tránh N×M query trong vòng lặp slot)
             var artistContexts = new List<(NailArtist Artist, Schedule Schedule, List<NailArtistBreak> Breaks, List<ProcedureScheduleSegment> BusySegments, List<(TimeSpan Start, TimeSpan End)> HoldRanges)>();
             foreach (var artist in qualifiedArtists)
             {
-                var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
-                if (schedule == null)
+                if (!schedulesMap.TryGetValue(artist.NailArtistId, out var schedule) || schedule == null)
                 {
-                    continue; // Thợ không có ca làm trong ngày này
+                    continue;
                 }
-                var breaks = await _unitOfWork.NailArtistBreakRepository.GetApprovedBreaksByArtistAndDateAsync(artist.NailArtistId, request.BookingDate);
-                var busySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsByDateAsync(artist.NailArtistId, request.BookingDate);
+                var artistBreaks = breaksMap.GetValueOrDefault(artist.NailArtistId) ?? new List<NailArtistBreak>();
+                var artistBusySegments = busySegmentsMap.GetValueOrDefault(artist.NailArtistId) ?? new List<ProcedureScheduleSegment>();
                 var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(artist.NailArtistId, request.BookingDate);
 
-                artistContexts.Add((artist, schedule, breaks, busySegments, holdRanges));
+                artistContexts.Add((artist, schedule, artistBreaks, artistBusySegments, holdRanges));
             }
 
             // Duyệt từng slot 15 phút trong giờ hoạt động salon, đếm số thợ rảnh mỗi slot
@@ -859,47 +958,41 @@ namespace Nailify.Capstone.Application.Services
             {
                 var targetEndTime = candidateStart.Add(TimeSpan.FromMinutes(totalDuration));
                 int availableCount = 0;
+                // Timeline giả lập tại slot này dùng chung cho mọi thợ
+                var timeLine = _bookingSchedulingService.BuildProcedureTimeline(mockProcedures, candidateStart);
 
-                if (operatingHours.IsWithinOperatingHours(candidateStart, targetEndTime))
+                foreach (var ctx in artistContexts)
                 {
-                    // Timeline giả lập tại slot này dùng chung cho mọi thợ
-                    var timeLine = _bookingSchedulingService.BuildProcedureTimeline(mockProcedures, candidateStart);
-
-                    foreach (var ctx in artistContexts)
+                    // Slot phải nằm trọn trong ca làm của thợ
+                    if (candidateStart < ctx.Schedule.ShiftStart
+                       || targetEndTime > ctx.Schedule.ShiftEnd)
                     {
-                        // Slot phải nằm trọn trong ca làm của thợ
-                        if (candidateStart < ctx.Schedule.ShiftStart
-                           || targetEndTime > ctx.Schedule.ShiftEnd)
-                        {
-                            continue;
-                        }
-                        // Không trùng giờ nghỉ đã duyệt của thợ
-                        if (ctx.Breaks.Any(x => candidateStart < x.EndTime && targetEndTime > x.StartTime))
-                        {
-                            continue;
-                        }
-                        // Không conflict với lịch bận hiện có (check in-memory trên dữ liệu pre-load)
-                        var conflict = _bookingSchedulingService.HasCapacityConflictInMemory(ctx.Artist.NailArtistId, ctx.BusySegments, timeLine, ctx.Artist.ConcurrentCapacity);
-                        if (conflict)
-                        {
-                            continue;
-                        }
-
-                        // Không bị giữ chỗ tạm thời (Redis Hold)
-                        if (ctx.HoldRanges.Any(x => x.Start < targetEndTime && x.End > candidateStart))
-                        {
-                            continue;
-                        }
-
-                        availableCount++;
+                        continue;
                     }
+                    // Không trùng giờ nghỉ đã duyệt của thợ
+                    if (ctx.Breaks.Any(x => candidateStart < x.EndTime && targetEndTime > x.StartTime))
+                    {
+                        continue;
+                    }
+                    // Không conflict với lịch bận hiện có (check in-memory trên dữ liệu pre-load)
+                    var isConflict = _bookingSchedulingService.HasCapacityConflictInMemory(ctx.Artist.NailArtistId, ctx.BusySegments, timeLine, ctx.Artist.ConcurrentCapacity);
+                    if (isConflict)
+                    {
+                        continue;
+                    }
+
+                    // Không bị giữ chỗ tạm thời (Redis Hold)
+                    bool isHeld = ctx.HoldRanges.Any(x => candidateStart < x.End && targetEndTime > x.Start);
+                    if (isHeld) continue;
+
+                    availableCount++;
                 }
                 timeSlots.Add(new SalonTimeSlotResponseDTO
                 {
                     StartTime = candidateStart,
                     EndTime = candidateStart.Add(interval),
                     IsAvailable = availableCount > 0,
-
+                    AvailableArtistCount = availableCount
                 });
                 candidateStart = candidateStart.Add(interval);
             }
@@ -916,21 +1009,21 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<TransferPreviewResponseDTO>> PreviewTransferSalonAsync(Guid bookingId, Guid targetSalonId, Guid actorId)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);
-            if(booking == null)
+            if (booking == null)
             {
                 return new ApiErrorResult<TransferPreviewResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if(booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
+            if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<TransferPreviewResponseDTO>($"Chỉ cho phép chuyển khi Pending hoặc Approved. Trạng thái hiện tại: '{booking.Status}'.");
 
             }
-            if(booking.SalonId == targetSalonId)
+            if (booking.SalonId == targetSalonId)
             {
                 return new ApiErrorResult<TransferPreviewResponseDTO>("Chi nhánh đích trùng với chi nhánh hiện tại.");
             }
             var targetSalon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(targetSalonId);
-            if(targetSalon == null)
+            if (targetSalon == null)
             {
                 return new ApiErrorResult<TransferPreviewResponseDTO>("Không tìm thấy chi nhánh đích.");
             }
@@ -950,7 +1043,7 @@ namespace Nailify.Capstone.Application.Services
             var operatingHours = targetSalon.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
             var targetEnd = booking.StartTime.Add(TimeSpan.FromMinutes(booking.TotalDuration));
 
-            if(!operatingHours.IsWithinOperatingHours(booking.StartTime, targetEnd))
+            if (!operatingHours.IsWithinOperatingHours(booking.StartTime, targetEnd))
             {
                 return new ApiErrorResult<TransferPreviewResponseDTO>("Khung giờ đặt lịch không nằm trong giờ hoạt động của chi nhánh đích.");
             }
@@ -961,21 +1054,21 @@ namespace Nailify.Capstone.Application.Services
             foreach (var artist in allArtists.Where(x => x.Status == "Active"))
             {
                 var schedule = await _unitOfWork.ScheduleRepository.GetScheduleByArtistAndDateAsync(artist.NailArtistId, booking.BookingDate);
-                if(schedule == null)
+                if (schedule == null)
                 {
                     continue;
                 }
-                if(booking.StartTime < schedule.ShiftStart || targetEnd > schedule.ShiftEnd)
+                if (booking.StartTime < schedule.ShiftStart || targetEnd > schedule.ShiftEnd)
                 {
                     continue;
                 }
                 var requiredSkill = await _skillMatchingService.HasRequiredSkillsAsync(artist, booking, null);
-                if(!requiredSkill)
+                if (!requiredSkill)
                 {
                     continue;
                 }
                 var hasConflict = await _bookingSchedulingService.HasCapacityConflictAsync(artist.NailArtistId, booking.BookingDate, timeline, artist.ConcurrentCapacity);
-                if(!hasConflict)
+                if (!hasConflict)
                 {
                     availableArtists.Add(artist);
                 }
@@ -1002,20 +1095,20 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<BookingResponseDTO>> TransferSalonAsync(Guid bookingId, TransferSalonRequestDTO request, Guid actorId)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
-            if(booking == null)
+            if (booking == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy thông tin đặt lịch.");
             }
-            if(booking.Status !=  BookingStatus.Pending && booking.Status != BookingStatus.Approved)
+            if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ cho phép chuyển khi Pending hoặc Approved. Trạng thái hiện tại: '{booking.Status}'.");
             }
-            if(booking.SalonId == request.TargetSalonId)
+            if (booking.SalonId == request.TargetSalonId)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Chi nhánh đích trùng với chi nhánh hiện tại.");
             }
             var targetSalon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(request.TargetSalonId);
-            if(targetSalon == null)
+            if (targetSalon == null)
             {
                 return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy chi nhánh đích.");
             }
@@ -1023,11 +1116,11 @@ namespace Nailify.Capstone.Application.Services
             {
                 var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(request.NewNailArtistId.Value);
 
-                if(artist == null || artist.Status != "Active")
+                if (artist == null || artist.Status != "Active")
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Thợ được chọn không tồn tại hoặc không hoạt động.");
                 }
-                if(artist.Account.SalonId != request.TargetSalonId)
+                if (artist.Account.SalonId != request.TargetSalonId)
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Thợ được chọn không thuộc chi nhánh đích.");
                 }
@@ -1049,7 +1142,7 @@ namespace Nailify.Capstone.Application.Services
                 _unitOfWork.BookingRepository.Update(booking);
 
                 var oldProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId, trackChanges: true);
-                foreach(var proc in oldProcedures)
+                foreach (var proc in oldProcedures)
                 {
                     _unitOfWork.BookingProcedureRepository.Delete(proc);
                 }
@@ -1057,7 +1150,7 @@ namespace Nailify.Capstone.Application.Services
                 await _unitOfWork.SaveChangesAsync();
 
                 var bookingItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
-                foreach(var item in bookingItems)
+                foreach (var item in bookingItems)
                 {
                     await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
                 }
@@ -1075,7 +1168,7 @@ namespace Nailify.Capstone.Application.Services
                             proc.EstimatedStartTime = segment.StartTime;
                             proc.EstimatedEndTime = segment.EndTime;
                             if (proc.ActiveDuration > 0 && proc.IsMainStep)
-                            { 
+                            {
                                 proc.AssignedArtistId = booking.NailArtistId.Value;
                             }
                             _unitOfWork.BookingProcedureRepository.Update(proc);

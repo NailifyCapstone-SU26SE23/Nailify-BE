@@ -343,38 +343,63 @@ namespace Nailify.Capstone.Infrastructure.Service
         }
         private async Task<int> CalculateTotalDuratonAysnc(IEnumerable<BookingItemRequestDTO> items, Guid salonId)
         {
+            var itemList = items.ToList();
+            if (!itemList.Any())
+            {
+                return 30;
+            }
+            var variantIds = itemList.Where(x => x.NailVariantId.HasValue)
+                                     .Select(x => x.NailVariantId!.Value)
+                                     .Distinct()
+                                     .ToList();
+            var serviceIds = itemList.Where(x => x.ServiceId.HasValue)
+                                     .Select(x => x.ServiceId!.Value)
+                                     .Distinct()
+                                     .ToList();
+            var customRequestIds = itemList.Where(x => x.CustomerNailRequestId.HasValue)
+                                           .Select(x => x.CustomerNailRequestId!.Value)
+                                           .Distinct()
+                                           .ToList();
+
+            var variantsMap = variantIds.Any() 
+                                              ?     (await _unitOfWork.NailVariantRepository.GetNailVariantsByIdsAsync(variantIds))
+                                                                                            .ToDictionary(x => x.NailVariantId) 
+                                              : new Dictionary<int, NailVariant>();
+
+            var servicesMap = serviceIds.Any()
+                                              ?  (await _unitOfWork.ServicesRepository.GetServicesByIdsAsync(serviceIds))
+                                                                                      .ToDictionary(x => x.ServiceId) 
+                                              : new Dictionary<Guid, Domain.Entities.Services>();
+
+            var customRequestsList = customRequestIds.Any() 
+                                              ? await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestsByIdsAsync(customRequestIds)
+                                              : new List<CustomerNailRequest>();
+            var customRequestsMap = customRequestsList.ToDictionary(x => x.CustomerNailRequestId);
+
             var durationMinutes = 0;
-            foreach (var x in items)
+            foreach (var x in itemList)
             {
                 var itemDuration = 0;
-                if (x.NailVariantId.HasValue)
-                {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
-                    if (variant != null)
-                    {
+                if (x.NailVariantId.HasValue && variantsMap.TryGetValue(x.NailVariantId.Value, out var variant))
+                {    
                         itemDuration += (variant.Duration ?? 60);
-                    }
                 }
 
-                if (x.ServiceId.HasValue)
-                {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(x.ServiceId.Value);
-                    if (service != null)
-                    {
+                if (x.ServiceId.HasValue && servicesMap.TryGetValue(x.ServiceId.Value, out var service))
+                {       
                         itemDuration += service.Duration;
-                    }
                 }
 
-                if (x.CustomerNailRequestId.HasValue)
+                if (x.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(x.CustomerNailRequestId.Value, out var customNailRequest))
                 {
-                    var customNailRequest = await _unitOfWork.CustomerNailRequestRepository.GetByIdAsync(x.CustomerNailRequestId.Value);
-                    if (customNailRequest != null &&
-                        customNailRequest.SalonId == salonId &&
-                        (customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Approved ||
-                         customNailRequest.Status == Nailify.Capstone.Domain.Enums.CustomerNailStatus.Quoted))
+                    if (customNailRequest.SalonId == salonId 
+                             && (
+                                    customNailRequest.Status == CustomerNailStatus.Approved
+                                    || customNailRequest.Status == CustomerNailStatus.Quoted
+                                 )
+                       )
                     {
-                        var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customNailRequest.CustomerNailId);
-                        itemDuration += customNailRequest.Duration ?? customerNail?.Duration ?? 60;
+                        itemDuration += customNailRequest.Duration ?? customNailRequest.CustomerNail?.Duration ?? 60;
                     }
                 }
 

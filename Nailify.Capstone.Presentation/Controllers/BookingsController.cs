@@ -65,10 +65,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Lấy danh sách các khung giờ bận của thợ làm móng trong ngày cụ thể.
         /// </summary>
-        [HttpGet("artist-available-slots")]
+        [HttpPost("artist-available-slots")]
         [ProducesResponseType(typeof(ApiResult<ArtistAvailabilityResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetArtistAvailableSlots([FromQuery] GetArtistAvailableSlotsRequestDTO request)
+        public async Task<IActionResult> GetArtistAvailableSlots([FromBody] GetArtistAvailableSlotsRequestDTO request)
         {
             var response = await _bookingService.GetArtistAvailableSlotAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);

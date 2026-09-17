@@ -63,7 +63,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     Message = "Booking not found for this transaction"
                 };
             }
-
+            // ThanhDT
             if (paidTransaction.Booking.IsRefunded)
             {
                 return new PayoutResult
@@ -73,6 +73,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 };
             }
 
+            // ThanhDT
             var existingRefund = await _unitOfWork.TransactionRepository
                 .FindByCondition(t => t.BookingId == paidTransaction.BookingId && t.Status == TransactionStatus.Refunded)
                 .FirstOrDefaultAsync();
