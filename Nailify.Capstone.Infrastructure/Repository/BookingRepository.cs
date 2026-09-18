@@ -250,14 +250,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                 .ThenInclude(c => c.Category)
                 .ToListAsync();
         }
-        public async Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date)
+        public async Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date, bool trackChanges = false)
         {
             var range = GetDateRangeUtc(date);
             return await FindByCondition(x =>
                 x.NailArtistId == artistId
                 && x.BookingDate >= range.start
                 && x.BookingDate <= range.end
-                && x.Status == BookingStatus.Approved)
+                && x.Status == BookingStatus.Approved,
+                trackChanges)
                 .Include(x => x.Customer)
                     .ThenInclude(x => x.User)
                 .Include(x => x.BookingItems)

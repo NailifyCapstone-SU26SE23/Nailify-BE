@@ -842,6 +842,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                       .HasDefaultValue(ArtistBreakStatus.Pending);
 
                 entity.Property(nab => nab.Reason).HasMaxLength(500);
+                entity.Property(nab => nab.RejectReason).HasColumnType("text");
                 entity.HasOne(nab => nab.NailArtist)
                       .WithMany(na => na.NailArtistBreaks)
                       .HasForeignKey(nab => nab.NailArtistId)
