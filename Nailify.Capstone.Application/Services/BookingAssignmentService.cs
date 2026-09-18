@@ -352,85 +352,9 @@ namespace Nailify.Capstone.Application.Services
                     TimeSlots = new List<TimeSlotResponseDTO>()
                 }, "Hôm nay là ngày nghỉ của Salon.");
             }
-            var mockProcedures = new List<BookingProcedure>();
-            int tempStepOrder = 1;
-            if (request.BookingItems != null && request.BookingItems.Any())
-            {
-                var variantIds = request.BookingItems.Where(x => x.NailVariantId.HasValue)
-                                                     .Select(x => x.NailVariantId!.Value)
-                                                     .Distinct()
-                                                     .ToList();
-                var serviceIds = request.BookingItems.Where(x => x.ServiceId.HasValue)
-                                                     .Select(x => x.ServiceId!.Value)
-                                                     .Distinct()
-                                                     .ToList();
-                var customRequestIds = request.BookingItems.Where(x => x.CustomerNailRequestId.HasValue)
-                                                           .Select(x => x.CustomerNailRequestId!.Value)
-                                                           .Distinct()
-                                                           .ToList();
-
-                var activeProcsList = variantIds.Any() ?
-                                                         await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdsAsync(variantIds)
-                                                       : new List<NailProcedure>();
-
-                var servicesList = serviceIds.Any() ?
-                                                      _unitOfWork.ServicesRepository.FindByCondition(x => serviceIds.Contains(x.ServiceId))
-                                                                                    .ToList()
-                                                    : new List<Domain.Entities.Services>();
-
-                var customRequestsList = customRequestIds.Any() ? _unitOfWork.CustomerNailRequestRepository.FindByCondition(x => customRequestIds.Contains(x.CustomerNailRequestId)).ToList() : new List<CustomerNailRequest>();
-
-                var proceduresMap = activeProcsList.GroupBy(x => x.NailVariantId).ToDictionary(g => g.Key, g => g.ToList());
-                var servicesMap = servicesList.ToDictionary(x => x.ServiceId);
-                var customRequestsMap = customRequestsList.ToDictionary(x => x.CustomerNailRequestId);
-
-                foreach (var item in request.BookingItems)
-                {
-                    if (item.NailVariantId.HasValue && proceduresMap.TryGetValue(item.NailVariantId.Value, out var activeNailProcedures))
-                    {
-                        foreach (var x in activeNailProcedures)
-                        {
-                            mockProcedures.Add(new BookingProcedure
-                            {
-                                BookingProcedureId = Guid.NewGuid(),
-                                StepOrder = tempStepOrder++,
-                                Duration = x.Procedure.Duration ?? 0,
-                                ActiveDuration = x.Procedure.ActiveDuration,
-                                PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.PassiveDuration >= 4 && x.Procedure.CanOverlap,
-                                TransitionBuffer = x.Procedure.TransitionBuffer > 0 ? x.Procedure.TransitionBuffer : 1
-                            });
-                        }
-                    }
-                    // 3.2. Nếu là dịch vụ lẻ
-                    if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
-                    {
-                        mockProcedures.Add(new BookingProcedure
-                        {
-                            BookingProcedureId = Guid.NewGuid(),
-                            StepOrder = tempStepOrder++,
-                            Duration = service.Duration,
-                            ActiveDuration = service.Duration, // Mặc định dịch vụ lẻ là thợ bận toàn bộ thời gian
-                            PassiveDuration = 0,
-                            CanOverlap = false
-                        });
-                    }
-                    if (item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var customNailRequest))
-                    {
-
-                        int duration = customNailRequest.Duration ?? 60; // Thời gian mặc định
-                        mockProcedures.Add(new BookingProcedure
-                        {
-                            BookingProcedureId = Guid.NewGuid(),
-                            StepOrder = tempStepOrder++,
-                            Duration = duration,
-                            ActiveDuration = duration, // Mặc định custom nail thợ bận toàn bộ thời gian
-                            PassiveDuration = 0,
-                            CanOverlap = false
-                        });
-                    }
-                }
-            }
+            var mockProcedures = (request.BookingItems != null && request.BookingItems.Any())
+                ? await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), salonId)
+                : new List<BookingProcedure>();
 
             if (!mockProcedures.Any())
             {
@@ -438,7 +362,7 @@ namespace Nailify.Capstone.Application.Services
                 mockProcedures.Add(new BookingProcedure
                 {
                     BookingProcedureId = Guid.NewGuid(),
-                    StepOrder = tempStepOrder++,
+                    StepOrder = 1,
                     Duration = 15,
                     ActiveDuration = 15,
                     PassiveDuration = 0,

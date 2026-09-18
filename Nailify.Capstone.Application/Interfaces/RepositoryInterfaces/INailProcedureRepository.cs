@@ -13,6 +13,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdAsync(int customerNailId);
         Task<NailProcedure?> GetNailProcedureWithProcedureAsync(Guid nailProcedureId);
         Task<List<NailProcedure>> GetActiveProceduresByVariantIdsAsync(IEnumerable<int> nailVariantIds);
+        Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdsAsync(IEnumerable<int> customerNailIds);
     }
 
 }
