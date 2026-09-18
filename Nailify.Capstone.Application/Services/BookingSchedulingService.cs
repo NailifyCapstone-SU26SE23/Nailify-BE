@@ -114,13 +114,13 @@ namespace Nailify.Capstone.Application.Services
             }
             var mockBooking = new Booking
             {
-                BookingId = Guid.NewGuid() 
+                BookingId = Guid.NewGuid()
             };
-            var mockBookingItem = new BookingItem 
-            { 
+            var mockBookingItem = new BookingItem
+            {
                 BookingItemId = Guid.NewGuid(),
                 Booking = mockBooking,
-                BookingId = mockBooking.BookingId 
+                BookingId = mockBooking.BookingId
             };
 
             // Query common procedures from master Procedure catalog (ProcedureType == Common or IsMainStep == true)
@@ -171,35 +171,35 @@ namespace Nailify.Capstone.Application.Services
             var customProcsMap = customProcsList.GroupBy(x => x.CustomerNailId!.Value).ToDictionary(g => g.Key, g => g.ToList());
 
             int currentStepOrder = 1;
+
+            foreach (var commonProc in commonProcedures)
+            {
+                var passiveDuration = commonProc.PassiveDuration;
+                mockProcedures.Add(new BookingProcedure
+                {
+                    BookingProcedureId = Guid.NewGuid(),
+                    BookingItemId = mockBookingItem.BookingItemId,
+                    BookingItem = mockBookingItem,
+                    ProcedureId = commonProc.ProcedureId,
+                    ProcedureName = commonProc.Name,
+                    StepOrder = currentStepOrder++,
+                    Duration = commonProc.Duration ?? 10,
+                    ActiveDuration = commonProc.ActiveDuration,
+                    PassiveDuration = passiveDuration,
+                    CanOverlap = passiveDuration >= 4 && commonProc.CanOverlap,
+                    TransitionBuffer = commonProc.TransitionBuffer > 0 ? commonProc.TransitionBuffer : 1,
+                    IsRequired = commonProc.IsRequired,
+                    IsMainStep = true,
+                    Status = BookingProcedureStatus.Pending
+                });
+            }
             foreach (var item in items)
             {
-                foreach (var commonProc in commonProcedures)
-                {
-                    var passiveDuration = commonProc.PassiveDuration;
-                    mockProcedures.Add(new BookingProcedure
-                    {
-                        BookingProcedureId = Guid.NewGuid(),
-                        BookingItemId = mockBookingItem.BookingItemId,
-                        BookingItem = mockBookingItem,
-                        ProcedureId = commonProc.ProcedureId,
-                        ProcedureName = commonProc.Name,
-                        StepOrder = currentStepOrder++,
-                        Duration = commonProc.Duration ?? 10,
-                        ActiveDuration = commonProc.ActiveDuration,
-                        PassiveDuration = passiveDuration,
-                        CanOverlap = passiveDuration >= 4 && commonProc.CanOverlap,
-                        TransitionBuffer = commonProc.TransitionBuffer > 0 ? commonProc.TransitionBuffer : 1,
-                        IsRequired = commonProc.IsRequired,
-                        IsMainStep = true,
-                        Status = BookingProcedureStatus.Pending
-                    });
-                }
-
                 if (item.NailVariantId.HasValue && proceduresMap.TryGetValue(item.NailVariantId.Value, out var activeNailProcedures))
                 {
-                   var filteredProcs  = activeNailProcedures
-                        .Where(np => !commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
-                        .ToList();
+                    var filteredProcs = activeNailProcedures
+                         .Where(np => !commonProcedures.Any(cp => cp.ProcedureId == np.ProcedureId))
+                         .ToList();
 
                     if (filteredProcs.Any())
                     {
@@ -280,41 +280,41 @@ namespace Nailify.Capstone.Application.Services
                 // 2. Nếu là dáng móng (ShapeMethodConfig)
                 if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeMethodConfig))
                 {
-                        mockProcedures.Add(new BookingProcedure
-                        {
-                            BookingProcedureId = Guid.NewGuid(),
-                            BookingItemId = mockBookingItem.BookingItemId,
-                            BookingItem = mockBookingItem,
-                            ProcedureName = $"Tạo dáng & làm móng: {shapeMethodConfig.Name}",
-                            StepOrder = currentStepOrder++,
-                            Duration = shapeMethodConfig.Duration,
-                            ActiveDuration = shapeMethodConfig.Duration,
-                            PassiveDuration = 0,
-                            CanOverlap = false,
-                            TransitionBuffer = 1
-                        });
+                    mockProcedures.Add(new BookingProcedure
+                    {
+                        BookingProcedureId = Guid.NewGuid(),
+                        BookingItemId = mockBookingItem.BookingItemId,
+                        BookingItem = mockBookingItem,
+                        ProcedureName = $"Tạo dáng & làm móng: {shapeMethodConfig.Name}",
+                        StepOrder = currentStepOrder++,
+                        Duration = shapeMethodConfig.Duration,
+                        ActiveDuration = shapeMethodConfig.Duration,
+                        PassiveDuration = 0,
+                        CanOverlap = false,
+                        TransitionBuffer = 1
+                    });
                 }
 
                 // 3. Nếu là dịch vụ lẻ (Service)
                 if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
                 {
-                        int qty = Math.Max(1, item.Quantity);
-                        for (int i = 0; i < qty; i++)
+                    int qty = Math.Max(1, item.Quantity);
+                    for (int i = 0; i < qty; i++)
+                    {
+                        mockProcedures.Add(new BookingProcedure
                         {
-                            mockProcedures.Add(new BookingProcedure
-                            {
-                                BookingProcedureId = Guid.NewGuid(),
-                                BookingItemId = mockBookingItem.BookingItemId,
-                                BookingItem = mockBookingItem,
-                                ProcedureName = service.Name,
-                                StepOrder = currentStepOrder++,
-                                Duration = service.Duration,
-                                ActiveDuration = service.Duration,
-                                PassiveDuration = 0,
-                                CanOverlap = false,
-                                TransitionBuffer = 1
-                            });
-                        }
+                            BookingProcedureId = Guid.NewGuid(),
+                            BookingItemId = mockBookingItem.BookingItemId,
+                            BookingItem = mockBookingItem,
+                            ProcedureName = service.Name,
+                            StepOrder = currentStepOrder++,
+                            Duration = service.Duration,
+                            ActiveDuration = service.Duration,
+                            PassiveDuration = 0,
+                            CanOverlap = false,
+                            TransitionBuffer = 1
+                        });
+                    }
                 }
 
                 // 4. Nếu là mẫu móng custom (CustomerNail)
@@ -328,7 +328,7 @@ namespace Nailify.Capstone.Application.Services
                     }
                     else if (customNailsMap.TryGetValue(customNailRequest.CustomerNailId, out var customNail))
                     {
-                            duration = customNail.Duration ?? 60;
+                        duration = customNail.Duration ?? 60;
                         if (customProcsMap.TryGetValue(customNail.CustomerNailId, out var activeCustomProcedures))
                         {
                             var customProcs = activeCustomProcedures.Where(x => !commonProcedures.Any(cp => cp.ProcedureId == x.ProcedureId)).ToList();
@@ -649,12 +649,12 @@ namespace Nailify.Capstone.Application.Services
                 if (delayMinutes >= 10 && overdue.NailArtistId.HasValue)
                 {
                     var nextBooking = await _unitOfWork.BookingRepository.GetNextBookingForArtistAsync(
-                                                overdue.NailArtistId.Value, 
-                                                currentDate, 
+                                                overdue.NailArtistId.Value,
+                                                currentDate,
                                                 endTime);
-                    if(nextBooking != null)
+                    if (nextBooking != null)
                     {
-                        string cacheKey  = $"DelayWarning_{nextBooking.BookingId}";
+                        string cacheKey = $"DelayWarning_{nextBooking.BookingId}";
                         var hasWarned = await _cache.GetStringAsync(cacheKey);
 
                         if (string.IsNullOrEmpty(hasWarned))
