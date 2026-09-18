@@ -28,13 +28,15 @@ namespace Nailify.Capstone.Application.Services
             int pageSize,
             string? name = null,
             IEnumerable<int>? categoryIds = null,
-            Guid? userId = null)
+            Guid? userId = null,
+            string? status = null)
         {
             var pagedResult = await _unitOfWork.NailDesignRepository.GetPagedActiveNailDesignsAsync(
                 pageNumber,
                 pageSize,
                 name,
-                categoryIds);
+                categoryIds,
+                status);
             var mappedItems = _mapper.Map<List<NailDesignDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<NailDesignDto>(
                 mappedItems,
@@ -50,7 +52,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id, Guid? userId = null)
         {
             var design = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
-            if (design == null || design.Status == "InActive")
+            if (design == null || design.Status == "Inactive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
@@ -116,7 +118,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, string? newImageUrl = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
-            if (existingDesign == null || existingDesign.Status == "InActive")
+            if (existingDesign == null || existingDesign.Status == "Inactive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
@@ -231,7 +233,7 @@ namespace Nailify.Capstone.Application.Services
             foreach (var categoryId in categoryIds.Distinct())
             {
                 var category = await _unitOfWork.CategoryRepository.GetByIdAsync(categoryId);
-                if (category == null || category.Status == "InActive")
+                if (category == null || category.Status == "Inactive")
                 {
                     invalidCategoryIds.Add(categoryId);
                 }

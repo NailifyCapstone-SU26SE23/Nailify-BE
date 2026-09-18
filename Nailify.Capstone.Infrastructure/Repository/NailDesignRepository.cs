@@ -69,9 +69,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
             int pageNumber,
             int pageSize,
             string? name = null,
-            IEnumerable<int>? categoryIds = null)
+            IEnumerable<int>? categoryIds = null,
+            string? status = null)
         {
-            var query = BuildNailDesignQuery().Where(nd => nd.Status == "Active");
+            var query = BuildNailDesignQuery();
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(nd => nd.Status == status);
+            }
+
             if (!string.IsNullOrWhiteSpace(name))
             {
                 var normalizedName = name.Trim().ToLower();

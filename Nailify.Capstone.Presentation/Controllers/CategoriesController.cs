@@ -88,7 +88,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xóa danh mục bằng cách chuyển trạng thái sang InActive.
+        /// Xóa danh mục bằng cách chuyển trạng thái sang Inactive.
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ApiResult<bool>), StatusCodes.Status200OK)]

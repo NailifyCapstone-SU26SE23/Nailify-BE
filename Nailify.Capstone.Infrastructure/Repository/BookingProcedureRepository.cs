@@ -155,5 +155,47 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return claimableProcedures;
         }
+
+        public async Task<List<ProcedureScheduleSegment>> GetArtistBusySegmentsForArtistsByDateAsync(IEnumerable<Guid> artistIds, DateTime bookingDate, Guid? excludingBookingId = null)
+        {
+            var idList = artistIds.Distinct().ToList();
+            if (!idList.Any())
+            {
+                return new List<ProcedureScheduleSegment>();
+            }
+
+            var date = (bookingDate.Kind == DateTimeKind.Utc ? bookingDate.AddHours(7) : bookingDate).Date;
+
+            var procedures = await FindByCondition(x =>
+                                                        x.AssignedArtistId.HasValue && idList.Contains(x.AssignedArtistId.Value) 
+                                                        && x.EstimatedStartTime.HasValue 
+                                                        && x.BookingItem.Booking.BookingDate.Date == date 
+                                                        && x.BookingItem.Booking.Status != BookingStatus.Cancelled 
+                                                        && x.BookingItem.Booking.Status != BookingStatus.Rejected 
+                                                        && (!excludingBookingId.HasValue || x.BookingItem.BookingId != excludingBookingId.Value))
+                                   .Include(x => x.BookingItem)
+                                        .ThenInclude(x => x.Booking)
+                                   .ToListAsync();
+
+            return procedures.Select(x =>
+            {
+                var busyStart = x.EstimatedStartTime!.Value;
+                var transition = x.TransitionBuffer > 0 ? x.TransitionBuffer : 1;
+
+                return new ProcedureScheduleSegment
+                {
+                    BookingProcedureId = x.BookingProcedureId,
+                    BookingItemId = x.BookingItemId,
+                    BookingId = x.BookingItem?.BookingId,
+                    AssignedArtistId = x.AssignedArtistId,
+                    StartTime = x.EstimatedStartTime.Value,
+                    EndTime = x.EstimatedEndTime ?? x.EstimatedStartTime.Value.Add(TimeSpan.FromMinutes(x.Duration)),
+                    ArtistBusyStart = busyStart,
+                    ArtistBusyEnd = busyStart.Add(TimeSpan.FromMinutes(x.ActiveDuration + transition)),
+                    CanOverlap = x.CanOverlap,
+                    TransitionBuffer = transition,
+                };
+            }).ToList();
+        }
     }
 }

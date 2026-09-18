@@ -8,5 +8,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
 {
     public interface IServicesRepository : IGenericRepository<Nailify.Capstone.Domain.Entities.Services>
     {
+        Task<List<Domain.Entities.Services>> GetServicesByIdsAsync(IEnumerable<Guid> serviceIds);
     }
 }

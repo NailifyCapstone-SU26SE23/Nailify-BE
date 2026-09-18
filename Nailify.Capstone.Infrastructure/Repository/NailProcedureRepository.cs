@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
 using System.Collections.Generic;
@@ -38,6 +39,31 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await FindByCondition(np => np.NailProcedureId == nailProcedureId)
                 .Include(np => np.Procedure)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<NailProcedure>> GetActiveProceduresByVariantIdsAsync(IEnumerable<int> nailVariantIds)
+        {
+            var variantIdList = nailVariantIds.Distinct().ToList();
+            if(!variantIdList.Any())
+            {
+                return new List<NailProcedure>();
+            }
+            return await FindByCondition(x => variantIdList.Contains((int)x.NailVariantId) && x.Status == "Active")
+                                .Include(x => x.Procedure)
+                                .Where(x => x.Procedure.Status == "Active")
+                                .OrderBy(x => x.StepOrder)
+                                .ToListAsync();
+        }
+
+        public async Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdsAsync(IEnumerable<int> customerNailIds)
+        {
+            var ids = customerNailIds.Distinct().ToList();
+            if (!ids.Any()) return new List<NailProcedure>();
+            return await FindByCondition(np => np.CustomerNailId.HasValue && ids.Contains(np.CustomerNailId.Value) && np.Status == "Active")
+                         .Include(np => np.Procedure)
+                         .Where(np => np.IsCustomStep || (np.Procedure != null && np.Procedure.Status == "Active"))
+                         .OrderBy(np => np.StepOrder)
+                         .ToListAsync();
         }
     }
 }

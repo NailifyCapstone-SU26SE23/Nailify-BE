@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;

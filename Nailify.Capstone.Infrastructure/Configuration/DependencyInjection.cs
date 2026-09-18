@@ -131,6 +131,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ICustomerQuizAnswerRepository, CustomerQuizAnswerRepository>();
             services.AddScoped<ISalonOffDateRepository, SalonOffDateRepository>();
             services.AddScoped<INailArtistBreakRepository, NailArtistBreakRepository>();
+            services.AddScoped<ICustomerWalletRepository, CustomerWalletRepository>();
+            services.AddScoped<IWalletTransactionRepository, WalletTransactionRepository>();
+            services.AddScoped<IPointConversionLogRepository, PointConversionLogRepository>();
+            services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
@@ -202,7 +206,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IOrderCodeGenerator, PayOSHelper>();
             services.AddScoped<PayOSHelper>();
             services.AddScoped<PayOSService>();
+            services.AddScoped<IPayOSPaymentService, PayOSService>();
+            services.AddScoped<IWalletService, WalletService>();
             services.AddScoped<RefundService>();
+            services.AddScoped<IRefundService>(provider => provider.GetRequiredService<RefundService>());
             services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
@@ -274,6 +281,14 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
             {
                 paymentUrls.CancelUrl = paymentSettings.CancelUrl;
+            }
+            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+            {
+                paymentUrls.ReturnUrl = "https://localhost:7066/swagger/index.html";
+            }
+            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+            {
+                paymentUrls.CancelUrl = "https://localhost:7066/swagger/index.html";
             }
             services.AddSingleton<IPaymentUrls>(paymentUrls);
 

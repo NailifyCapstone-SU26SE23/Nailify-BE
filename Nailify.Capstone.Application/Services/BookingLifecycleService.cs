@@ -29,6 +29,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IPromotionService _promotionService;
         private readonly IOrderCodeGenerator _orderCodeGenerator;
+        private readonly IRefundService _refundService;
         public BookingLifecycleService(
                                          IUnitOfWork unitOfWork,
                                          IMapper mapper,
@@ -39,7 +40,8 @@ namespace Nailify.Capstone.Application.Services
                                          IBookingProcedureService bookingProcedureService,
                                          INotificationService notificationService,
                                          IPromotionService promotionService,
-                                         IOrderCodeGenerator orderCodeGenerator)
+                                         IOrderCodeGenerator orderCodeGenerator,
+                                         IRefundService refundService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -51,6 +53,7 @@ namespace Nailify.Capstone.Application.Services
             _notificationService = notificationService;
             _promotionService = promotionService;
             _orderCodeGenerator = orderCodeGenerator;
+            _refundService = refundService;
         }
 
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
@@ -408,13 +411,22 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
+            var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                bookingId,
+                "Hoàn toàn bộ tiền cọc do lịch hẹn bị từ chối.",
+                forceFullRefund: true);
+            if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+            {
+                return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+
             booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối đơn đặt lịch thành công.");
         }
-        public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
+        public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid actorId, CancelBookingRequestDTO request, bool isCustomerActor = false)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
@@ -422,17 +434,27 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
 
-            // if (booking.CustomerId != customerId)
-            // {
-            //     return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
-            // }
+            if (isCustomerActor && booking.CustomerId != actorId)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
+            }
 
             if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ được hủy đơn ở trạng thái 'Pending' hoặc 'Approved'. Trạng thái hiện tại: '{booking.Status}'.");
             }
 
-            booking.Cancel(customerId, request.Reason);
+            var policyRefund = isCustomerActor || request.CustomerRequest == true;
+            var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                bookingId,
+                policyRefund ? request.Reason : $"Hoàn toàn bộ tiền cọc do Salon hủy lịch. Lý do: {request.Reason}",
+                forceFullRefund: !policyRefund);
+            if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+            {
+                return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+
+            booking.Cancel(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
             try

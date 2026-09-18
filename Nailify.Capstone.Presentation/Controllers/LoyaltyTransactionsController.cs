@@ -5,11 +5,13 @@ using Nailify.Capstone.Application.DTOs.RequestDTOs.LoyaltyTransactionRequestDTO
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
-using Nailify.Capstone.Application.Services;
 using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý giao dịch điểm tích lũy (ví điểm) của khách hàng.
+    /// </summary>
     [Authorize]
     [Route("api/[controller]")]
     public class LoyaltyTransactionsController : BaseApiController
@@ -17,6 +19,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         private readonly ILoyaltyTransactionService _service;
         public LoyaltyTransactionsController(ILoyaltyTransactionService service) => _service = service;
 
+        /// <summary>
+        /// Lấy danh sách giao dịch điểm tích lũy có phân trang (dành cho quản trị viên).
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] Guid? userId = null,
@@ -26,6 +31,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(await _service.GetPagedAsync(pageNumber, pageSize, userId));
         }
 
+        /// <summary>
+        /// Lấy danh sách giao dịch điểm của người dùng hiện tại.
+        /// </summary>
         [HttpGet("me")]
         public async Task<IActionResult> GetMyTransactions(
             [FromQuery] int pageNumber = 1,
@@ -34,6 +42,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             return Ok(await _service.GetPagedAsync(pageNumber, pageSize, GetCurrentUserId()));
         }
 
+        /// <summary>
+        /// Lấy chi tiết giao dịch điểm theo ID.
+        /// </summary>
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -42,8 +53,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             if (!User.IsInRole(nameof(UserRole.Admin)) && result.Data.CustomerId != GetCurrentUserId()) return Forbid();
             return Ok(result);
         }
+
         /// <summary>
-        /// Lấy tổng quan Ví điểm và thông tin Hạng thành viên của khách hàng đang đăng nhập.
+        /// Lấy tổng quan ví điểm và thông tin hạng thành viên của khách hàng đang đăng nhập.
         /// </summary>
         [HttpGet("my-wallet-summary")]
         [Authorize]
@@ -51,12 +63,13 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetMyWalletSummary()
         {
             var userId = GetCurrentUserId();
-            
+
             var result = await _service.GetWalletSummaryAsync(userId);
             return Ok(result);
         }
+
         /// <summary>
-        /// Hoàn điểm trực tiếp vào ví điểm của khách hàng (Dành cho Admin/Salon khi xử lý hoàn đơn hoặc đền bù).
+        /// Hoàn điểm trực tiếp vào ví điểm của khách hàng (dành cho Admin/Salon khi xử lý hoàn đơn hoặc đền bù).
         /// </summary>
         [HttpPost("refund-points")]
         [Authorize(Roles = "Admin,Staff")]

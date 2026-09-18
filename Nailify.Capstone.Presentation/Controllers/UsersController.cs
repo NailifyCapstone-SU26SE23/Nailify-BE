@@ -155,7 +155,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xóa người dùng (Chuyển trạng thái hoạt động thành InActive).
+        /// Xóa người dùng (Chuyển trạng thái hoạt động thành Inactive).
         /// </summary>
         /// <param name="id">ID của người dùng cần xóa.</param>
         /// <returns>Kết quả xóa thành công.</returns>

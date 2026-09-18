@@ -62,5 +62,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// Lấy đơn đặt lịch tiếp theo (Approved/Pending) của một thợ sau một mốc thời gian cụ thể.
         /// </summary>
         Task<Booking?> GetNextBookingForArtistAsync(Guid artistId, DateTime date, TimeSpan afterTime, bool trackChanges = false);
+
+        Task<Dictionary<Guid, int>> GetBookingCountsByArtistIdsAndDateAsync(IEnumerable<Guid> artistIds, DateTime date);
     }
 }
