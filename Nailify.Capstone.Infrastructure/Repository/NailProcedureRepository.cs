@@ -54,5 +54,16 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                 .OrderBy(x => x.StepOrder)
                                 .ToListAsync();
         }
+
+        public async Task<List<NailProcedure>> GetActiveProceduresByCustomerNailIdsAsync(IEnumerable<int> customerNailIds)
+        {
+            var ids = customerNailIds.Distinct().ToList();
+            if (!ids.Any()) return new List<NailProcedure>();
+            return await FindByCondition(np => np.CustomerNailId.HasValue && ids.Contains(np.CustomerNailId.Value) && np.Status == "Active")
+                         .Include(np => np.Procedure)
+                         .Where(np => np.IsCustomStep || (np.Procedure != null && np.Procedure.Status == "Active"))
+                         .OrderBy(np => np.StepOrder)
+                         .ToListAsync();
+        }
     }
 }

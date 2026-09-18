@@ -15,11 +15,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly INotificationService _notificationService;
         #region Constructor
-        public CustomerNailService(IUnitOfWork unitOfWork, IMapper mapper)
+        public CustomerNailService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _notificationService = notificationService;
         }
         #endregion Constructor
         #region CRUD Operations
@@ -216,6 +218,20 @@ namespace Nailify.Capstone.Application.Services
             request.IsCustomerRequest = true;
             await _unitOfWork.CustomerNailRequestRepository.CreateAsync(request);
             await _unitOfWork.SaveChangesAsync();
+            var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(customerId);
+            string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : "Khách hàng";
+            await _notificationService.SendNotificationToSalonStaffAsync(
+                requestDto.SalonId.ToString(),
+                "NEW_CUSTOM_NAIL_REQUEST",
+                new
+                {
+                    Message = $"Có yêu cầu duyệt và báo giá mẫu móng custom mới từ khách hàng {customerName}!",
+                    CustomerNailRequestId = request.CustomerNailRequestId,
+                    CustomerNailId = request.CustomerNailId,
+                    SalonId = request.SalonId,
+                    CustomerId = customerId,
+                    CustomerName = customerName
+                });
 
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(request.CustomerNailRequestId);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
@@ -363,6 +379,22 @@ namespace Nailify.Capstone.Application.Services
             nailRequest.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
+            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(nailRequest.CustomerNailId);
+            if (customerNail != null)
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    customerNail.UserId.ToString(),
+                    "CUSTOM_NAIL_QUOTED",
+                    new
+                    {
+                        Message = $"Salon đã duyệt báo giá {request.FinalPrice:N0}đ cho mẫu nail custom của bạn. Vui lòng kiểm tra và xác nhận!",
+                        CustomerNailRequestId = nailRequest.CustomerNailRequestId,
+                        CustomerNailId = nailRequest.CustomerNailId,
+                        Price = request.FinalPrice,
+                        Duration = request.FinalDuration,
+                        Status = nailRequest.Status.ToString()
+                    });
+            }
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
             return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Quản lý chốt giá gửi khách hàng thành công.");
@@ -397,6 +429,21 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.CustomerNailRequestRepository.Update(nailRequest);
             await _unitOfWork.SaveChangesAsync();
+            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(nailRequest.CustomerNailId);
+            if (customerNail != null)
+            {
+                await _notificationService.SendNotificationToUserAsync(
+                    customerNail.UserId.ToString(),
+                    "CUSTOM_NAIL_REJECTED",
+                    new
+                    {
+                        Message = $"Yêu cầu báo giá mẫu nail custom của bạn đã bị từ chối. Lý do: {request.Reason}",
+                        CustomerNailRequestId = nailRequest.CustomerNailRequestId,
+                        CustomerNailId = nailRequest.CustomerNailId,
+                        Reason = request.Reason,
+                        Status = nailRequest.Status.ToString()
+                    });
+            }
             var updatedNail = await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestDetailAsync(id);
             var response = _mapper.Map<CustomerNailRequestResponseDTO>(updatedNail);
             return new ApiSuccessResult<CustomerNailRequestResponseDTO>(response, "Yêu cầu duyệt mẫu nail đã bị từ chối.");
