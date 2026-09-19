@@ -14,6 +14,7 @@ using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
@@ -226,7 +227,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             var redisSettings = configuration.GetSection("Redis")
                                              .Get<RedisConfiguration>()
-                                ?? new RedisConfiguration { UseMemoryCache = true };
+                                ?? new RedisConfiguration();
             services.AddSingleton<IRedisConfiguration>(redisSettings);
 
             var nemotronSettings = configuration.GetSection("NemotronConfig")
@@ -243,18 +244,11 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                  ?? new GoogleConfiguration();
             services.AddSingleton<IGoogleConfiguration>(googleSettings);
 
-            if (redisSettings.UseMemoryCache)
+            services.AddStackExchangeRedisCache(options =>
             {
-                services.AddDistributedMemoryCache();
-            }
-            else
-            {
-                services.AddStackExchangeRedisCache(options =>
-                {
-                   options.Configuration = redisSettings?.ConnectionString;
-                   options.InstanceName = redisSettings?.InstanceName;
-                });
-            }
+               options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
+               options.InstanceName = redisSettings.InstanceName;
+            });
 
             var emailSettings = configuration.GetSection("SMTPEmailSettings")
                                   .Get<SmtpEmailConfiguration>()
