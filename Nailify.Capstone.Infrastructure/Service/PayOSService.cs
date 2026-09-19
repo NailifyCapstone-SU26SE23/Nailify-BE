@@ -94,7 +94,8 @@ namespace Nailify.Capstone.Infrastructure.Service
                     if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
                 }
                 decimal walletPaidAmount = 0m;
-                if(request.UseWalletBalance && finalAmountDue > 0)
+                WalletTransaction ? walletTx = null;
+                if (request.UseWalletBalance && finalAmountDue > 0)
                 {
                     var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
                     if(wallet != null)
@@ -107,7 +108,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                             wallet.Balance -= walletPaidAmount;
                             wallet.UpdatedAt = DateTime.UtcNow;
                             _unitOfWork.CustomerWalletRepository.Update(wallet);
-                            var walletTx = new WalletTransaction
+                            walletTx = new WalletTransaction
                             {
                                 WalletId = wallet.WalletId,
                                 Amount = -walletPaidAmount,
@@ -121,6 +122,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                                 CreatedAt = DateTime.UtcNow
                             };
                             await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                            request.UseWalletBalance = false;
                         }
                     }
                 }
@@ -141,8 +143,13 @@ namespace Nailify.Capstone.Infrastructure.Service
                     {
                         booking.AmountPaid = walletPaidAmount;
                         booking.AmountDue = Math.Max(0m, amountDue - walletPaidAmount);
-                        booking.Status = BookingStatus.Pending; 
+                        booking.Status = BookingStatus.Pending;
                         _unitOfWork.BookingRepository.Update(booking);
+                        if (walletTx != null)
+                        {
+                            walletTx.ReferenceId = createdBookingId.ToString();
+                            _unitOfWork.WalletTransactionRepository.Update(walletTx);
+                        }
                     }
                     var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
                     var transactions = new Transaction
@@ -597,11 +604,21 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             try
             {
+                var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(orderCode.ToString(CultureInfo.InvariantCulture), trackChanges: false);
+                if (transaction != null && (transaction.PaymentLinkId == "WALLET_PAYMENT" || transaction.Status == TransactionStatus.Paid))
+                {
+                    return (true, "Lấy trạng thái thanh toán thành công!", transaction.Status.ToString().ToUpper());
+                }
+
                 ApplyAuthenticationHeaders();
                 var response = await _httpClient.GetAsync($"{PayOSBaseUrl}/v2/payment-requests/{orderCode}");
                 var responseContent = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
+                    if (transaction != null)
+                    {
+                        return (true, "Lấy trạng thái từ hệ thống thành công!", transaction.Status.ToString().ToUpper());
+                    }
                     return (false, $"Lỗi từ PayOS: {responseContent}", null);
                 }
 
