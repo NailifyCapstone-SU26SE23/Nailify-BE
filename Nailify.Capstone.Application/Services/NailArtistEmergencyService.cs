@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly IEmailService _emailService;
         private readonly IBookingSkillMatchingService _skillMatchingService;
         private readonly IPromotionService _promotionService;
+        private readonly IRefundService _refundService;
 
         public NailArtistEmergencyService(
             IUnitOfWork unitOfWork,
@@ -32,7 +33,8 @@ namespace Nailify.Capstone.Application.Services
             INotificationService notificationService,
             IEmailService emailService,
             IBookingSkillMatchingService skillMatchingService,
-            IPromotionService promotionService)
+            IPromotionService promotionService,
+            IRefundService refundService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -41,12 +43,13 @@ namespace Nailify.Capstone.Application.Services
             _emailService = emailService;
             _skillMatchingService = skillMatchingService;
             _promotionService = promotionService;
+            _refundService = refundService;
         }
 
         public async Task<EmergencyOffResultDTO> ProcessAffectedBookingsForDateAsync(Guid artistId, DateTime targetDate, string reason)
         {
             // Lấy tất cả  các lịch hẹn Approve của thợ trong ngày
-            var affectedBookings = await _unitOfWork.BookingRepository.GetApprovedBookingsWithDetailsByArtistAndDateAsync(artistId, targetDate);
+            var affectedBookings = await _unitOfWork.BookingRepository.GetApprovedBookingsWithDetailsByArtistAndDateAsync(artistId, targetDate, trackChanges: true);
 
             var orderedBookings = affectedBookings.OrderBy(x => x.StartTime).ToList();
 
@@ -220,6 +223,15 @@ namespace Nailify.Capstone.Application.Services
 
                 // LUỒNG HỦY ĐƠN & HOÀN CỌC + VOUCHER KHI KHÔNG CÓ THỢ NÀO THAY THẾ
                 string cancelReason = $"[Tự động hủy] Sự cố thợ bận đột xuất ({reason}) - Không có thợ/slot có kỹ năng phù hợp thay thế.";
+                var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                    x.BookingId,
+                    $"Hoàn toàn bộ tiền cọc do Salon hủy lịch khẩn cấp. Lý do: {cancelReason}",
+                    forceFullRefund: true);
+                if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+                {
+                    throw new InvalidOperationException(refundResult.Message);
+                }
+
                 x.Cancel(Guid.Empty, cancelReason);
                 _unitOfWork.BookingRepository.Update(x);
 
