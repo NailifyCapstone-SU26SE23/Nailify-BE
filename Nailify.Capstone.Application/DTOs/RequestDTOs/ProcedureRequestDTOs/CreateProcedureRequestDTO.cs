@@ -2,6 +2,7 @@ using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Application.Mapping;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ProcedureRequestDTOs
         public int? Duration { get; set; }
         public bool IsRequired { get; set; } = true;
         public bool IsMainStep { get; set; } = true;
-
+        public ProcedureType ProcedureType { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<CreateProcedureRequestDTO, Procedure>()
