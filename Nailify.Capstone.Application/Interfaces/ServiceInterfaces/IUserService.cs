@@ -9,7 +9,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IUserService
     {
-        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null);
+        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, string? status = null, Guid? salonId = null);
         Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null);
         Task<ApiResult<UserDto>> GetUserByIdAsync(Guid id);
         Task<ApiResult<UserDto>> CreateUserAsync(UserCreateRequest request);

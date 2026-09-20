@@ -452,7 +452,10 @@ namespace Nailify.Capstone.Application.Services
                         var availableBalance = wallet.Balance - wallet.FrozenBalance;
                         if (availableBalance > 0) 
                         {
-                            walletPaidAmount = Math.Min(availableBalance, finalTotalPrice);
+                            var salonForDeposit = await _unitOfWork.SalonRepository.GetByIdAsync(request.SalonId);
+                            decimal depositRate = salonForDeposit?.DepositConfig ?? 0.25m;
+                            decimal depositAmount = finalTotalPrice * depositRate;
+                            walletPaidAmount = Math.Min(availableBalance, depositAmount);
                             var balanceBefore = wallet.Balance;
                             wallet.Balance -= walletPaidAmount;
                             wallet.UpdatedAt = DateTime.UtcNow;
@@ -477,6 +480,7 @@ namespace Nailify.Capstone.Application.Services
                     }
                 }
                 decimal amountDueForPayOS = finalTotalPrice - walletPaidAmount;
+                booking.AmountPaid = walletPaidAmount;
                 booking.AmountDue = amountDueForPayOS;
              
 

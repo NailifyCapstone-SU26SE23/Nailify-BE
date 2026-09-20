@@ -29,8 +29,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [AllowAnonymous]
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
-
+        public async Task<IActionResult> GetAll([FromQuery] int pageNumber = 1,
+                                                [FromQuery] int pageSize = 10,
+                                                [FromQuery] ActiveStatusFilter? status = null)
+        {
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _service.GetAllAsync(pageNumber, pageSize, statusStr);
+            return Ok(result);
+        }
         /// <summary>
         /// Lấy chi tiết hạng thành viên theo ID.
         /// </summary>
