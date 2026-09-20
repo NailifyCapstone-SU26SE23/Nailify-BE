@@ -94,10 +94,16 @@ namespace Nailify.Capstone.Application.Services
 
         private static TransactionResponseDto Map(Transaction transaction)
         {
+            var booking = transaction.Booking;
+            var bookingCustomerUser = booking?.Customer?.User;
+            var wallet = transaction.Wallet;
+            var walletCustomerUser = wallet?.Customer?.User;
+
             return new TransactionResponseDto
             {
                 TransactionId = transaction.TransactionId,
-                BookingId = (Guid)transaction.BookingId,
+                BookingId = transaction.BookingId,
+                WalletId = transaction.WalletId,
                 OrderCode = transaction.OrderCode,
                 Amount = transaction.Amount,
                 Reference = transaction.Reference,
@@ -109,12 +115,12 @@ namespace Nailify.Capstone.Application.Services
                 CreatedAt = transaction.CreatedAt,
                 PaidAt = transaction.PaidAt,
                 ExpiresAt = transaction.ExpiresAt,
-                CustomerId = transaction.Booking.CustomerId,
-                CustomerName = transaction.Booking.Customer?.User == null
+                CustomerId = booking?.CustomerId ?? wallet?.CustomerId ?? Guid.Empty,
+                CustomerName = bookingCustomerUser == null && walletCustomerUser == null
                     ? string.Empty
-                    : $"{transaction.Booking.Customer.User.FirstName} {transaction.Booking.Customer.User.LastName}".Trim(),
-                SalonId = transaction.Booking.SalonId,
-                SalonName = transaction.Booking.Salon?.Name ?? string.Empty
+                    : $"{bookingCustomerUser?.FirstName ?? walletCustomerUser?.FirstName} {bookingCustomerUser?.LastName ?? walletCustomerUser?.LastName}".Trim(),
+                SalonId = booking?.SalonId,
+                SalonName = booking?.Salon?.Name ?? string.Empty
             };
         }
     }
