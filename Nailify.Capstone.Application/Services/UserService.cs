@@ -28,7 +28,7 @@ namespace Nailify.Capstone.Application.Services
             _passwordHasher = passwordHasher;
         }
         #region Account Management
-        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null)
+        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, string? status = null,  Guid? salonId = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>>? predicate = null;
             if (!string.IsNullOrWhiteSpace(searchTerm) || role.HasValue || salonId.HasValue)
@@ -37,15 +37,10 @@ namespace Nailify.Capstone.Application.Services
                 predicate = u =>
                     (string.IsNullOrEmpty(term) || u.Email.ToLower().Contains(term) || u.FirstName.ToLower().Contains(term) || u.LastName.ToLower().Contains(term))
                     && (!role.HasValue || u.Role == role.Value)
-                    && (!salonId.HasValue || u.SalonId == salonId.Value)
-                    && u.Status == "Active";
-            }
-            else
-            {
-                predicate = u => u.Status == "Active";
+                    && (!salonId.HasValue || u.SalonId == salonId.Value);
             }
 
-            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, null);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 

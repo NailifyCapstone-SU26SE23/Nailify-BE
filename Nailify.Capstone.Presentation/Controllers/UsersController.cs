@@ -44,9 +44,11 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageSize = 10, 
             [FromQuery] string? searchTerm = null,
             [FromQuery] UserRole? role = null,
+            [FromQuery] ActiveStatusFilter? status = null,
             [FromQuery] Guid? salonId = null)
         {
-            var result = await _userService.GetPagedUsersAsync(pageNumber, pageSize, searchTerm, role, salonId);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _userService.GetPagedUsersAsync(pageNumber, pageSize, searchTerm, role, statusStr, salonId);
             return Ok(result);
         }
 
