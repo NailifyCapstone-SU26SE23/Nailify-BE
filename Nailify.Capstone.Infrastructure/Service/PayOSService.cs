@@ -148,7 +148,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                         if (walletTx != null)
                         {
                             walletTx.ReferenceId = createdBookingId.ToString();
-                            _unitOfWork.WalletTransactionRepository.Update(walletTx);
                         }
                     }
                     var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
