@@ -78,5 +78,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
                    int freedDurationMinutes,
                    int continuousWindowMinutes
                    );
+        Task<BookingWaitlist?> GetWaitlistForUpdateAsync(Guid waitlistId);
     }
 }

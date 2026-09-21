@@ -194,5 +194,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
 
             return scoredCandidates?.Candidate;
         }
+
+        public async Task<BookingWaitlist?> GetWaitlistForUpdateAsync(Guid waitlistId)
+        {
+            return await _context.Set<BookingWaitlist>()
+              .FromSqlRaw("SELECT * FROM \"BookingWaitlists\" WHERE \"WailistId\" = {0} FOR UPDATE", waitlistId)
+              .FirstOrDefaultAsync();
+        }
     }
 }
