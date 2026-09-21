@@ -94,38 +94,15 @@ namespace Nailify.Capstone.Infrastructure.Service
                     if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
                 }
                 decimal walletPaidAmount = 0m;
-                WalletTransaction ? walletTx = null;
                 if (request.UseWalletBalance && finalAmountDue > 0)
                 {
-                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdAsync(customerId);
                     if(wallet != null)
                     {
-                        var availableBalance = wallet.Balance - wallet.FrozenBalance;
-                        if(availableBalance > 0)
-                        {
-                            walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
-                            var balanceBefore = wallet.Balance;
-                            wallet.Balance -= walletPaidAmount;
-                            wallet.UpdatedAt = DateTime.UtcNow;
-                            _unitOfWork.CustomerWalletRepository.Update(wallet);
-                            walletTx = new WalletTransaction
-                            {
-                                WalletId = wallet.WalletId,
-                                Amount = -walletPaidAmount,
-                                BalanceBefore = balanceBefore,
-                                BalanceAfter = wallet.Balance,
-                                Type = WalletTransactionType.BookingPayment,
-                                Status = WalletTransactionStatus.Completed,
-                                ReferenceId = null,
-                                ReferenceType = WalletReferenceType.Booking,
-                                Description = $"Thanh toán cọc đơn đặt lịch tại {salon.Name}",
-                                CreatedAt = DateTime.UtcNow
-                            };
-                            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
-                            request.UseWalletBalance = false;
+                        var availableBalance = Math.Max(0m, wallet.Balance - wallet.FrozenBalance);
+                        walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
                         }
                     }
-                }
 
                 decimal remainingAmountToPayOnline = finalAmountDue - walletPaidAmount;
 
@@ -138,18 +115,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
 
                     var createdBookingId = createBookingResult.Data.BookingId;
-                    var booking = await _unitOfWork.BookingRepository.GetByIdAsync(createdBookingId);
-                    if (booking != null)
-                    {
-                        booking.AmountPaid = walletPaidAmount;
-                        booking.AmountDue = Math.Max(0m, amountDue - walletPaidAmount);
-                        booking.Status = BookingStatus.Pending;
-                        _unitOfWork.BookingRepository.Update(booking);
-                        if (walletTx != null)
-                        {
-                            walletTx.ReferenceId = createdBookingId.ToString();
-                        }
-                    }
                     var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
                     var transactions = new Transaction
                     {
