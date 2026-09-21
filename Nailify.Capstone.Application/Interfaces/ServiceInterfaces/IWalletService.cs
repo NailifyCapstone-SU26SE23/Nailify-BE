@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.PaymentDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalletRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Domain.Enums;
@@ -14,7 +15,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<CustomerWalletSummaryDto>> GetWalletSummaryAsync(Guid customerId);
         Task<ApiResult<WalletSummaryDTO>> GetWalletSummaryByIdAsync(Guid customerId);
-        Task<ApiResult<string>> RequestDepositAsync(Guid customerId, decimal amount);
+        Task<ApiResult<PaymentResponseDto>> RequestDepositAsync(Guid customerId, decimal amount);
         Task<ApiResult<WithdrawalRequestResponseDto>> RequestWithdrawalAsync(Guid customerId, CreateWithdrawalRequestDto request);
         Task<ApiResult<string>> ConvertMoneyToPointsAsync(Guid customerId, decimal moneyAmount);
         Task<ApiResult<PagedList<WalletTransactionResponseDto>>> GetTransactionHistoryAsync(Guid customerId, int pageNumber, int pageSize);

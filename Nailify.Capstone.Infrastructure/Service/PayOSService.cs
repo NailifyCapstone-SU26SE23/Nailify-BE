@@ -94,38 +94,15 @@ namespace Nailify.Capstone.Infrastructure.Service
                     if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
                 }
                 decimal walletPaidAmount = 0m;
-                WalletTransaction ? walletTx = null;
                 if (request.UseWalletBalance && finalAmountDue > 0)
                 {
-                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdAsync(customerId);
                     if(wallet != null)
                     {
-                        var availableBalance = wallet.Balance - wallet.FrozenBalance;
-                        if(availableBalance > 0)
-                        {
-                            walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
-                            var balanceBefore = wallet.Balance;
-                            wallet.Balance -= walletPaidAmount;
-                            wallet.UpdatedAt = DateTime.UtcNow;
-                            _unitOfWork.CustomerWalletRepository.Update(wallet);
-                            walletTx = new WalletTransaction
-                            {
-                                WalletId = wallet.WalletId,
-                                Amount = -walletPaidAmount,
-                                BalanceBefore = balanceBefore,
-                                BalanceAfter = wallet.Balance,
-                                Type = WalletTransactionType.BookingPayment,
-                                Status = WalletTransactionStatus.Completed,
-                                ReferenceId = null,
-                                ReferenceType = WalletReferenceType.Booking,
-                                Description = $"Thanh toán cọc đơn đặt lịch tại {salon.Name}",
-                                CreatedAt = DateTime.UtcNow
-                            };
-                            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
-                            request.UseWalletBalance = false;
+                        var availableBalance = Math.Max(0m, wallet.Balance - wallet.FrozenBalance);
+                        walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
                         }
                     }
-                }
 
                 decimal remainingAmountToPayOnline = finalAmountDue - walletPaidAmount;
 
@@ -138,19 +115,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
 
                     var createdBookingId = createBookingResult.Data.BookingId;
-                    var booking = await _unitOfWork.BookingRepository.GetByIdAsync(createdBookingId);
-                    if (booking != null)
-                    {
-                        booking.AmountPaid = walletPaidAmount;
-                        booking.AmountDue = Math.Max(0m, amountDue - walletPaidAmount);
-                        booking.Status = BookingStatus.Pending;
-                        _unitOfWork.BookingRepository.Update(booking);
-                        if (walletTx != null)
-                        {
-                            walletTx.ReferenceId = createdBookingId.ToString();
-                            _unitOfWork.WalletTransactionRepository.Update(walletTx);
-                        }
-                    }
                     var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
                     var transactions = new Transaction
                     {
@@ -240,7 +204,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     BookingId = null,
                     OrderCode = orderCode.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    Amount = finalAmountDue,
+                    Amount = amount,
                     PaymentLinkId = GetString(data, "paymentLinkId"),
                     CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
                     QrCode = GetString(data, "qrCode") ?? string.Empty,
@@ -380,6 +344,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     description = "Wallet withdrawal",
                     toBin = GetBankBin(bankCode),
                     toAccountNumber = accountNumber,
+                    toAccountName = string.IsNullOrWhiteSpace(accountHolderName) ? null : accountHolderName,
                     category = new[] { "withdrawal" }
                 };
 
@@ -773,7 +738,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                 { "SHB", "970443" }, { "EIB", "970431" }, { "VAB", "970425" },
                 { "NAB", "970428" }, { "BAB", "970409" }, { "PGB", "970430" },
                 { "GPB", "970408" }, { "AGB", "970405" }, { "LVB", "970434" },
-                { "KLB", "970452" }, { "VBSP", "970427" }
+                { "KLB", "970452" }, { "VBSP", "970427" },
+                { "CTG", "970415" }, { "ICB", "970415" }, { "VIETINBANK", "970415" },
+                { "VIETIN", "970415" },
+                { "STB", "970403" }, { "SACOMBANK", "970403" }
             };
 
             return bankBins.GetValueOrDefault(bankCode.ToUpperInvariant(), "970436");
@@ -938,7 +906,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             transaction.Booking = await _unitOfWork.BookingRepository.GetByIdAsync(createResult.Data.BookingId);
             await _cache.RemoveAsync(cacheKey);
         }
-
+        /*
         private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
             if (transaction.Booking == null || !transaction.BookingId.HasValue)
@@ -963,7 +931,26 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.Booking.CheckOut(Guid.Empty);
             }
         }
+        */
+        private Task ApplyPaidAmountToBookingAsync(Transaction transaction)
+        {
+            if (transaction.Booking == null || !transaction.BookingId.HasValue)
+            {
+                return Task.CompletedTask;
+            }
 
+            var currentAmountPaid = transaction.Booking.AmountPaid ?? 0m;
+            var totalPrice = transaction.Booking.TotalPrice ?? 0m;
+
+            var newAmountPaid = currentAmountPaid + transaction.Amount;
+            transaction.Booking.AmountPaid = newAmountPaid;
+            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - newAmountPaid);
+            if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
+            {
+                transaction.Booking.CheckOut(Guid.Empty);
+            }
+            return Task.CompletedTask;
+        }
         private void StartStatusPolling(long orderCode, DateTime expiresAt)
         {
             _ = Task.Run(async () =>
