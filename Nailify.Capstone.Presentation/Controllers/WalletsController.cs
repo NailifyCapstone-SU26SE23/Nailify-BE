@@ -57,8 +57,8 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         /// <param name="amount">Số tiền nạp tối thiểu là 10,000 VNĐ.</param>
         [HttpPost("deposit")]
-        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResult<PaymentResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<PaymentResponseDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RequestDeposit([FromBody] decimal amount)
         {
             var customerId = GetCurrentUserId();
