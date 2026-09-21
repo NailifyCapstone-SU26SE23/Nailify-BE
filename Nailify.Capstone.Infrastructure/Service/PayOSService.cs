@@ -217,7 +217,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tạo link thanh toán thành công!", ToResponse(transaction));
             }
@@ -304,7 +303,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tạo link nạp tiền ví thành công!", ToResponse(transaction));
             }
@@ -498,7 +496,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
             }
@@ -536,11 +533,32 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.WebhookPayload = JsonSerializer.Serialize(webhookDto, JsonOptions);
                 transaction.Reference = webhookDto.Data?.Reference;
                 transaction.PaymentLinkId = webhookDto.Data?.PaymentLinkId ?? transaction.PaymentLinkId;
-                transaction.Status = webhookDto.Code == "00" && webhookDto.Success
+                var webhookStatus = webhookDto.Code == "00" && webhookDto.Success
                     ? TransactionStatus.Paid
                     : TransactionStatus.Cancelled;
-                transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
-                if (transaction.Status == TransactionStatus.Paid)
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus == TransactionStatus.Paid)
+                {
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Webhook da duoc xu ly truoc do.");
+                }
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus != TransactionStatus.Paid)
+                {
+                    _logger.LogWarning(
+                        "PayOS webhook attempted to move paid transaction {OrderCode} to {WebhookStatus}. Payload: {@Payload}",
+                        transaction.OrderCode,
+                        webhookStatus,
+                        webhookDto);
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Giao dich da thanh toan, bo qua webhook khong thanh cong.");
+                }
+
+                transaction.Status = webhookStatus;
+                transaction.PaidAt = webhookStatus == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
+                if (webhookStatus == TransactionStatus.Paid)
                 {
                     if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
                     {
