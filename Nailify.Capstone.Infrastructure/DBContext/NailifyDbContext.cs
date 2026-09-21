@@ -231,7 +231,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 .WithMany()
                 .HasForeignKey(cn => cn.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             modelBuilder.Entity<CustomerNail>()
                 .HasOne(cn => cn.NailShape)
                 .WithMany()
@@ -631,7 +631,7 @@ namespace Nailify.Capstone.Infrastructure.DBContext
             {
                 entity.HasKey(a => a.CustomerQuizAnswerId);
                 entity.Property(a => a.CustomerQuizAnswerId).ValueGeneratedOnAdd();
-                
+
                 entity.HasOne(a => a.Customer)
                       .WithMany(c => c.CustomerQuizAnswers)
                       .HasForeignKey(a => a.CustomerId)
@@ -829,6 +829,14 @@ namespace Nailify.Capstone.Infrastructure.DBContext
                 entity.HasOne(wi => wi.CustomerNail)
                       .WithMany()
                       .HasForeignKey(wi => wi.CustomerNailId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(wi => wi.ShapeMethodConfig)
+                      .WithMany()
+                      .HasForeignKey(wi => wi.ShapeMethodConfigId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(wi => wi.CustomerNailRequest)
+                      .WithMany()
+                      .HasForeignKey(wi => wi.CustomerNailRequestId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<NailArtistBreak>(entity =>
