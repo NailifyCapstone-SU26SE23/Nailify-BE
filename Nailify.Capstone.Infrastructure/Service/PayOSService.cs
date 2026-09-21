@@ -414,7 +414,7 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                     depositRate = salon.DepositConfig;
                 }
-
+                /*
                 var amountDue = booking.Status == BookingStatus.ServiceCompleted
                     ? booking.AmountDue ?? booking.TotalPrice ?? 0m
                     : booking.TotalPrice * depositRate ?? 0m;
@@ -422,11 +422,34 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     return (false, $"Số tiền không hợp lệ: {amountDue}.", null);
                 }
+                */
+                decimal amountDue;
+                if(booking.Status == BookingStatus.ServiceCompleted)
+                {
+                    amountDue = booking.AmountDue ?? booking.TotalPrice ?? 0m;
+                }
+                else
+                {
+                    var totalDepositRequired = (booking.TotalPrice ?? 0m) * depositRate;
+                    var amountAlreadyPaid = booking.AmountPaid ?? 0m;
 
+                    amountDue = Math.Max(0m, totalDepositRequired - amountAlreadyPaid);
+                }
+                if (amountDue <= 0 && booking.Status != BookingStatus.ServiceCompleted)
+                {
+                    return (true, "Tiền cọc đã được thanh toán hoàn tất bằng Ví cá nhân.", new PaymentResponseDto
+                    {
+                        OrderCode = 0,
+                        Amount = 0,
+                        QrCode = string.Empty,
+                        Status = "PAID",
+                        BookingId = bookingId
+                    });
+                }
                 var existing = await _unitOfWork.TransactionRepository
-                    .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
-                    .OrderByDescending(t => t.CreatedAt)
-                    .FirstOrDefaultAsync();
+                        .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
+                        .OrderByDescending(t => t.CreatedAt)
+                        .FirstOrDefaultAsync();
                 if (existing != null && existing.ExpiresAt > DateTime.UtcNow)
                 {
                     return (true, "Link thanh toán đã tồn tại.", ToResponse(existing));
