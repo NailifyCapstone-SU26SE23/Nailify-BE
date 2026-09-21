@@ -82,19 +82,19 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<WalletSummaryDTO>(summary, "Lấy thông tin ví khách hàng thành công.");
         }
 
-        public async Task<ApiResult<string>> RequestDepositAsync(Guid customerId, decimal amount)
+        public async Task<ApiResult<PaymentResponseDto>> RequestDepositAsync(Guid customerId, decimal amount)
         {
             if (amount < 10000m)
             {
-                return new ApiErrorResult<string>("Số tiền nạp tối thiểu là 10,000 VND.");
+                return new ApiErrorResult<PaymentResponseDto>("Số tiền nạp tối thiểu là 10,000 VND.");
             }
             var wallet = await GetOrCreateWalletEntityAsync(customerId);
             var result = await _payOSPaymentService.CreateWalletDepositPaymentLinkAsync(wallet.WalletId, amount);
             if (!result.Success || result.Payment == null)
             {
-                return new ApiErrorResult<string>(result.Message);
+                return new ApiErrorResult<PaymentResponseDto>(result.Message);
             }
-            return new ApiSuccessResult<string>(result.Payment.PaymentUrl, "Tạo link nạp tiền qua PayOS thành công!");
+            return new ApiSuccessResult<PaymentResponseDto>(result.Payment, "Tạo link nạp tiền qua PayOS thành công!");
         }
         public async Task<ApiResult<WithdrawalRequestResponseDto>> RequestWithdrawalAsync(Guid customerId, CreateWithdrawalRequestDto request)
         {

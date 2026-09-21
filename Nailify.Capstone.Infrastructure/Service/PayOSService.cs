@@ -204,7 +204,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     BookingId = null,
                     OrderCode = orderCode.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    Amount = finalAmountDue,
+                    Amount = amount,
                     PaymentLinkId = GetString(data, "paymentLinkId"),
                     CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
                     QrCode = GetString(data, "qrCode") ?? string.Empty,
@@ -344,6 +344,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     description = "Wallet withdrawal",
                     toBin = GetBankBin(bankCode),
                     toAccountNumber = accountNumber,
+                    toAccountName = string.IsNullOrWhiteSpace(accountHolderName) ? null : accountHolderName,
                     category = new[] { "withdrawal" }
                 };
 
@@ -413,7 +414,7 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                     depositRate = salon.DepositConfig;
                 }
-
+                /*
                 var amountDue = booking.Status == BookingStatus.ServiceCompleted
                     ? booking.AmountDue ?? booking.TotalPrice ?? 0m
                     : booking.TotalPrice * depositRate ?? 0m;
@@ -421,11 +422,34 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     return (false, $"Số tiền không hợp lệ: {amountDue}.", null);
                 }
+                */
+                decimal amountDue;
+                if(booking.Status == BookingStatus.ServiceCompleted)
+                {
+                    amountDue = booking.AmountDue ?? booking.TotalPrice ?? 0m;
+                }
+                else
+                {
+                    var totalDepositRequired = (booking.TotalPrice ?? 0m) * depositRate;
+                    var amountAlreadyPaid = booking.AmountPaid ?? 0m;
 
+                    amountDue = Math.Max(0m, totalDepositRequired - amountAlreadyPaid);
+                }
+                if (amountDue <= 0 && booking.Status != BookingStatus.ServiceCompleted)
+                {
+                    return (true, "Tiền cọc đã được thanh toán hoàn tất bằng Ví cá nhân.", new PaymentResponseDto
+                    {
+                        OrderCode = 0,
+                        Amount = 0,
+                        QrCode = string.Empty,
+                        Status = "PAID",
+                        BookingId = bookingId
+                    });
+                }
                 var existing = await _unitOfWork.TransactionRepository
-                    .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
-                    .OrderByDescending(t => t.CreatedAt)
-                    .FirstOrDefaultAsync();
+                        .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
+                        .OrderByDescending(t => t.CreatedAt)
+                        .FirstOrDefaultAsync();
                 if (existing != null && existing.ExpiresAt > DateTime.UtcNow)
                 {
                     return (true, "Link thanh toán đã tồn tại.", ToResponse(existing));
@@ -737,7 +761,10 @@ namespace Nailify.Capstone.Infrastructure.Service
                 { "SHB", "970443" }, { "EIB", "970431" }, { "VAB", "970425" },
                 { "NAB", "970428" }, { "BAB", "970409" }, { "PGB", "970430" },
                 { "GPB", "970408" }, { "AGB", "970405" }, { "LVB", "970434" },
-                { "KLB", "970452" }, { "VBSP", "970427" }
+                { "KLB", "970452" }, { "VBSP", "970427" },
+                { "CTG", "970415" }, { "ICB", "970415" }, { "VIETINBANK", "970415" },
+                { "VIETIN", "970415" },
+                { "STB", "970403" }, { "SACOMBANK", "970403" }
             };
 
             return bankBins.GetValueOrDefault(bankCode.ToUpperInvariant(), "970436");
@@ -902,7 +929,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             transaction.Booking = await _unitOfWork.BookingRepository.GetByIdAsync(createResult.Data.BookingId);
             await _cache.RemoveAsync(cacheKey);
         }
-
+        /*
         private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
             if (transaction.Booking == null || !transaction.BookingId.HasValue)
@@ -927,7 +954,26 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.Booking.CheckOut(Guid.Empty);
             }
         }
+        */
+        private Task ApplyPaidAmountToBookingAsync(Transaction transaction)
+        {
+            if (transaction.Booking == null || !transaction.BookingId.HasValue)
+            {
+                return Task.CompletedTask;
+            }
 
+            var currentAmountPaid = transaction.Booking.AmountPaid ?? 0m;
+            var totalPrice = transaction.Booking.TotalPrice ?? 0m;
+
+            var newAmountPaid = currentAmountPaid + transaction.Amount;
+            transaction.Booking.AmountPaid = newAmountPaid;
+            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - newAmountPaid);
+            if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
+            {
+                transaction.Booking.CheckOut(Guid.Empty);
+            }
+            return Task.CompletedTask;
+        }
         private void StartStatusPolling(long orderCode, DateTime expiresAt)
         {
             _ = Task.Run(async () =>
