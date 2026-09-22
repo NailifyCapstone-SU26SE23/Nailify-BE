@@ -26,6 +26,7 @@ namespace Nailify.Capstone.Test
         private readonly Mock<IPromotionService> _promotionServiceMock;
         private readonly Mock<IBookingProcedureService> _bookingProcedureServiceMock;
         private readonly Mock<IBookingSchedulingService> _bookingSchedulingServiceMock;
+        private readonly Mock<IBookingCreationService> _bookingCreationServiceMock;
 
         private readonly BookingWaitlistService _service;
 
@@ -42,6 +43,7 @@ namespace Nailify.Capstone.Test
             _promotionServiceMock = new Mock<IPromotionService>();
             _bookingProcedureServiceMock = new Mock<IBookingProcedureService>();
             _bookingSchedulingServiceMock = new Mock<IBookingSchedulingService>();
+            _bookingCreationServiceMock = new Mock<IBookingCreationService>();
 
             _unitOfWorkMock.Setup(u => u.BookingWaitlistRepository).Returns(_waitlistRepoMock.Object);
 
@@ -51,7 +53,8 @@ namespace Nailify.Capstone.Test
                 _loyaltyTierServiceMock.Object,
                 _promotionServiceMock.Object,
                 _bookingProcedureServiceMock.Object,
-                _bookingSchedulingServiceMock.Object
+                _bookingSchedulingServiceMock.Object,
+                _bookingCreationServiceMock.Object
             );
 
             SetupDefaultMapper();
