@@ -342,7 +342,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                     description = "Wallet withdrawal",
                     toBin = GetBankBin(bankCode),
                     toAccountNumber = accountNumber,
-                    toAccountName = string.IsNullOrWhiteSpace(accountHolderName) ? null : accountHolderName,
                     category = new[] { "withdrawal" }
                 };
 
