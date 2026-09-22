@@ -217,7 +217,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tạo link thanh toán thành công!", ToResponse(transaction));
             }
@@ -304,7 +303,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tạo link nạp tiền ví thành công!", ToResponse(transaction));
             }
@@ -522,7 +520,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
             }
@@ -560,11 +557,32 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.WebhookPayload = JsonSerializer.Serialize(webhookDto, JsonOptions);
                 transaction.Reference = webhookDto.Data?.Reference;
                 transaction.PaymentLinkId = webhookDto.Data?.PaymentLinkId ?? transaction.PaymentLinkId;
-                transaction.Status = webhookDto.Code == "00" && webhookDto.Success
+                var webhookStatus = webhookDto.Code == "00" && webhookDto.Success
                     ? TransactionStatus.Paid
                     : TransactionStatus.Cancelled;
-                transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
-                if (transaction.Status == TransactionStatus.Paid)
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus == TransactionStatus.Paid)
+                {
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Webhook da duoc xu ly truoc do.");
+                }
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus != TransactionStatus.Paid)
+                {
+                    _logger.LogWarning(
+                        "PayOS webhook attempted to move paid transaction {OrderCode} to {WebhookStatus}. Payload: {@Payload}",
+                        transaction.OrderCode,
+                        webhookStatus,
+                        webhookDto);
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Giao dich da thanh toan, bo qua webhook khong thanh cong.");
+                }
+
+                transaction.Status = webhookStatus;
+                transaction.PaidAt = webhookStatus == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
+                if (webhookStatus == TransactionStatus.Paid)
                 {
                     if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
                     {
@@ -929,32 +947,7 @@ namespace Nailify.Capstone.Infrastructure.Service
             transaction.Booking = await _unitOfWork.BookingRepository.GetByIdAsync(createResult.Data.BookingId);
             await _cache.RemoveAsync(cacheKey);
         }
-        /*
-        private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
-        {
-            if (transaction.Booking == null || !transaction.BookingId.HasValue)
-            {
-                return;
-            }
 
-            var paidAmountBeforeCurrentTransaction = await _unitOfWork.TransactionRepository
-                .FindByCondition(t =>
-                    t.BookingId == transaction.BookingId &&
-                    t.TransactionId != transaction.TransactionId &&
-                    t.Status == TransactionStatus.Paid)
-                .SumAsync(t => t.Amount);
-
-            var amountPaid = paidAmountBeforeCurrentTransaction + transaction.Amount;
-            var totalPrice = transaction.Booking.TotalPrice ?? 0m;
-
-            transaction.Booking.AmountPaid = amountPaid;
-            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - amountPaid);
-            if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
-            {
-                transaction.Booking.CheckOut(Guid.Empty);
-            }
-        }
-        */
         private Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
             if (transaction.Booking == null || !transaction.BookingId.HasValue)
@@ -973,74 +966,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.Booking.CheckOut(Guid.Empty);
             }
             return Task.CompletedTask;
-        }
-        private void StartStatusPolling(long orderCode, DateTime expiresAt)
-        {
-            _ = Task.Run(async () =>
-            {
-                var maxDuration = expiresAt - DateTime.UtcNow;
-                if (maxDuration < TimeSpan.FromMinutes(1))
-                {
-                    maxDuration = TimeSpan.FromMinutes(1);
-                }
-
-                var deadline = DateTime.UtcNow.Add(maxDuration);
-                var delay = TimeSpan.FromSeconds(10);
-
-                var attempt = 0;
-                while (DateTime.UtcNow < deadline)
-                {
-                    attempt++;
-                    try
-                    {
-                        using var scope = _scopeFactory.CreateScope();
-                        var scopedPaymentService = scope.ServiceProvider.GetRequiredService<PayOSService>();
-                        var (_, _, status) = await scopedPaymentService.GetPaymentStatusAsync(orderCode);
-                        if (IsTerminalPayOSStatus(status))
-                        {
-                            return;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(
-                            ex,
-                            "Auto status poll failed for order code {OrderCode} on attempt {Attempt}.",
-                            orderCode,
-                            attempt);
-                    }
-
-                    if (DateTime.UtcNow < deadline)
-                    {
-                        await Task.Delay(delay);
-                    }
-                }
-
-                using var overdueScope = _scopeFactory.CreateScope();
-                var overduePaymentService = overdueScope.ServiceProvider.GetRequiredService<PayOSService>();
-                await overduePaymentService.MarkTransactionOverdueAsync(orderCode);
-            });
-        }
-
-        private async Task MarkTransactionOverdueAsync(long orderCode)
-        {
-            var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(
-                orderCode.ToString(CultureInfo.InvariantCulture),
-                trackChanges: true);
-
-            if (transaction == null || transaction.Status == TransactionStatus.Paid || transaction.Status == TransactionStatus.Cancelled || transaction.Status == TransactionStatus.Overdue)
-            {
-                return;
-            }
-
-            transaction.Status = TransactionStatus.Overdue;
-            _unitOfWork.TransactionRepository.Update(transaction);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        private static bool IsTerminalPayOSStatus(string? status)
-        {
-            return status?.ToUpperInvariant() is "PAID" or "CANCELLED" or "CANCELED" or "EXPIRED";
         }
 
         private PaymentResponseDto ToResponse(Transaction transaction)
