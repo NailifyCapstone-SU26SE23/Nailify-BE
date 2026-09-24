@@ -27,5 +27,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<WithdrawalRequestResponseDto>> ApproveWithdrawalAsync(Guid adminId, Guid requestId, ApproveWithdrawalDto dto);
         Task<ApiResult<WithdrawalRequestResponseDto>> RejectWithdrawalAsync(Guid adminId, Guid requestId, RejectWithdrawalDto dto);
         Task<ApiResult<SystemWalletSummaryDto>> GetSystemWalletSummaryAsync();
+        Task<ApiResult<List<WalletTransactionResponseDto>>> GetWalletTransactionsByBookingId(string bookingId);
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
@@ -87,6 +88,16 @@ namespace Nailify.Capstone.Presentation.Controllers
         public async Task<IActionResult> GetByBookingId(Guid bookingId)
         {
             return Ok(await _transactionService.GetByBookingIdAsync(bookingId));
+        }
+        /// <summary>
+        /// Lấy tổng hợp lịch sử giao dịch thanh toán (PayOS + Wallet) theo ID lịch hẹn.
+        /// </summary>
+        [HttpGet("booking/{bookingId:guid}/payment-history")]
+        [ProducesResponseType(typeof(ApiResult<IEnumerable<BookingPaymentHistoryDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetPaymentHistoryByBookingId(Guid bookingId)
+        {
+            return Ok(await _transactionService.GetPaymentHistoryByBookingIdAsync(bookingId));
         }
     }
 }

@@ -227,7 +227,9 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             var redisSettings = configuration.GetSection("Redis")
                                              .Get<RedisConfiguration>()
-                                ?? new RedisConfiguration();
+                                //?? new RedisConfiguration();
+                                // ThanhDT
+                                ?? new RedisConfiguration { UseMemoryCache = true};
             services.AddSingleton<IRedisConfiguration>(redisSettings);
 
             var nemotronSettings = configuration.GetSection("NemotronConfig")
@@ -244,11 +246,39 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                  ?? new GoogleConfiguration();
             services.AddSingleton<IGoogleConfiguration>(googleSettings);
 
+            if (redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                    options.Configuration = redisSettings?.ConnectionString;
+                    options.InstanceName = redisSettings?.InstanceName;
+                });
+            }
+
+            // ThanhDT
+            /*
             services.AddStackExchangeRedisCache(options =>
             {
                options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
                options.InstanceName = redisSettings.InstanceName;
             });
+            */
+            if (redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                    options.Configuration = redisSettings?.ConnectionString;
+                    options.InstanceName = redisSettings?.InstanceName;
+                });
+            }
 
             var emailSettings = configuration.GetSection("SMTPEmailSettings")
                                   .Get<SmtpEmailConfiguration>()
