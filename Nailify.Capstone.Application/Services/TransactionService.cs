@@ -1,4 +1,5 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -122,6 +123,47 @@ namespace Nailify.Capstone.Application.Services
                 SalonId = booking?.SalonId,
                 SalonName = booking?.Salon?.Name ?? string.Empty
             };
+        }
+
+        public async Task<ApiResult<IEnumerable<BookingPaymentHistoryDto>>> GetPaymentHistoryByBookingIdAsync(Guid bookingId)
+        {
+            var paymentHistory = new List<BookingPaymentHistoryDto>();
+
+            var transactions = await _unitOfWork.TransactionRepository.GetByBookingIdAsync(bookingId);
+            foreach (var transaction in transactions)
+            {
+                paymentHistory.Add(new BookingPaymentHistoryDto
+                {
+                    Id = transaction.TransactionId.ToString(),
+                    Amount = transaction.Amount,
+                    PaymentMethod = "Chuyển khoản",
+                    Status = transaction.Status.ToString(),
+                    Description = transaction.Reference ?? "Thanh toán qua PayOS",
+                    CreatedAt = transaction.CreatedAt
+                });
+            }
+
+            var bookingIdStr = bookingId.ToString();
+            var walletTransactions = await _unitOfWork.WalletTransactionRepository.GetWalletTransactionByBookingId(bookingIdStr);
+            if (walletTransactions != null)
+            {
+                foreach (var wt in walletTransactions)
+                {
+                    paymentHistory.Add(new BookingPaymentHistoryDto
+                    {
+                        Id = wt.WalletTransactionId.ToString(),
+                        Amount = Math.Abs(wt.Amount),
+                        PaymentMethod = "Ví",
+                        Status = wt.Status.ToString(),
+                        Description = wt.Description ?? "Thanh toán bằng ví",
+                        CreatedAt = wt.CreatedAt
+                    });
+                }
+            }
+            var response = paymentHistory.OrderByDescending(x => x.CreatedAt).ToList();
+            return new ApiSuccessResult<IEnumerable<BookingPaymentHistoryDto>>(
+                response,
+                "Lấy lịch sử giao dịch thành công.");
         }
     }
 }
