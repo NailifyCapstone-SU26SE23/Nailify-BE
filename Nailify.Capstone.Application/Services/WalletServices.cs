@@ -389,5 +389,21 @@ namespace Nailify.Capstone.Application.Services
             var summary = await _unitOfWork.CustomerWalletRepository.GetSystemSummaryAsync();
             return new ApiSuccessResult<SystemWalletSummaryDto>(summary, "Lấy thống kê ví toàn hệ thống thành công.");
         }
+
+        public async Task<ApiResult<List<WalletTransactionResponseDto>>> GetWalletTransactionsByBookingId(string bookingId)
+        {
+            if (!Guid.TryParse(bookingId, out var parsedBookingId))
+            {
+                return new ApiErrorResult<List<WalletTransactionResponseDto>>("Mã booking không hợp lệ");
+            }
+            var booking = await _unitOfWork.BookingRepository.GetByIdAsync(parsedBookingId);
+            if (booking == null)
+            {
+                return new ApiErrorResult<List<WalletTransactionResponseDto>>("Không tìm thấy booking");
+            }
+            var walletTransactions = await _unitOfWork.WalletTransactionRepository.GetWalletTransactionByBookingId(bookingId);
+            var response = _mapper.Map<List<WalletTransactionResponseDto>>(walletTransactions);
+            return new ApiSuccessResult<List<WalletTransactionResponseDto>>(response, "Lấy chi tiết giao dịch của 1 booking thành công");
+        }
     }
 }
