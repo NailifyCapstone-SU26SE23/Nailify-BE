@@ -395,7 +395,8 @@ namespace Nailify.Capstone.Application.Services
                         DiscountAmount = promotionTotalDiscount,
                         IsAutoApplied = !promotion.IsSelectable,
                         AppliedDate = DateTime.UtcNow,
-                        PromotionId = promotion.PromotionId
+                        PromotionId = promotion.PromotionId,
+                        Promotion = promotion
                     });
                 }
             }
