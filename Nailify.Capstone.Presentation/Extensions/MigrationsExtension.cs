@@ -10,9 +10,17 @@ namespace Nailify.Capstone.Presentation.Extensions
         public static IHost ApplyMigrations(this IHost host)
         {
             using var scope = host.Services.CreateScope();
-            scope.ServiceProvider
-                .GetRequiredService<NailifyDbContext>()
-                .Database.Migrate();
+            try
+            {
+                scope.ServiceProvider
+                    .GetRequiredService<NailifyDbContext>()
+                    .Database.Migrate();
+            }
+            catch (Exception ex)
+            {
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<NailifyDbContext>>();
+                logger.LogError(ex, "An error occurred while applying database migrations.");
+            }
             return host;
         }
     }
