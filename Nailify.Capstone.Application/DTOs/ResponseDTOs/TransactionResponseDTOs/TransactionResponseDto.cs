@@ -22,5 +22,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
         public string CustomerName { get; set; } = string.Empty;
         public Guid? SalonId { get; set; }
         public string SalonName { get; set; } = string.Empty;
+        public PaymentType PaymentType { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
     }
 }

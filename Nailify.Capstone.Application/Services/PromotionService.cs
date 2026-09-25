@@ -457,7 +457,8 @@ namespace Nailify.Capstone.Application.Services
                 var remainingAmount = itemRemainingAmounts[item.BookingItemId];
                 if(remainingAmount > 0)
                 {
-                    var discountAmount = decimal.Round(remainingAmount * (promotion.DiscountValue / 100m), 0, MidpointRounding.AwayFromZero);
+                    var originalAmount = GetLineAmount(item);
+                    var discountAmount = decimal.Round(originalAmount * (promotion.DiscountValue / 100m), 0, MidpointRounding.AwayFromZero);
 
                     discountAmount = Math.Min(discountAmount, remainingAmount);
 
