@@ -93,6 +93,27 @@ namespace Nailify.Capstone.Application.Services
 
         private static int NormalizePageSize(int pageSize) => pageSize < 1 ? 10 : pageSize;
 
+        public static string DeterminePaymentMethod(string? paymentLinkId, Guid? walletId)
+        {
+            if (string.Equals(paymentLinkId, "WALLET_PAYMENT", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ví";
+            }
+            if (!string.IsNullOrWhiteSpace(paymentLinkId) && walletId.HasValue)
+            {
+                return "Nạp tiền vào ví";
+            }
+            if (!string.IsNullOrWhiteSpace(paymentLinkId) && !walletId.HasValue)
+            {
+                return "Chuyển khoản";
+            }
+            if (string.IsNullOrWhiteSpace(paymentLinkId) && !walletId.HasValue)
+            {
+                return "Tiền mặt";
+            }
+            return "Ví";
+        }
+
         private static TransactionResponseDto Map(Transaction transaction)
         {
             var booking = transaction.Booking;
@@ -121,7 +142,9 @@ namespace Nailify.Capstone.Application.Services
                     ? string.Empty
                     : $"{bookingCustomerUser?.FirstName ?? walletCustomerUser?.FirstName} {bookingCustomerUser?.LastName ?? walletCustomerUser?.LastName}".Trim(),
                 SalonId = booking?.SalonId,
-                SalonName = booking?.Salon?.Name ?? string.Empty
+                SalonName = booking?.Salon?.Name ?? string.Empty,
+                PaymentType = transaction.PaymentType,
+                PaymentMethod = DeterminePaymentMethod(transaction.PaymentLinkId, transaction.WalletId)
             };
         }
 
@@ -137,13 +160,22 @@ namespace Nailify.Capstone.Application.Services
                     continue;
                 }
 
+                var paymentMethod = DeterminePaymentMethod(transaction.PaymentLinkId, transaction.WalletId);
+                var defaultDesc = paymentMethod switch
+                {
+                    "Tiền mặt" => "Thanh toán bằng tiền mặt",
+                    "Ví" => "Thanh toán bằng ví",
+                    "Nạp tiền vào ví" => "Nạp tiền vào ví qua PayOS",
+                    _ => "Thanh toán qua PayOS"
+                };
+
                 paymentHistory.Add(new BookingPaymentHistoryDto
                 {
                     Id = transaction.TransactionId.ToString(),
                     Amount = transaction.Amount,
-                    PaymentMethod = "Chuyển khoản",
+                    PaymentMethod = paymentMethod,
                     Status = transaction.Status.ToString(),
-                    Description = transaction.Reference ?? "Thanh toán qua PayOS",
+                    Description = !string.IsNullOrWhiteSpace(transaction.Reference) ? transaction.Reference : defaultDesc,
                     CreatedAt = transaction.CreatedAt
                 });
             }
