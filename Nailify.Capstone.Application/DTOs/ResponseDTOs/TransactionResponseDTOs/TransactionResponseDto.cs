@@ -1,4 +1,5 @@
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
 {
