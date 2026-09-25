@@ -128,8 +128,10 @@ namespace Nailify.Capstone.Application.Services
                 .Select(discount => new DiscountBreakdownDTO
                 {
                     Name = discount.Name,
+                    Description = discount.Promotion?.Description ?? (discount.LoyaltyTierId.HasValue ? "Ưu đãi chiết khấu theo hạng thành viên" : null),
                     Amount = discount.DiscountAmount,
-                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion"
+                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion",
+                    IsAutoApplied = discount.IsAutoApplied
                 })
                 .ToList();
 
