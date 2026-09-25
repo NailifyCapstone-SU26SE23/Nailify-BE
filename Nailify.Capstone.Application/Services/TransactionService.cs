@@ -132,6 +132,11 @@ namespace Nailify.Capstone.Application.Services
             var transactions = await _unitOfWork.TransactionRepository.GetByBookingIdAsync(bookingId);
             foreach (var transaction in transactions)
             {
+                if (transaction.Status == TransactionStatus.Refunded)
+                {
+                    continue;
+                }
+
                 paymentHistory.Add(new BookingPaymentHistoryDto
                 {
                     Id = transaction.TransactionId.ToString(),
