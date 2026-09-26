@@ -41,6 +41,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         /// <summary>
         /// Lấy toàn bộ khoảng thời gian đang bị giữ chỗ của thợ trong ngày (đọc Redis 1 lần để check nhiều slot).
         /// </summary>
-        Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date);
+        Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date, Guid? customerId = null, string? excludingHoldToken = null);
     }
 }
