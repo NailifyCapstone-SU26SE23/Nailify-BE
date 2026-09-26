@@ -19,11 +19,15 @@ namespace Nailify.Capstone.Presentation.Extensions
                 var dbContext = services.GetRequiredService<NailifyDbContext>();
                 try
                 {
-                    dbContext.Database.EnsureCreated();
+                    var script = dbContext.Database.GenerateCreateScript();
+                    if (!string.IsNullOrWhiteSpace(script))
+                    {
+                        dbContext.Database.ExecuteSqlRaw(script);
+                    }
                 }
-                catch (Exception exEnsure)
+                catch (Exception exCreate)
                 {
-                    logger?.LogWarning(exEnsure, "EnsureCreated encountered an issue or tables exist.");
+                    logger?.LogWarning(exCreate, "GenerateCreateScript / ExecuteSqlRaw warning (some tables may already exist).");
                 }
 
                 dbContext.Database.Migrate();
