@@ -70,6 +70,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetArtistAvailableSlots([FromBody] GetArtistAvailableSlotsRequestDTO request)
         {
+            if (!request.CustomerId.HasValue)
+            {
+                try
+                {
+                    var customerId = GetCurrentUserId();
+                    if (customerId != Guid.Empty)
+                    {
+                        request.CustomerId = customerId;
+                    }
+                }
+                catch
+                {
+                }
+            }
             var response = await _bookingService.GetArtistAvailableSlotAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
@@ -632,6 +646,18 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetSalonAvailableSlots([FromBody] GetSalonAvailableSlotsRequestDTO request)
         {
+            if (!request.CustomerId.HasValue)
+            {
+                try
+                {
+                    var customerId = GetCurrentUserId();
+                    if (customerId != Guid.Empty)
+                    {
+                        request.CustomerId = customerId;
+                    }
+                }
+                catch { }
+            }
             var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
