@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
@@ -17,6 +18,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public WalletTransactionRepository(NailifyDbContext context) : base(context)
         {
         }
+
 
         public async Task<IEnumerable<WalletTransaction>> GetByWalletIdAsync(Guid walletId)
         {
@@ -72,6 +74,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ToListAsync();
 
             return new PagedList<WalletTransaction>(items, totalCount, pageNumber, pageSize);
+        }
+
+        public async Task<List<WalletTransaction>?> GetWalletTransactionByBookingId(string bookingId)
+        {
+            return await FindByCondition(x => x.ReferenceId == bookingId)
+                         .OrderByDescending(x => x.CreatedAt)
+                         .ToListAsync(); ;
         }
     }
 }

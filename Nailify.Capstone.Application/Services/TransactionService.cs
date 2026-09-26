@@ -1,4 +1,5 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
@@ -92,6 +93,27 @@ namespace Nailify.Capstone.Application.Services
 
         private static int NormalizePageSize(int pageSize) => pageSize < 1 ? 10 : pageSize;
 
+        public static string DeterminePaymentMethod(string? paymentLinkId, Guid? walletId)
+        {
+            if (string.Equals(paymentLinkId, "WALLET_PAYMENT", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ví";
+            }
+            if (!string.IsNullOrWhiteSpace(paymentLinkId) && walletId.HasValue)
+            {
+                return "Nạp tiền vào ví";
+            }
+            if (!string.IsNullOrWhiteSpace(paymentLinkId) && !walletId.HasValue)
+            {
+                return "Chuyển khoản";
+            }
+            if (string.IsNullOrWhiteSpace(paymentLinkId) && !walletId.HasValue)
+            {
+                return "Tiền mặt";
+            }
+            return "Ví";
+        }
+
         private static TransactionResponseDto Map(Transaction transaction)
         {
             var booking = transaction.Booking;
@@ -120,8 +142,65 @@ namespace Nailify.Capstone.Application.Services
                     ? string.Empty
                     : $"{bookingCustomerUser?.FirstName ?? walletCustomerUser?.FirstName} {bookingCustomerUser?.LastName ?? walletCustomerUser?.LastName}".Trim(),
                 SalonId = booking?.SalonId,
-                SalonName = booking?.Salon?.Name ?? string.Empty
+                SalonName = booking?.Salon?.Name ?? string.Empty,
+                PaymentType = transaction.PaymentType,
+                PaymentMethod = DeterminePaymentMethod(transaction.PaymentLinkId, transaction.WalletId)
             };
+        }
+
+        public async Task<ApiResult<IEnumerable<BookingPaymentHistoryDto>>> GetPaymentHistoryByBookingIdAsync(Guid bookingId)
+        {
+            var paymentHistory = new List<BookingPaymentHistoryDto>();
+
+            var transactions = await _unitOfWork.TransactionRepository.GetByBookingIdAsync(bookingId);
+            foreach (var transaction in transactions)
+            {
+                if (transaction.Status == TransactionStatus.Refunded)
+                {
+                    continue;
+                }
+
+                var paymentMethod = DeterminePaymentMethod(transaction.PaymentLinkId, transaction.WalletId);
+                var defaultDesc = paymentMethod switch
+                {
+                    "Tiền mặt" => "Thanh toán bằng tiền mặt",
+                    "Ví" => "Thanh toán bằng ví",
+                    "Nạp tiền vào ví" => "Nạp tiền vào ví qua PayOS",
+                    _ => "Thanh toán qua PayOS"
+                };
+
+                paymentHistory.Add(new BookingPaymentHistoryDto
+                {
+                    Id = transaction.TransactionId.ToString(),
+                    Amount = transaction.Amount,
+                    PaymentMethod = paymentMethod,
+                    Status = transaction.Status.ToString(),
+                    Description = !string.IsNullOrWhiteSpace(transaction.Reference) ? transaction.Reference : defaultDesc,
+                    CreatedAt = transaction.CreatedAt
+                });
+            }
+
+            var bookingIdStr = bookingId.ToString();
+            var walletTransactions = await _unitOfWork.WalletTransactionRepository.GetWalletTransactionByBookingId(bookingIdStr);
+            if (walletTransactions != null)
+            {
+                foreach (var wt in walletTransactions)
+                {
+                    paymentHistory.Add(new BookingPaymentHistoryDto
+                    {
+                        Id = wt.WalletTransactionId.ToString(),
+                        Amount = Math.Abs(wt.Amount),
+                        PaymentMethod = "Ví",
+                        Status = wt.Status.ToString(),
+                        Description = wt.Description ?? "Thanh toán bằng ví",
+                        CreatedAt = wt.CreatedAt
+                    });
+                }
+            }
+            var response = paymentHistory.OrderByDescending(x => x.CreatedAt).ToList();
+            return new ApiSuccessResult<IEnumerable<BookingPaymentHistoryDto>>(
+                response,
+                "Lấy lịch sử giao dịch thành công.");
         }
     }
 }

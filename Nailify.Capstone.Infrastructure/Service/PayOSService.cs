@@ -115,27 +115,12 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
 
                     var createdBookingId = createBookingResult.Data.BookingId;
-                    var code = await _payOSHelper.GenerateUniqueOrderCodeAsync();
-                    var transactions = new Transaction
-                    {
-                        BookingId = createdBookingId,
-                        OrderCode = code.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        Amount = finalAmountDue,
-                        PaymentLinkId = "WALLET_PAYMENT",
-                        CheckoutUrl = string.Empty,
-                        QrCode = string.Empty,
-                        Status = TransactionStatus.Paid,
-                        Policy = FormatDepositPolicy(depositRate),
-                        CreatedAt = DateTime.UtcNow,
-                        ExpiresAt = DateTime.UtcNow,
-                        WebhookPayload = "Paid via Customer Wallet"
-                    };
-                    await _unitOfWork.TransactionRepository.CreateAsync(transactions);
-                    await _unitOfWork.SaveChangesAsync();
+                    // Không tạo fake Transaction ở đây nữa vì BookingCreationService đã tạo WalletTransaction.
+
                     return (true, "Thanh toán cọc bằng Ví thành công! Đơn đặt lịch đã được xác nhận.", new PaymentResponseDto
                     {
-                        OrderCode = code,
-                        Amount = (int)finalAmountDue,
+                        OrderCode = 0,
+                        Amount = 0,
                         QrCode = string.Empty,
                         Status = "PAID",
                         BookingId = createdBookingId
@@ -342,7 +327,6 @@ namespace Nailify.Capstone.Infrastructure.Service
                     description = "Wallet withdrawal",
                     toBin = GetBankBin(bankCode),
                     toAccountNumber = accountNumber,
-                    toAccountName = string.IsNullOrWhiteSpace(accountHolderName) ? null : accountHolderName,
                     category = new[] { "withdrawal" }
                 };
 

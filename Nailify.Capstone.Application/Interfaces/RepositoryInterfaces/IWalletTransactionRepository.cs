@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.WalletResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Domain.Enums;
 using System;
@@ -14,5 +15,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<IEnumerable<WalletTransaction>> GetByWalletIdAsync(Guid walletId);
         Task<PagedList<WalletTransaction>> GetPagedByWalletIdAsync(Guid walletId, int pageNumber, int pageSize);
         Task<PagedList<WalletTransaction>> GetPagedSystemTransactionsAsync(WalletTransactionType? type, WalletTransactionStatus? status, DateTime? fromDate, DateTime? toDate, int pageNumber, int pageSize);
+        Task<List<WalletTransaction>?> GetWalletTransactionByBookingId(string bookingId);
     }
 }

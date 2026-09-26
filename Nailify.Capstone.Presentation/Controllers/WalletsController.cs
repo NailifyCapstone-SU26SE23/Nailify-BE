@@ -218,5 +218,11 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _walletService.GetSystemWalletSummaryAsync();
             return Ok(result);
         }
+        [HttpGet("/get-wallet-transaction-to-bookingId/{bookingId}")]
+        public async Task<IActionResult> GetWalletTransactionByBookingId(string bookingId)
+        {
+            var result = await _walletService.GetWalletTransactionsByBookingId(bookingId);
+            return Ok(result);
+        }
     }
 }

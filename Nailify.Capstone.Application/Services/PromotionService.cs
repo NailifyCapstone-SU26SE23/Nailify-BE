@@ -347,8 +347,61 @@ namespace Nailify.Capstone.Application.Services
         {
             decimal totalDiscount = 0;
             var appliedDiscounts = new List<BookingDiscount>();
-            var usedPromotions = new HashSet<int>();
 
+            // Số tiền còn lại của từng item sau khi trừ các khuyến mãi trước đó
+            var itemRemainingAmounts = new Dictionary<Guid, decimal>();
+            //var usedPromotions = new HashSet<int>();
+            foreach(var item in booking.BookingItems)
+            {
+                itemRemainingAmounts[item.BookingItemId] = GetLineAmount(item);
+            }
+
+            var sortedPromotions = applicablePromotions.OrderBy(x => x.DiscountType == DiscountType.Percentage ? 0 : 1).ToList();
+            foreach(var promotion in sortedPromotions)
+            {
+                // Tìm tất cả các items hợp lệ cho Promotion này
+                var eligibleItems = new List<BookingItem>();
+                foreach(var item in booking.BookingItems)
+                {
+                    if(await IsItemEligibleForPromotionAsync(item, promotion))
+                    {
+                        eligibleItems.Add(item);
+                    }
+                }
+
+                if (!eligibleItems.Any())
+                {
+                    continue;
+                }
+
+                decimal promotionTotalDiscount = 0;
+
+                if (promotion.DiscountType == DiscountType.Percentage)
+                {
+                    promotionTotalDiscount = ApplyPercentageDiscount(promotion, eligibleItems, itemRemainingAmounts);
+                }
+                else if(promotion.DiscountType == DiscountType.FixedAmount)
+                {
+                    promotionTotalDiscount = ApplyFixedAmountDiscount(promotion, eligibleItems, itemRemainingAmounts);
+                }
+
+                if(promotionTotalDiscount > 0)
+                {
+                    totalDiscount += promotionTotalDiscount;
+                    appliedDiscounts.Add(new BookingDiscount
+                    {
+                        BookingId = booking.BookingId,
+                        Name = promotion.Name,
+                        DiscountAmount = promotionTotalDiscount,
+                        IsAutoApplied = !promotion.IsSelectable,
+                        AppliedDate = DateTime.UtcNow,
+                        PromotionId = promotion.PromotionId,
+                        Promotion = promotion
+                    });
+                }
+            }
+            /// ThanhDT
+            /*
             foreach (var item in booking.BookingItems)
             {
                 var selectedPromotions = await SelectApplicablePromotionsAsync(item, applicablePromotions, usedPromotions);
@@ -389,10 +442,62 @@ namespace Nailify.Capstone.Application.Services
                     });
                 }
             }
+            */
 
             return (totalDiscount, appliedDiscounts);
         }
+        /// <summary>
+        /// Xử lý mã Giảm Phần trăm (Percentage). Áp dụng giảm giá trên TOÀN BỘ món đồ hợp lệ.
+        /// </summary>
+        private static decimal ApplyPercentageDiscount(Promotion promotion, List<BookingItem> eligibleItems, Dictionary<Guid, decimal> itemRemainingAmounts)
+        {
+            decimal totalDiscount = 0;
+            foreach(var item in eligibleItems)
+            {
+                var remainingAmount = itemRemainingAmounts[item.BookingItemId];
+                if(remainingAmount > 0)
+                {
+                    var originalAmount = GetLineAmount(item);
+                    var discountAmount = decimal.Round(originalAmount * (promotion.DiscountValue / 100m), 0, MidpointRounding.AwayFromZero);
 
+                    discountAmount = Math.Min(discountAmount, remainingAmount);
+
+                    if(discountAmount > 0)
+                    {
+                        itemRemainingAmounts[item.BookingItemId] -= discountAmount;
+                        totalDiscount += discountAmount;
+                    }
+                }
+            }
+            return totalDiscount;
+        }
+        /// <summary>
+        /// Xử lý mã Tiền mặt (Fixed Amount). Trừ dần vào các món đồ hợp lệ cho đến khi Voucher bằng 0.
+        /// </summary>
+        private static decimal ApplyFixedAmountDiscount(Promotion promotion, List<BookingItem> eligibleItems, Dictionary<Guid, decimal> itemRemainingAmounts)
+        {
+            decimal totalDiscount = 0;
+            decimal remainingVoucher = promotion.DiscountValue;
+
+            foreach(var item in eligibleItems)
+            {
+                if(remainingVoucher <= 0)
+                {
+                    break;
+                }
+
+                var remainingAmount = itemRemainingAmounts[item.BookingItemId];
+                if(remainingAmount > 0)
+                {
+                    var discountAmount = Math.Min(remainingAmount, remainingVoucher);
+
+                    itemRemainingAmounts[item.BookingItemId] -= discountAmount;
+                    remainingVoucher -= discountAmount;
+                    totalDiscount += discountAmount;
+                }
+            }
+            return totalDiscount;
+        }
         public async Task UpdateUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts)
         {
             var promotionIds = appliedDiscounts

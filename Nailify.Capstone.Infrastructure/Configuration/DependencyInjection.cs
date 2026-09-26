@@ -233,7 +233,7 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             var nemotronSettings = configuration.GetSection("NemotronConfig")
                                                 .Get<NemotronConfiguration>()
                                    ?? new NemotronConfiguration();
-           
+
             services.AddSingleton<INemotronConfiguration>(nemotronSettings);
 
             services.AddScoped<IGoogleAuthService, GoogleAuthService>();
@@ -244,59 +244,81 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                  ?? new GoogleConfiguration();
             services.AddSingleton<IGoogleConfiguration>(googleSettings);
 
+
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
+                options.InstanceName = redisSettings.InstanceName;
+            });
+
+            // ThanhDT
+            /*
             services.AddStackExchangeRedisCache(options =>
             {
                options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
                options.InstanceName = redisSettings.InstanceName;
             });
+            */
+            if (redisSettings.UseMemoryCache)
+            {
+                services.AddDistributedMemoryCache();
+            }
+            else
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                    options.Configuration = redisSettings?.ConnectionString;
+                    options.InstanceName = redisSettings?.InstanceName;
+                });
+            }
 
             var emailSettings = configuration.GetSection("SMTPEmailSettings")
                                   .Get<SmtpEmailConfiguration>()
                     ?? new SmtpEmailConfiguration();
-            services.AddSingleton<IEmailConfiguration>(emailSettings);
+services.AddSingleton<IEmailConfiguration>(emailSettings);
 
-            var sendGridSettings = configuration.GetSection("SendGrid")
-                                  .Get<SendGridEmailConfiguration>()
-                    ?? new SendGridEmailConfiguration();
-            services.AddSingleton(sendGridSettings);
+var sendGridSettings = configuration.GetSection("SendGrid")
+                      .Get<SendGridEmailConfiguration>()
+        ?? new SendGridEmailConfiguration();
+services.AddSingleton(sendGridSettings);
 
-            var paymentSettings = configuration.GetSection("PayOSSettings")
-                                  .Get<PayOSSettings>()
-                    ?? new PayOSSettings();
-            services.AddSingleton<IPayOSSettings>(paymentSettings);
+var paymentSettings = configuration.GetSection("PayOSSettings")
+                      .Get<PayOSSettings>()
+        ?? new PayOSSettings();
+services.AddSingleton<IPayOSSettings>(paymentSettings);
 
-            var paymentUrls = configuration.GetSection("PaymentUrls")
-                                  .Get<PaymentUrls>()
-                    ?? new PaymentUrls();
-            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
-            {
-                paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
-            }
-            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
-            {
-                paymentUrls.CancelUrl = paymentSettings.CancelUrl;
-            }
-            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
-            {
-                paymentUrls.ReturnUrl = "https://localhost:7066/swagger/index.html";
-            }
-            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
-            {
-                paymentUrls.CancelUrl = "https://localhost:7066/swagger/index.html";
-            }
-            services.AddSingleton<IPaymentUrls>(paymentUrls);
+var paymentUrls = configuration.GetSection("PaymentUrls")
+                      .Get<PaymentUrls>()
+        ?? new PaymentUrls();
+if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+{
+    paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+{
+    paymentUrls.CancelUrl = paymentSettings.CancelUrl;
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+{
+    paymentUrls.ReturnUrl = "https://localhost:7066/swagger/index.html";
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+{
+    paymentUrls.CancelUrl = "https://localhost:7066/swagger/index.html";
+}
+services.AddSingleton<IPaymentUrls>(paymentUrls);
 
-            // Đăng ký FluentValidation từ tầng Application
-            services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);
+// Đăng ký FluentValidation từ tầng Application
+services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);
 
-            // Đăng ký AutoMapper
-            services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
+// Đăng ký AutoMapper
+services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
 
-            // Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
-            services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
+// Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
+services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
 
 
-            return services;
+return services;
         }
     }
 }
