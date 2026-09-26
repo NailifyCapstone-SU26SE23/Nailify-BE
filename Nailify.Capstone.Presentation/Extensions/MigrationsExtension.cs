@@ -17,6 +17,15 @@ namespace Nailify.Capstone.Presentation.Extensions
             try
             {
                 var dbContext = services.GetRequiredService<NailifyDbContext>();
+                try
+                {
+                    dbContext.Database.EnsureCreated();
+                }
+                catch (Exception exEnsure)
+                {
+                    logger?.LogWarning(exEnsure, "EnsureCreated encountered an issue or tables exist.");
+                }
+
                 dbContext.Database.Migrate();
             }
             catch (Exception ex)
