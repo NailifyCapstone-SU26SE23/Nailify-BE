@@ -34,7 +34,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<List<Promotion>> GetApplicablePromotionsAsync(Guid customerId, ICollection<BookingItem> items, IEnumerable<int>? selectedPromotionIds = null);
         Task<(decimal totalDiscount, List<BookingDiscount> appliedDiscounts)> CalculateDiscountsAsync(Booking booking, List<Promotion> applicablePromotions);
         Task UpdateUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts);
-
+        Task RollbackUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts);
 
         // Wallet
         Task<ApiResult<PagedList<PromotionDto>>> GetRedeemablePromotionsAsync(int pageNumber, int pageSize, Guid customerId);

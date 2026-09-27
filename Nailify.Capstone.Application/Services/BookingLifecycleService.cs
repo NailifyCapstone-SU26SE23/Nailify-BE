@@ -419,6 +419,10 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
             }
+            if (booking.BookingDiscounts != null && booking.BookingDiscounts.Any())
+            {
+                await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
+            }
 
             booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
@@ -452,6 +456,10 @@ namespace Nailify.Capstone.Application.Services
             if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
             {
                 return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+            if (booking.BookingDiscounts != null && booking.BookingDiscounts.Any())
+            {
+                await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
             }
 
             booking.Cancel(actorId, request.Reason);
