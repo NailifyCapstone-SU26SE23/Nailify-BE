@@ -918,8 +918,30 @@ namespace Nailify.Capstone.Application.Services
                         foreach (var assign in secondaryAssignments)
                         {
                             var secName = assign.SecondaryArtist.Account != null 
-                                ? $"{assign.SecondaryArtist.Account.FirstName} {assign.SecondaryArtist.Account.LastName}" 
+                                ? $"{assign.SecondaryArtist.Account.FirstName} {assign.SecondaryArtist.Account.LastName}".Trim() 
                                 : "Thợ phụ";
+
+                            var customerName = booking.Customer?.Account != null
+                                ? $"{booking.Customer.Account.FirstName} {booking.Customer.Account.LastName}".Trim()
+                                : "Khách hàng";
+
+                            int overflowMinutes = (int)(assign.EndTime - assign.StartTime).TotalMinutes;
+
+                            var availableSecondaryList = activeArtists
+                                .Where(candidate => candidate.NailArtistId != primaryArtistId &&
+                                    !_bookingSchedulingService.HasCapacityConflictInMemory(
+                                        candidate.NailArtistId,
+                                        busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
+                                        timeline.Where(t => t.EstimatedStartTime == assign.StartTime && t.EstimatedEndTime == assign.EndTime).ToList(),
+                                        candidate.ConcurrentCapacity))
+                                .Select(candidate => new
+                                {
+                                    NailArtistId = candidate.NailArtistId,
+                                    FullName = candidate.Account != null 
+                                        ? $"{candidate.Account.FirstName} {candidate.Account.LastName}".Trim() 
+                                        : "Thợ phụ"
+                                })
+                                .ToList();
 
                             await _notificationService.SendNotificationToSalonStaffAsync(
                                 booking.SalonId.ToString(),
@@ -927,17 +949,20 @@ namespace Nailify.Capstone.Application.Services
                                 new
                                 {
                                     BookingId = booking.BookingId,
+                                    CustomerName = customerName,
                                     PrimaryArtistId = primaryArtistId,
                                     SecondaryArtistId = assign.SecondaryArtist.NailArtistId,
                                     SecondaryArtistName = secName,
                                     ProcedureName = assign.ProcedureName,
                                     StartTime = assign.StartTime,
                                     EndTime = assign.EndTime,
-                                    Message = $"Đơn đặt lịch cập nhật đổi dịch vụ: Công đoạn '{assign.ProcedureName}' ({assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm}) được tự động phân công cho thợ phụ {secName} hỗ trợ."
+                                    OverflowMinutes = overflowMinutes,
+                                    AvailableSecondaryArtists = availableSecondaryList,
+                                    Message = $"Khách {customerName} đổi dịch vụ bị lố {overflowMinutes} phút. Hệ thống gợi ý {secName} làm thợ phụ từ {assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm}."
                                 }
                             );
 
-                            if (assign.SecondaryArtist.AccountId != Guid.Empty)
+                            if (request.SecondaryArtistId.HasValue && assign.SecondaryArtist.AccountId != Guid.Empty)
                             {
                                 await _notificationService.SendNotificationToUserAsync(
                                     assign.SecondaryArtist.AccountId.ToString(),
