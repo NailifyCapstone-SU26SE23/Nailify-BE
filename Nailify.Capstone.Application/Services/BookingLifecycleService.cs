@@ -921,8 +921,8 @@ namespace Nailify.Capstone.Application.Services
                                 ? $"{assign.SecondaryArtist.Account.FirstName} {assign.SecondaryArtist.Account.LastName}".Trim() 
                                 : "Thợ phụ";
 
-                            var customerName = booking.Customer?.Account != null
-                                ? $"{booking.Customer.Account.FirstName} {booking.Customer.Account.LastName}".Trim()
+                            var customerName = booking.Customer?.User != null
+                                ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim()
                                 : "Khách hàng";
 
                             int overflowMinutes = (int)(assign.EndTime - assign.StartTime).TotalMinutes;
@@ -932,7 +932,7 @@ namespace Nailify.Capstone.Application.Services
                                     !_bookingSchedulingService.HasCapacityConflictInMemory(
                                         candidate.NailArtistId,
                                         busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
-                                        timeline.Where(t => t.EstimatedStartTime == assign.StartTime && t.EstimatedEndTime == assign.EndTime).ToList(),
+                                        timeline.Where(t => t.StartTime == assign.StartTime && t.EndTime == assign.EndTime).ToList(),
                                         candidate.ConcurrentCapacity))
                                 .Select(candidate => new
                                 {
