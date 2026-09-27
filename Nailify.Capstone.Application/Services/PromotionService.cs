@@ -821,5 +821,33 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<List<UserWalletVoucherDTO>>(usages);
             return new ApiSuccessResult<List<UserWalletVoucherDTO>>(response, "Lấy danh sách voucher trong ví thành công.");
         }
+
+        public async Task RollbackUsageAsync(Guid userId, IEnumerable<BookingDiscount> appliedDiscounts)
+        {
+            if (appliedDiscounts == null || !appliedDiscounts.Any())
+            {
+                return;
+            }
+            var promotionIds = appliedDiscounts
+                .Where(discount => discount.PromotionId.HasValue)
+                .Select(discount => discount.PromotionId!.Value)
+                .Distinct()
+                .ToList();
+            foreach (var promotionId in promotionIds)
+            {
+                var promotion = await _unitOfWork.PromotionRepository.GetByIdAsync(promotionId);
+                if (promotion != null && promotion.CurrentUsageCount > 0)
+                {
+                    promotion.CurrentUsageCount--;
+                    _unitOfWork.PromotionRepository.Update(promotion);
+                }
+                var usage = await _unitOfWork.UserPromotionUsageRepository.GetByUserAndPromotionAsync(userId, promotionId);
+                if (usage != null && usage.UsageCount > 0)
+                {
+                    usage.UsageCount--;
+                    _unitOfWork.UserPromotionUsageRepository.Update(usage);
+                }
+            }
+        }
     }
 }
