@@ -234,6 +234,10 @@ namespace Nailify.Capstone.Application.Services
 
                 x.Cancel(Guid.Empty, cancelReason);
                 _unitOfWork.BookingRepository.Update(x);
+                if (x.BookingDiscounts != null && x.BookingDiscounts.Any())
+                {
+                    await _promotionService.RollbackUsageAsync(x.CustomerId, x.BookingDiscounts);
+                }
 
                 // Tự động cộng Voucher đền bù hủy đơn cho khách hàng
                 await _promotionService.AddVoucherForCancelledAsync(x.BookingId);

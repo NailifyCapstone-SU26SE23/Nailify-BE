@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
@@ -321,7 +322,34 @@ namespace Nailify.Capstone.Application.Services
                 booking.AmountDue = Math.Max(0m, (booking.TotalPrice ?? amountPaid) - amountPaid);
             }
             _unitOfWork.BookingRepository.Update(booking);
-            //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            if (booking.AmountPaid.HasValue && booking.TotalPrice.HasValue && booking.AmountPaid.Value > booking.TotalPrice.Value)
+            {
+                decimal overpaidAmount = booking.AmountPaid.Value - booking.TotalPrice.Value;
+                var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(booking.CustomerId);
+                if (wallet != null)
+                {
+                    var balanceBefore = wallet.Balance;
+                    wallet.Balance += overpaidAmount;
+                    wallet.UpdatedAt = DateTime.UtcNow;
+                    var walletTx = new WalletTransaction
+                    {
+                        WalletId = wallet.WalletId,
+                        Amount = overpaidAmount,
+                        BalanceBefore = balanceBefore,
+                        BalanceAfter = wallet.Balance,
+                        Type = WalletTransactionType.BookingRefund,
+                        Status = WalletTransactionStatus.Completed,
+                        ReferenceId = booking.BookingId.ToString(),
+                        ReferenceType = WalletReferenceType.Booking,
+                        Description = $"Hoàn lại tiền cọc dư ({overpaidAmount:N0}đ) do giảm dịch vụ đơn hàng {booking.BookingId}",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                    _unitOfWork.CustomerWalletRepository.Update(wallet);
+
+                    booking.AmountPaid = booking.TotalPrice.Value;
+                }
+            }
             await _unitOfWork.SaveChangesAsync();
 
             var response = _mapper.Map<BookingResponseDTO>(booking);
@@ -673,10 +701,35 @@ namespace Nailify.Capstone.Application.Services
                 var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), booking.SalonId);
                 var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
                 var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
+                    request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
                 if (isConflict)
                 {
-                    return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ đã bận, xin chọn giờ khác.");
+                    // Quét thợ phụ rảnh hỗ trợ các bước bị lố của thợ chính
+                    var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+                    var candidateSecondary = activeArtists.Where(x => x.NailArtistId != request.NailArtistId.Value)
+                                                          .ToList();
+
+                    bool hasSecondaryFallback = false;
+                    foreach (var candidate in candidateSecondary)
+                    {
+                        var isSecondaryConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                                                                                                            candidate.NailArtistId,
+                                                                                                            request.BookingDate,
+                                                                                                            timeline,
+                                                                                                            candidate.ConcurrentCapacity,
+                                                                                                            bookingId
+                                                                                                          );
+                        if (!isSecondaryConflict)
+                        {
+                            hasSecondaryFallback = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasSecondaryFallback)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ chính và thợ phụ đều bận, xin chọn giờ khác.");
+                    }
                 }
             }
 
@@ -808,6 +861,17 @@ namespace Nailify.Capstone.Application.Services
                     if (procedures.Any())
                     {
                         var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                        var primaryArtistId = booking.NailArtistId.Value;
+                        var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+                        var allArtistIds = activeArtists.Select(x => x.NailArtistId).ToList();
+                        var allBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync(
+                            allArtistIds, booking.BookingDate, excludingBookingId: booking.BookingId);
+                        var busySegmentsByArtist = allBusySegments.GroupBy(x => x.AssignedArtistId!.Value)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+                        var primaryBusySegments = busySegmentsByArtist.GetValueOrDefault(primaryArtistId) ?? new List<ProcedureScheduleSegment>();
+
+                        var secondaryAssignments = new List<(NailArtist SecondaryArtist, string ProcedureName, TimeSpan StartTime, TimeSpan EndTime)>();
+
                         foreach (var segment in timeline)
                         {
                             var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
@@ -815,11 +879,105 @@ namespace Nailify.Capstone.Application.Services
                             procedure.EstimatedEndTime = segment.EndTime;
                             if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
                             {
-                                procedure.AssignedArtistId = booking.NailArtistId.Value;
+                                bool primaryHasConflictForSegment = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                    primaryArtistId, primaryBusySegments, new List<ProcedureScheduleSegment> { segment }, capacity: 1);
+                                if (!primaryHasConflictForSegment)
+                                {
+                                    procedure.AssignedArtistId = primaryArtistId;
+                                }
+                                else
+                                {
+                                    NailArtist? chosenSecondary = null;
+                                    if (request.SecondaryArtistId.HasValue)
+                                    {
+                                        chosenSecondary = activeArtists.FirstOrDefault(x => x.NailArtistId == request.SecondaryArtistId.Value);
+                                    }
+
+                                    chosenSecondary ??= activeArtists.FirstOrDefault(candidate =>
+                                        candidate.NailArtistId != primaryArtistId &&
+                                        !_bookingSchedulingService.HasCapacityConflictInMemory(
+                                            candidate.NailArtistId,
+                                            busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
+                                            new List<ProcedureScheduleSegment> { segment },
+                                            candidate.ConcurrentCapacity)
+                                    );
+
+                                    procedure.AssignedArtistId = chosenSecondary?.NailArtistId ?? primaryArtistId;
+
+                                    if (chosenSecondary != null)
+                                    {
+                                        secondaryAssignments.Add((chosenSecondary, procedure.ProcedureName, segment.StartTime, segment.EndTime));
+                                    }
+                                }
                             }
                             _unitOfWork.BookingProcedureRepository.Update(procedure);
                         }
                         await _unitOfWork.SaveChangesAsync();
+
+                        // Bắn thông báo SignalR cho Lễ tân và Thợ phụ khi có công đoạn bị phân công cho thợ phụ
+                        foreach (var assign in secondaryAssignments)
+                        {
+                            var secName = assign.SecondaryArtist.Account != null 
+                                ? $"{assign.SecondaryArtist.Account.FirstName} {assign.SecondaryArtist.Account.LastName}".Trim() 
+                                : "Thợ phụ";
+
+                            var customerName = booking.Customer?.User != null
+                                ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim()
+                                : "Khách hàng";
+
+                            int overflowMinutes = (int)(assign.EndTime - assign.StartTime).TotalMinutes;
+
+                            var availableSecondaryList = activeArtists
+                                .Where(candidate => candidate.NailArtistId != primaryArtistId &&
+                                    !_bookingSchedulingService.HasCapacityConflictInMemory(
+                                        candidate.NailArtistId,
+                                        busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
+                                        timeline.Where(t => t.StartTime == assign.StartTime && t.EndTime == assign.EndTime).ToList(),
+                                        candidate.ConcurrentCapacity))
+                                .Select(candidate => new
+                                {
+                                    NailArtistId = candidate.NailArtistId,
+                                    FullName = candidate.Account != null 
+                                        ? $"{candidate.Account.FirstName} {candidate.Account.LastName}".Trim() 
+                                        : "Thợ phụ"
+                                })
+                                .ToList();
+
+                            await _notificationService.SendNotificationToSalonStaffAsync(
+                                booking.SalonId.ToString(),
+                                "BookingUpdatedWithSecondaryArtistNotification",
+                                new
+                                {
+                                    BookingId = booking.BookingId,
+                                    CustomerName = customerName,
+                                    PrimaryArtistId = primaryArtistId,
+                                    SecondaryArtistId = assign.SecondaryArtist.NailArtistId,
+                                    SecondaryArtistName = secName,
+                                    ProcedureName = assign.ProcedureName,
+                                    StartTime = assign.StartTime,
+                                    EndTime = assign.EndTime,
+                                    OverflowMinutes = overflowMinutes,
+                                    AvailableSecondaryArtists = availableSecondaryList,
+                                    Message = $"Khách {customerName} đổi dịch vụ bị lố {overflowMinutes} phút. Hệ thống gợi ý {secName} làm thợ phụ từ {assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm}."
+                                }
+                            );
+
+                            if (request.SecondaryArtistId.HasValue && assign.SecondaryArtist.AccountId != Guid.Empty)
+                            {
+                                await _notificationService.SendNotificationToUserAsync(
+                                    assign.SecondaryArtist.AccountId.ToString(),
+                                    "SecondaryArtistTaskAssignedNotification",
+                                    new
+                                    {
+                                        BookingId = booking.BookingId,
+                                        ProcedureName = assign.ProcedureName,
+                                        StartTime = assign.StartTime,
+                                        EndTime = assign.EndTime,
+                                        Message = $"Bạn được phân công làm thợ phụ hỗ trợ ca lố đơn {booking.BookingId}, công đoạn '{assign.ProcedureName}' ({assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm})."
+                                    }
+                                );
+                            }
+                        }
                     }
                 }
 
