@@ -15,14 +15,16 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
         private readonly IEmailTemplateService _emailTemplateService;
+        private readonly IPromotionService _promotionService;
 
 
-        public BookingJobExecutor(IUnitOfWork unitOfWork, INotificationService notificationService, IEmailService emailService, IEmailTemplateService emailTemplateService)
+        public BookingJobExecutor(IUnitOfWork unitOfWork, INotificationService notificationService, IEmailService emailService, IEmailTemplateService emailTemplateService, IPromotionService promotionService)
         {
             _unitOfWork = unitOfWork;
             _notificationService = notificationService;
             _emailService = emailService;
             _emailTemplateService = emailTemplateService;
+            _promotionService = promotionService;
         }
         public async Task CancelLateBookingsAsync()
         {
@@ -37,6 +39,10 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
                 booking.Cancel(Guid.Empty, "Hệ thống tự động hủy do khách trễ quá 15 phút mà không check-in.");
                 _unitOfWork.BookingRepository.Update(booking);
 
+                if (booking.BookingDiscounts != null && booking.BookingDiscounts.Any())
+                {
+                    await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
+                }
                 // Gửi thông báo SignalR cho khách hàng báo hủy lịch do đến muộn
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
