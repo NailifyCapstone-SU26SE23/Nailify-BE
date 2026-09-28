@@ -372,7 +372,8 @@ namespace Nailify.Capstone.Application.Services
             var existingBusySegments = await _unitOfWork.BookingProcedureRepository
                                                         .GetArtistBusySegmentsByDateAsync(request.NailArtistId, request.BookingDate);
             // Lấy danh sách các khoảng thời gian giữ chỗ tạm thời của thợ
-            var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(request.NailArtistId, request.BookingDate);
+            var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(request.NailArtistId, request.BookingDate, request.CustomerId,
+                request.HoldToken);
             var dayOfWeek = (int)localDate.DayOfWeek;
             var salon = await _unitOfWork.SalonRepository.GetSalonWithOperatingHoursAsync(salonId);
             var operatingHours = salon?.OperatingHours?.Where(x => x.DayOfWeek == dayOfWeek).ToList() ?? new List<SalonOperatingHour>();
@@ -869,7 +870,8 @@ namespace Nailify.Capstone.Application.Services
                 }
                 var artistBreaks = breaksMap.GetValueOrDefault(artist.NailArtistId) ?? new List<NailArtistBreak>();
                 var artistBusySegments = busySegmentsMap.GetValueOrDefault(artist.NailArtistId) ?? new List<ProcedureScheduleSegment>();
-                var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(artist.NailArtistId, request.BookingDate);
+                var holdRanges = await _slotHoldService.GetActiveHoldRangesAsync(artist.NailArtistId, request.BookingDate, request.CustomerId,
+                request.HoldToken);
 
                 artistContexts.Add((artist, schedule, artistBreaks, artistBusySegments, holdRanges));
             }

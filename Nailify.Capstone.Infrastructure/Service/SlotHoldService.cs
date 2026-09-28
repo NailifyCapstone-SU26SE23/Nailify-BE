@@ -613,11 +613,13 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
         }
         
-        public async Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date)
+        public async Task<List<(TimeSpan Start, TimeSpan End)>> GetActiveHoldRangesAsync(Guid artistId, DateTime date, Guid? customerId = null, string? excludingHoldToken = null)
         {
             var redisListKey = BuildSlotKey(artistId, date);
             var activeHolds = await GetActiveHoldsFromRedisAsync(redisListKey);
             return activeHolds
+                .Where(x => (!customerId.HasValue || x.CustomerId != customerId.Value)
+                         && (string.IsNullOrEmpty(excludingHoldToken) || x.HoldToken != excludingHoldToken))
                 .Select(x => (Start: x.StartTime, End: x.StartTime.Add(TimeSpan.FromMinutes(x.EstimatedDurationMinutes))))
                 .ToList();
         }

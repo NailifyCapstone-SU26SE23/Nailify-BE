@@ -11,5 +11,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs
         public Guid SalonId { get; set; }
         public DateTime BookingDate { get; set; }
         public List<BookingItemRequestDTO> BookingItems { get; set; } = new();
+        public Guid? CustomerId { get; set; }
+        public string? HoldToken { get; set; }
     }
 }
