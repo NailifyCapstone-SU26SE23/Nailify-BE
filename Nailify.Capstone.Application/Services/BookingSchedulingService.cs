@@ -335,7 +335,7 @@ namespace Nailify.Capstone.Application.Services
 
                             if (customProcs.Any())
                             {
-                                int totalCatalogDuration = customProcs.Sum(x => x.Procedure.Duration ?? 0);
+                                int totalCatalogDuration = customProcs.Sum(x => x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0);
                                 if (duration > 0 && totalCatalogDuration > 0 && duration != totalCatalogDuration)
                                 {
                                     double scaleFactor = (double)duration / totalCatalogDuration;
@@ -345,7 +345,7 @@ namespace Nailify.Capstone.Application.Services
                                     for (int i = 0; i < count; i++)
                                     {
                                         var np = customProcs[i];
-                                        int catalogDuration = np.Procedure.Duration ?? 0;
+                                        int catalogDuration = np.EstimatedMinutes ?? np.Procedure?.Duration ?? 0;
                                         int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
                                         if (i == count - 1)
@@ -357,7 +357,8 @@ namespace Nailify.Capstone.Application.Services
                                             accumulatedDuration += scaledDuration;
                                         }
 
-                                        int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(np.Procedure.ActiveDuration * scaleFactor)));
+                                        int activeDuration = np.Procedure?.ActiveDuration ?? catalogDuration;
+                                        int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(activeDuration * scaleFactor)));
                                         int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
 
                                         mockProcedures.Add(new BookingProcedure
@@ -366,15 +367,15 @@ namespace Nailify.Capstone.Application.Services
                                             BookingItemId = mockBookingItem.BookingItemId,
                                             BookingItem = mockBookingItem,
                                             ProcedureId = np.ProcedureId,
-                                            ProcedureName = np.Procedure.Name,
+                                            ProcedureName = np.Name ?? np.Procedure?.Name ?? "Công đoạn custom",
                                             StepOrder = currentStepOrder++,
                                             Duration = scaledDuration,
                                             ActiveDuration = scaledActive,
                                             PassiveDuration = scaledPassive,
-                                            CanOverlap = scaledPassive >= 4 && np.Procedure.CanOverlap,
-                                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
-                                            IsRequired = np.Procedure.IsRequired,
-                                            IsMainStep = np.Procedure.IsMainStep,
+                                            CanOverlap = scaledPassive >= 4 && (np.Procedure?.CanOverlap ?? false),
+                                            TransitionBuffer = np.Procedure?.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                            IsRequired = np.Procedure?.IsRequired ?? true,
+                                            IsMainStep = np.Procedure?.IsMainStep ?? true,
                                             Status = BookingProcedureStatus.Pending
                                         });
                                     }
@@ -383,22 +384,22 @@ namespace Nailify.Capstone.Application.Services
                                 {
                                     foreach (var np in customProcs)
                                     {
-                                        var passiveDuration = np.Procedure.PassiveDuration;
+                                        var passiveDuration = np.Procedure?.PassiveDuration ?? 0;
                                         mockProcedures.Add(new BookingProcedure
                                         {
                                             BookingProcedureId = Guid.NewGuid(),
                                             BookingItemId = mockBookingItem.BookingItemId,
                                             BookingItem = mockBookingItem,
                                             ProcedureId = np.ProcedureId,
-                                            ProcedureName = np.Procedure.Name,
+                                            ProcedureName = np.Name ?? np.Procedure?.Name ?? "Công đoạn custom",
                                             StepOrder = currentStepOrder++,
-                                            Duration = np.Procedure.Duration ?? 15,
-                                            ActiveDuration = np.Procedure.ActiveDuration,
+                                            Duration = np.EstimatedMinutes ?? np.Procedure?.Duration ?? 15,
+                                            ActiveDuration = np.Procedure?.ActiveDuration ?? np.EstimatedMinutes ?? np.Procedure?.Duration ?? 15,
                                             PassiveDuration = passiveDuration,
-                                            CanOverlap = passiveDuration >= 4 && np.Procedure.CanOverlap,
-                                            TransitionBuffer = np.Procedure.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
-                                            IsRequired = np.Procedure.IsRequired,
-                                            IsMainStep = np.Procedure.IsMainStep,
+                                            CanOverlap = passiveDuration >= 4 && (np.Procedure?.CanOverlap ?? false),
+                                            TransitionBuffer = np.Procedure?.TransitionBuffer > 0 ? np.Procedure.TransitionBuffer : 1,
+                                            IsRequired = np.Procedure?.IsRequired ?? true,
+                                            IsMainStep = np.Procedure?.IsMainStep ?? true,
                                             Status = BookingProcedureStatus.Pending
                                         });
                                     }
