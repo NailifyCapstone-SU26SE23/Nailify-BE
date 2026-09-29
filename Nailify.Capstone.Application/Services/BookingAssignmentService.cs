@@ -636,11 +636,21 @@ namespace Nailify.Capstone.Application.Services
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
 
+            string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+            string salonName = booking.Salon?.Name ?? "Salon";
+            string newArtistName = $"{artist.Account?.FirstName} {artist.Account?.LastName}".Trim();
+
             // Bắn SignalR cập nhật
             await _notificationService.SendNotificationToUserAsync(
                 booking.CustomerId.ToString(),
                 "ArtistReassigned",
-                new { BookingId = bookingId, NewArtistName = $"{artist.Account?.FirstName} {artist.Account?.LastName}" }
+                new 
+                { 
+                    BookingId = bookingId, 
+                    SalonName = salonName,
+                    CustomerName = customerName,
+                    NewArtistName = newArtistName 
+                }
             );
             var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
             var response = _mapper.Map<BookingResponseDTO>(savedBooking);
@@ -1104,14 +1114,20 @@ namespace Nailify.Capstone.Application.Services
                 }
                 await _unitOfWork.CommitTransactionAsync();
 
+                var oldSalon = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                string oldSalonName = oldSalon?.Name ?? "Salon cũ";
+                string transferCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+
                 _ = _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingTransferred",
                     new
                     {
                         BookingId = bookingId,
+                        OldSalonName = oldSalonName,
                         NewSalonName = targetSalon.Name,
-                        Message = $"Lịch hẹn của bạn đã được chuyển sang chi nhánh '{targetSalon.Name}'. " +
+                        CustomerName = transferCustomerName,
+                        Message = $"Lịch hẹn của bạn đã được chuyển từ chi nhánh '{oldSalonName}' sang chi nhánh '{targetSalon.Name}'. " +
                       "Vui lòng đến đúng địa điểm mới."
                     });
                 var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId);

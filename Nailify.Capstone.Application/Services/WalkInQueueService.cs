@@ -442,12 +442,19 @@ namespace Nailify.Capstone.Application.Services
             // Bắn tín hiệu SignalR / Notification trực tiếp về máy người dùng
             if (queue.CustomerId.HasValue)
             {
+                var customerUser = queue.Customer?.User ?? await _unitOfWork.UserRepository.GetByIdAsync(queue.CustomerId.Value);
+                var salon = queue.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(queue.SalonId);
+                string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : (!string.IsNullOrEmpty(queue.GuestName) ? queue.GuestName : "Khách hàng");
+                string salonName = salon?.Name ?? "Salon";
+
                 _ = _notificationService.SendNotificationToUserAsync(
                     queue.CustomerId.Value.ToString(),
                     "WALK_IN_QUEUE_CALLED",
                     new
                     {
                         QueueId = queue.QueueId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
                         QueuePosition = queue.QueuePosition,
                         Title = "Đã đến lượt của bạn!",
                         Message = $"Đã đến lượt phục vụ của bạn (Số STT: #{queue.QueuePosition})! Vui lòng di chuyển đến quầy để thợ phục vụ.",

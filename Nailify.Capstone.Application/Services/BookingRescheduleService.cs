@@ -141,13 +141,22 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Salon Manager / Staff
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToSalonStaffAsync(
                     booking.SalonId.ToString(),
                     "BookingRescheduleAccepted",
                     new
                     {
                         BookingId = booking.BookingId,
-                        Message = $"Khách hàng đã đồng ý với giờ hẹn mới được đề xuất cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()}."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        ArtistName = artistName,
+                        Message = $"Khách hàng {customerName} đã đồng ý với giờ hẹn mới được đề xuất cho đơn #{bookingCode}."
                     }
                 );
             }
@@ -182,13 +191,20 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Salon Manager / Staff
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToSalonStaffAsync(
                     booking.SalonId.ToString(),
                     "BookingRescheduleDeclined",
                     new
                     {
                         BookingId = booking.BookingId,
-                        Message = $"Khách hàng đã từ chối giờ hẹn mới được đề xuất cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()}."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Message = $"Khách hàng {customerName} đã từ chối giờ hẹn mới được đề xuất cho đơn #{bookingCode}."
                     }
                 );
             }
@@ -228,17 +244,26 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Salon Manager / Staff
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToSalonStaffAsync(
                     booking.SalonId.ToString(),
                     "BookingRescheduleRequested",
                     new
                     {
                         BookingId = booking.BookingId,
+                        BookingCode = bookingCode,
                         CustomerId = booking.CustomerId,
+                        CustomerName = customerName,
+                        SalonName = salonName,
+                        ArtistName = artistName,
                         NewDate = request.NewDate.ToString("yyyy-MM-dd"),
                         NewTime = request.NewTime.ToString(@"hh\:mm"),
                         Reason = request.Reason,
-                        Message = $"Khách hàng vừa gửi yêu cầu đổi lịch hẹn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} sang ngày {request.NewDate:dd/MM/yyyy} lúc {request.NewTime:hh\\:mm}."
+                        Message = $"Khách hàng {customerName} vừa gửi yêu cầu đổi lịch hẹn #{bookingCode} sang ngày {request.NewDate:dd/MM/yyyy} lúc {request.NewTime:hh\\:mm}."
                     }
                 );
             }
@@ -291,13 +316,22 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Khách hàng
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingRescheduleApproved",
                     new
                     {
                         BookingId = booking.BookingId,
-                        Message = $"Yêu cầu đổi lịch cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} của bạn đã được Salon chấp nhận."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        ArtistName = artistName,
+                        Message = $"Yêu cầu đổi lịch cho đơn #{bookingCode} của bạn đã được Salon {salonName} chấp nhận."
                     }
                 );
             }
@@ -328,13 +362,20 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Khách hàng
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingRescheduleRejected",
                     new
                     {
                         BookingId = booking.BookingId,
-                        Message = $"Yêu cầu đổi lịch cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} không được Salon chấp nhận."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Message = $"Yêu cầu đổi lịch cho đơn #{bookingCode} không được Salon {salonName} chấp nhận."
                     }
                 );
             }
@@ -375,16 +416,25 @@ namespace Nailify.Capstone.Application.Services
             // Gửi thông báo SignalR cho Khách hàng
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingRescheduleSuggested",
                     new
                     {
                         BookingId = booking.BookingId,
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        ArtistName = artistName,
                         SuggestedDate = request.SuggestedDate.ToString("yyyy-MM-dd"),
                         SuggestedTime = request.SuggestedTime.ToString(@"hh\:mm"),
                         Reason = request.Reason,
-                        Message = $"Salon vừa đề xuất đổi lịch hẹn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} sang ngày {request.SuggestedDate:dd/MM/yyyy} lúc {request.SuggestedTime:hh\\:mm}. Vui lòng kiểm tra và phản hồi."
+                        Message = $"Salon {salonName} vừa đề xuất đổi lịch hẹn #{bookingCode} sang ngày {request.SuggestedDate:dd/MM/yyyy} lúc {request.SuggestedTime:hh\\:mm}. Vui lòng kiểm tra và phản hồi."
                     }
                 );
             }

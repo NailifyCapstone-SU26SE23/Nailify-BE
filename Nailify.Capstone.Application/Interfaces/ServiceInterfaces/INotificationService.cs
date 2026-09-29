@@ -12,6 +12,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task SendNotificationToAllAsync(string messageType, object payload);
         Task SendNotificationToGroupAsync(string groupName, string messageType, object payload);
         Task SendNotificationToSalonStaffAsync(string salonId, string messageType, object payload);
-
+        Task SendNotificationToSalonReceptionistsAsync(string salonId, string messageType, object payload);
     }
 }

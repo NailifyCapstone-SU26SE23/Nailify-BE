@@ -1,6 +1,7 @@
 using Nailify.Capstone.Application.DTOs.RequestDTOs.MailRequestDTO;
 using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,11 +44,20 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
                 {
                     await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
                 }
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
                 // Gửi thông báo SignalR cho khách hàng báo hủy lịch do đến muộn
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingAutoCancelled",
-                    new { BookingId = booking.BookingId, Message = "Lịch hẹn của bạn đã tự động hủy do trễ quá 15 phút." }
+                    new 
+                    {
+                        BookingId = booking.BookingId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        ArtistName = artistName,
+                        Message = "Lịch hẹn của bạn đã tự động hủy do trễ quá 15 phút." }
                 );
             }
             if (lateBookings.Any())

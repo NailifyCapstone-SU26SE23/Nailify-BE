@@ -229,6 +229,7 @@ namespace Nailify.Capstone.Application.Services
                     CustomerNailRequestId = request.CustomerNailRequestId,
                     CustomerNailId = request.CustomerNailId,
                     SalonId = request.SalonId,
+                    SalonName = salon?.Name ?? "Salon",
                     CustomerId = customerId,
                     CustomerName = customerName
                 });
@@ -382,14 +383,21 @@ namespace Nailify.Capstone.Application.Services
             var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(nailRequest.CustomerNailId);
             if (customerNail != null)
             {
+                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(nailRequest.SalonId);
+                var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(customerNail.UserId);
+                string salonName = salonObj?.Name ?? "Salon";
+                string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : "Khách hàng";
+
                 await _notificationService.SendNotificationToUserAsync(
                     customerNail.UserId.ToString(),
                     "CUSTOM_NAIL_QUOTED",
                     new
                     {
-                        Message = $"Salon đã duyệt báo giá {request.FinalPrice:N0}đ cho mẫu nail custom của bạn. Vui lòng kiểm tra và xác nhận!",
+                        Message = $"Salon {salonName} đã duyệt báo giá {request.FinalPrice:N0}đ cho mẫu nail custom của bạn. Vui lòng kiểm tra và xác nhận!",
                         CustomerNailRequestId = nailRequest.CustomerNailRequestId,
                         CustomerNailId = nailRequest.CustomerNailId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
                         Price = request.FinalPrice,
                         Duration = request.FinalDuration,
                         Status = nailRequest.Status.ToString()
@@ -432,6 +440,11 @@ namespace Nailify.Capstone.Application.Services
             var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(nailRequest.CustomerNailId);
             if (customerNail != null)
             {
+                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(nailRequest.SalonId);
+                var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(customerNail.UserId);
+                string salonName = salonObj?.Name ?? "Salon";
+                string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : "Khách hàng";
+
                 await _notificationService.SendNotificationToUserAsync(
                     customerNail.UserId.ToString(),
                     "CUSTOM_NAIL_REJECTED",
@@ -440,6 +453,8 @@ namespace Nailify.Capstone.Application.Services
                         Message = $"Yêu cầu báo giá mẫu nail custom của bạn đã bị từ chối. Lý do: {request.Reason}",
                         CustomerNailRequestId = nailRequest.CustomerNailRequestId,
                         CustomerNailId = nailRequest.CustomerNailId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
                         Reason = request.Reason,
                         Status = nailRequest.Status.ToString()
                     });

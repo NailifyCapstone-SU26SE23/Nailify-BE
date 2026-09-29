@@ -98,6 +98,19 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                 x => x.CancelIfExpiredAsync(nextEntry.WailistId),
                 TimeSpan.FromMinutes(15)
             );
+            var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(nextEntry.CustomerId);
+            var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(nextEntry.SalonId);
+            string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : "Khách hàng";
+            string salonName = salonObj?.Name ?? "Salon";
+            string artistName = "Thợ nail";
+            if (e.NailArtistId.HasValue)
+            {
+                var artistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(e.NailArtistId.Value);
+                if (artistObj?.Account != null)
+                {
+                    artistName = $"{artistObj.Account.FirstName} {artistObj.Account.LastName}".Trim();
+                }
+            }
             // 2. Gửi thông báo thời gian thực qua SignalR
             await _notificationService.SendNotificationToUserAsync(
                 nextEntry.CustomerId.ToString(),
@@ -105,10 +118,14 @@ namespace Nailify.Capstone.Application.DomainEventHandlers.BookingEvents
                 new
                 {
                     WaitlistId = nextEntry.WailistId,
+                    SalonName = salonName,
+                    CustomerName = customerName,
+                    ArtistName = artistName,
+                    RequestedDate = nextEntry.RequestedDate.ToString("yyyy-MM-dd"),
+                    RequestedStartTime = nextEntry.RequestedStartTime.ToString(@"hh\:mm"),
                     Message = "Đã có slot trống! Bạn có 15 phút để xác nhận chuyển thành lịch hẹn chính thức."
                 }
             );
-            var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(nextEntry.CustomerId);
             if (customerUser != null && !string.IsNullOrEmpty(customerUser.Email))
             {
                 var confirmUrl = $"https://localhost:7066/api/Waitlists/{nextEntry.WailistId}/confirm-via-email";

@@ -409,13 +409,27 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon")
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = bookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingConfirmed",
                     new
                     {
                         BookingId = bookingId,
-                        Message = "Đơn đặt lịch của bạn đã được Salon xác nhận."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        ArtistName = artistName,
+                        CustomerName = customerName,
+                        Message = $"Đơn đặt lịch #{bookingCode} của bạn đã được Salon xác nhận."
                     });
             }
             catch (Exception ex)
@@ -455,6 +469,36 @@ namespace Nailify.Capstone.Application.Services
             booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon")
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRejected",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Reason = request.Reason,
+                        Message = $"Đơn đặt lịch #{bookingCode} của bạn tại Salon {salonName} đã bị từ chối. Lý do: {request.Reason}"
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send booking rejected notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối đơn đặt lịch thành công.");
         }
@@ -495,20 +539,53 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             try
             {
-                await _notificationService.SendNotificationToUserAsync(
-                    booking.CustomerId.ToString(),
-                    "BookingRejected",
-                    new
-                    {
-                        BookingId = booking.BookingId,
-                        Reason = request.Reason,
-                        Message = $"Đơn đặt lịch của bạn đã bị Salon từ chối. Lý do: {request.Reason}"
-                    }
-                );
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon")
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
+                if (policyRefund)
+                {
+                    // Khách hàng hủy -> Gửi thông báo SignalR tới Lễ tân / Staff của Salon
+                    await _notificationService.SendNotificationToSalonStaffAsync(
+                        booking.SalonId.ToString(),
+                        "BookingCancelled",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            BookingCode = bookingCode,
+                            SalonName = salonName,
+                            CustomerName = customerName,
+                            Reason = request.Reason,
+                            Message = $"Khách hàng {customerName} đã hủy đơn đặt lịch #{bookingCode}. Lý do: {request.Reason}"
+                        }
+                    );
+                }
+                else
+                {
+                    // Salon / Manager hủy -> Gửi thông báo SignalR tới Khách hàng
+                    await _notificationService.SendNotificationToUserAsync(
+                        booking.CustomerId.ToString(),
+                        "BookingRejected",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            BookingCode = bookingCode,
+                            SalonName = salonName,
+                            CustomerName = customerName,
+                            Reason = request.Reason,
+                            Message = $"Đơn đặt lịch #{bookingCode} của bạn tại Salon {salonName} đã bị Salon hủy. Lý do: {request.Reason}"
+                        }
+                    );
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[NotificationError] Failed to send booking rejected notification: {ex.Message}");
+                Console.WriteLine($"[NotificationError] Failed to send booking cancelled/rejected notification: {ex.Message}");
             }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
@@ -943,14 +1020,24 @@ namespace Nailify.Capstone.Application.Services
                                 })
                                 .ToList();
 
-                            await _notificationService.SendNotificationToSalonStaffAsync(
+                            string primaryArtistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ chính";
+                            string salonName = booking.Salon?.Name ?? "Salon";
+                            if (salonName == "Salon")
+                            {
+                                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                                if (salonObj != null) salonName = salonObj.Name;
+                            }
+
+                            await _notificationService.SendNotificationToSalonReceptionistsAsync(
                                 booking.SalonId.ToString(),
                                 "BookingUpdatedWithSecondaryArtistNotification",
                                 new
                                 {
                                     BookingId = booking.BookingId,
+                                    SalonName = salonName,
                                     CustomerName = customerName,
                                     PrimaryArtistId = primaryArtistId,
+                                    PrimaryArtistName = primaryArtistName,
                                     SecondaryArtistId = assign.SecondaryArtist.NailArtistId,
                                     SecondaryArtistName = secName,
                                     ProcedureName = assign.ProcedureName,
@@ -970,6 +1057,8 @@ namespace Nailify.Capstone.Application.Services
                                     new
                                     {
                                         BookingId = booking.BookingId,
+                                        SalonName = salonName,
+                                        CustomerName = customerName,
                                         ProcedureName = assign.ProcedureName,
                                         StartTime = assign.StartTime,
                                         EndTime = assign.EndTime,
@@ -1084,8 +1173,24 @@ namespace Nailify.Capstone.Application.Services
                     booking.NailArtistId = newArtist.NailArtistId;
                     _unitOfWork.BookingRepository.Update(booking);
 
+                    string newAssignCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    string newAssignSalonName = booking.Salon?.Name ?? "Salon";
+                    if (newAssignSalonName == "Salon")
+                    {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                        if (salonObj != null) newAssignSalonName = salonObj.Name;
+                    }
+
                     await _notificationService.SendNotificationToUserAsync(
-                        newArtist.NailArtistId.ToString(), "NewAssignment", "Bạn có ca mới được assign do thợ trước bị kẹt khách."
+                        newArtist.AccountId.ToString(),
+                        "NewAssignment",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            SalonName = newAssignSalonName,
+                            CustomerName = newAssignCustomerName,
+                            Message = $"Bạn có ca mới được assign cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} do thợ trước bị kẹt khách."
+                        }
                     );
                     break;
                 case DelayCustomerDecision.Reschedule:

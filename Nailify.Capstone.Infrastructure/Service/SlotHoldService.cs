@@ -87,10 +87,17 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     try
                     {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
+                        var artistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(mapping.ArtistId);
+                        string salonName = salonObj?.Name ?? "Salon";
+                        string artistName = artistObj?.Account != null ? $"{artistObj.Account.FirstName} {artistObj.Account.LastName}".Trim() : "Thợ nail";
+
                         await _notificationService.SendNotificationToAllAsync("SlotStatusChanged", new
                         {
                             SalonId = salonId,
+                            SalonName = salonName,
                             ArtistId = mapping.ArtistId,
+                            ArtistName = artistName,
                             BookingDate = mapping.BookingDate.ToString("yyyy-MM-dd"),
                             StartTime = startTime.ToString(@"hh\:mm"),
                             Action = "Booked"
@@ -247,10 +254,16 @@ namespace Nailify.Capstone.Infrastructure.Service
                 
                 try
                 {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(request.SalonId);
+                    string salonName = salonObj?.Name ?? "Salon";
+                    string artistName = artist?.Account != null ? $"{artist.Account.FirstName} {artist.Account.LastName}".Trim() : "Thợ nail";
+
                     await _notificationService.SendNotificationToAllAsync("SlotStatusChanged", new
                     {
                         SalonId = request.SalonId,
+                        SalonName = salonName,
                         ArtistId = request.NailArtistId,
+                        ArtistName = artistName,
                         BookingDate = request.BookingDate.ToString("yyyy-MM-dd"),
                         StartTime = request.StartTime.ToString(@"hh\:mm"),
                         Action = "Held"
@@ -333,10 +346,17 @@ namespace Nailify.Capstone.Infrastructure.Service
                     await NotifyWaitersInternalAsync(holdToken, mapping.ArtistId, mapping.BookingDate, startTime);
                     try
                     {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
+                        var artistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(mapping.ArtistId);
+                        string salonName = salonObj?.Name ?? "Salon";
+                        string artistName = artistObj?.Account != null ? $"{artistObj.Account.FirstName} {artistObj.Account.LastName}".Trim() : "Thợ nail";
+
                         await _notificationService.SendNotificationToAllAsync("SlotStatusChanged", new
                         {
                             SalonId = salonId,
+                            SalonName = salonName,
                             ArtistId = mapping.ArtistId,
+                            ArtistName = artistName,
                             BookingDate = mapping.BookingDate.ToString("yyyy-MM-dd"),
                             StartTime = startTime.ToString(@"hh\:mm"),
                             Action = "Released"
@@ -546,10 +566,17 @@ namespace Nailify.Capstone.Infrastructure.Service
                     await NotifyWaitersInternalAsync(holdToken, mapping.ArtistId, mapping.BookingDate, startTime);
                     try
                     {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(salonId);
+                        var artistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(mapping.ArtistId);
+                        string salonName = salonObj?.Name ?? "Salon";
+                        string artistName = artistObj?.Account != null ? $"{artistObj.Account.FirstName} {artistObj.Account.LastName}".Trim() : "Thợ nail";
+
                         await _notificationService.SendNotificationToAllAsync("SlotStatusChanged", new
                         {
                             SalonId = salonId,
+                            SalonName = salonName,
                             ArtistId = mapping.ArtistId,
+                            ArtistName = artistName,
                             BookingDate = mapping.BookingDate.ToString("yyyy-MM-dd"),
                             StartTime = startTime.ToString(@"hh\:mm"),
                             Action = "Released"
@@ -587,6 +614,8 @@ namespace Nailify.Capstone.Infrastructure.Service
             {
                 var artist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
                 var artistName = artist != null ? $"{artist.Account.FirstName} {artist.Account.LastName}" : "Thợ nail";
+                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(artist?.Account?.SalonId ?? Guid.Empty);
+                string salonName = salonObj?.Name ?? "Salon";
 
                 foreach (var waiterId in waiters)
                 {
@@ -595,10 +624,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                         "WaitlistPromoted",
                         new
                         {
+                            SalonName = salonName,
                             ArtistName = artistName,
                             BookingDate = bookingDate.ToString("dd/MM/yyyy"),
                             StartTime = startTime.ToString(@"hh\:mm"),
-                            Message = $"Lịch hẹn ngày {bookingDate:dd/MM/yyyy} lúc {startTime:hh\\:mm} với thợ {artistName} đã được giải phóng. Bạn hãy nhanh tay đăng ký giữ chỗ!"
+                            Message = $"Lịch hẹn ngày {bookingDate:dd/MM/yyyy} lúc {startTime:hh\\:mm} với thợ {artistName} tại {salonName} đã được giải phóng. Bạn hãy nhanh tay đăng ký giữ chỗ!"
                         }
                     );
                 }
