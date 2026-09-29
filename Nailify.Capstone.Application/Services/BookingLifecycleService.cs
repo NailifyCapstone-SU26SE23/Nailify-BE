@@ -411,7 +411,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
                 string salonName = booking.Salon?.Name ?? "Salon";
-                if (salonName == "Salon")
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
                 {
                     var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
                     if (salonObj != null) salonName = salonObj.Name;
@@ -473,7 +473,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
                 string salonName = booking.Salon?.Name ?? "Salon";
-                if (salonName == "Salon")
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
                 {
                     var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
                     if (salonObj != null) salonName = salonObj.Name;
@@ -541,7 +541,7 @@ namespace Nailify.Capstone.Application.Services
             {
                 string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
                 string salonName = booking.Salon?.Name ?? "Salon";
-                if (salonName == "Salon")
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
                 {
                     var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
                     if (salonObj != null) salonName = salonObj.Name;

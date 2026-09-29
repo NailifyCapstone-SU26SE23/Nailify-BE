@@ -17,5 +17,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<WaitlistResponseDTO>> GetMyWaitlistAsync(Guid customerId, Guid salonId);
         Task<ApiResult<List<WaitlistResponseDTO>>> GetMyWaitlistsAsync(Guid customerId);
         Task<ApiResult<PagedList<WaitlistResponseDTO>>> GetSalonWaitlistAsync(Guid salonId, int pageNumber, int pageSize);
+        Task<ApiResult<WaitlistResponseDTO>> GetWaitlistByIdAsync(Guid waitlistId);
     }
 }
