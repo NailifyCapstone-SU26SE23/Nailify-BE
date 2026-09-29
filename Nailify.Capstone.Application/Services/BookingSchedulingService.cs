@@ -541,13 +541,31 @@ namespace Nailify.Capstone.Application.Services
                     await _unitOfWork.SaveChangesAsync();
 
 
+                    string customerName = checkedInBooking.Customer?.User != null ? $"{checkedInBooking.Customer.User.FirstName} {checkedInBooking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    var salonObj = checkedInBooking.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(checkedInBooking.SalonId);
+                    string salonName = salonObj?.Name ?? "Salon";
+                    string artistName = $"{availableAlternativeArtist.Account.FirstName} {availableAlternativeArtist.Account.LastName}".Trim();
+
                     await _notificationService.SendNotificationToUserAsync(
                         checkedInBooking.CustomerId.ToString(),
                         "ArtistChanged",
-                        new { Message = $"Thợ phụ {availableAlternativeArtist.Account.FirstName} sẽ hỗ trợ làm sạch móng trước cho bạn." });
+                        new 
+                        { 
+                            BookingId = checkedInBooking.BookingId,
+                            SalonName = salonName,
+                            CustomerName = customerName,
+                            ArtistName = artistName,
+                            Message = $"Thợ phụ {artistName} sẽ hỗ trợ làm sạch móng trước cho bạn." 
+                        });
                     return;
                 }
             }
+
+            string defaultCustomerName = checkedInBooking.Customer?.User != null ? $"{checkedInBooking.Customer.User.FirstName} {checkedInBooking.Customer.User.LastName}".Trim() : "Khách hàng";
+            var defaultSalonObj = checkedInBooking.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(checkedInBooking.SalonId);
+            string defaultSalonName = defaultSalonObj?.Name ?? "Salon";
+            var currentArtistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
+            string currentArtistName = currentArtistObj?.Account != null ? $"{currentArtistObj.Account.FirstName} {currentArtistObj.Account.LastName}".Trim() : "Thợ nail";
 
             if (delayMinutes > 5)
             {
@@ -583,9 +601,11 @@ namespace Nailify.Capstone.Application.Services
                 var alertDto = new SlaViolationAlertDTO
                 {
                     SalonId = checkedInBooking.SalonId,
+                    SalonName = defaultSalonName,
                     AffectedBookingId = checkedInBooking.BookingId,
-                    CustomerName = checkedInBooking.Customer?.User?.FirstName ?? "Khách hàng",
+                    CustomerName = defaultCustomerName,
                     CurrentArtistId = artistId,
+                    CurrentArtistName = currentArtistName,
                     EstimatedDelayMinutes = delayMinutes,
                     OverrunningBookingOrQueueId = currentBusyBooking.BookingId,
                     AvailableAlternativeArtists = alternativeArtistsDto.OrderByDescending(a => a.IsFullyAvailable).ToList()
@@ -616,8 +636,11 @@ namespace Nailify.Capstone.Application.Services
                                                                             "DelayWarningWithAutonomy",
                                                                             new
                                                                             {
-                                                                                Message = $"Ca của bạn lúc {checkedInBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
                                                                                 BookingId = checkedInBooking.BookingId,
+                                                                                SalonName = defaultSalonName,
+                                                                                CustomerName = defaultCustomerName,
+                                                                                ArtistName = currentArtistName,
+                                                                                Message = $"Ca của bạn lúc {checkedInBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
                                                                                 Options = new[] { "WAIT", "REASSIGN", "RESCHEDULE" }
                                                                             }
                                                                           );
@@ -627,13 +650,27 @@ namespace Nailify.Capstone.Application.Services
             await _notificationService.SendNotificationToUserAsync(
                 checkedInBooking.CustomerId.ToString(),
                 "DelayETA",
-                new { Message = customerMessage });
+                new 
+                { 
+                    BookingId = checkedInBooking.BookingId,
+                    SalonName = defaultSalonName,
+                    CustomerName = defaultCustomerName,
+                    ArtistName = currentArtistName,
+                    Message = customerMessage 
+                });
 
             // BR-01.4: Gửi cho Màn hình Lễ tân (SalonStaff) để cập nhật ETA
             await _notificationService.SendNotificationToSalonStaffAsync(
                 checkedInBooking.SalonId.ToString(),
                 "DelayETA",
-                new { Message = $"Khách hàng {checkedInBooking.Customer?.User?.FirstName} đang chờ. {customerMessage}" });
+                new 
+                { 
+                    BookingId = checkedInBooking.BookingId,
+                    SalonName = defaultSalonName,
+                    CustomerName = defaultCustomerName,
+                    ArtistName = currentArtistName,
+                    Message = $"Khách hàng {defaultCustomerName} đang chờ. {customerMessage}" 
+                });
         }
 
         public async Task CheckAndNotifyDelayAsync()
@@ -665,13 +702,30 @@ namespace Nailify.Capstone.Application.Services
                                 AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12)
                             });
 
+                            var nextCustomerUser = nextBooking.Customer?.User ?? await _unitOfWork.UserRepository.GetByIdAsync(nextBooking.CustomerId);
+                            string nextCustomerName = nextCustomerUser != null ? $"{nextCustomerUser.FirstName} {nextCustomerUser.LastName}".Trim() : "Khách hàng";
+                            var nextSalonObj = nextBooking.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(nextBooking.SalonId);
+                            string nextSalonName = nextSalonObj?.Name ?? "Salon";
+                            string nextArtistName = "Thợ nail";
+                            if (overdue.NailArtistId.HasValue)
+                            {
+                                var nextArtistObj = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(overdue.NailArtistId.Value);
+                                if (nextArtistObj?.Account != null)
+                                {
+                                    nextArtistName = $"{nextArtistObj.Account.FirstName} {nextArtistObj.Account.LastName}".Trim();
+                                }
+                            }
+
                             await _notificationService.SendNotificationToUserAsync(
                                 nextBooking.CustomerId.ToString(),
                                 "DelayWarningWithAutonomy",
                                 new
                                 {
-                                    Message = $"Ca của bạn lúc {nextBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
                                     BookingId = nextBooking.BookingId,
+                                    SalonName = nextSalonName,
+                                    CustomerName = nextCustomerName,
+                                    ArtistName = nextArtistName,
+                                    Message = $"Ca của bạn lúc {nextBooking.StartTime:hh\\:mm} dự kiến muộn {delayMinutes} phút do thợ chưa xong ca trước. Vui lòng chọn hướng xử lý.",
                                     Options = new[] { "WAIT", "REASSIGN", "RESCHEDULE" }
                                 }
                             );

@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.NailArtistResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Application.Mapping;
@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
     public class SlaViolationAlertDTO : IMapFrom<Booking>
     {
         public Guid SalonId { get; set; }
+        public string SalonName { get; set; } = string.Empty;
         public Guid AffectedBookingId { get; set; }
         public string CustomerName { get; set; } = string.Empty;
         public Guid CurrentArtistId { get; set; }

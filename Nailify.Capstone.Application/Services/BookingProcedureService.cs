@@ -441,10 +441,13 @@ namespace Nailify.Capstone.Application.Services
                     if (nextProcedure != null && nextProcedure.AssignedArtistId.HasValue)
                     {
                         var currentArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
-                        var currentArtistName = currentArtist != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}" : "Thợ nail";
+                        var currentArtistName = currentArtist != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}".Trim() : "Thợ nail";
 
                         var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(existbooking.BookingItem.BookingId);
-                        var customerName = booking != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}" : "Khách hàng";
+                        var customerName = booking?.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                        var salonObj = booking?.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(booking?.SalonId ?? Guid.Empty);
+                        string salonName = salonObj?.Name ?? "Salon";
+                        string nextArtistName = nextProcedure.AssignedArtist?.Account != null ? $"{nextProcedure.AssignedArtist.Account.FirstName} {nextProcedure.AssignedArtist.Account.LastName}".Trim() : "Thợ nail";
 
                         var nextArtistAccountId = nextProcedure.AssignedArtist.AccountId;
 
@@ -453,8 +456,14 @@ namespace Nailify.Capstone.Application.Services
                             "NextStepReady",
                             new
                             {
+                                BookingId = booking?.BookingId ?? Guid.Empty,
                                 BookingProcedureId = nextProcedure.BookingProcedureId,
                                 BookingItemId = nextProcedure.BookingItemId,
+                                SalonName = salonName,
+                                CustomerName = customerName,
+                                CurrentArtistName = currentArtistName,
+                                NextArtistName = nextArtistName,
+                                ProcedureName = nextProcedure.ProcedureName,
                                 Message = $"Thợ {currentArtistName} đã hoàn thành bước '{existbooking.ProcedureName}' cho khách {customerName}. Mời bạn vào thực hiện bước tiếp theo '{nextProcedure.ProcedureName}'."
                             }
                         );
@@ -804,9 +813,17 @@ namespace Nailify.Capstone.Application.Services
                     break;
                 }
             }
+            string addonCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+            string addonSalonName = booking.Salon?.Name ?? "Salon";
+            if (addonSalonName == "Salon")
+            {
+                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                if (salonObj != null) addonSalonName = salonObj.Name;
+            }
+
             if (availableSecondary != null)
             {
-                var secondaryName = availableSecondary.Account != null ? $"{availableSecondary.Account.FirstName} {availableSecondary.Account.LastName}" : "Thơ phụ";
+                var secondaryName = availableSecondary.Account != null ? $"{availableSecondary.Account.FirstName} {availableSecondary.Account.LastName}".Trim() : "Thợ phụ";
                 response.CanMultiArtistSplit = true;
                 response.SuggestedSecondaryArtistId = availableSecondary.NailArtistId;
                 response.SuggestedSecondaryArtistName = secondaryName;
@@ -819,6 +836,8 @@ namespace Nailify.Capstone.Application.Services
                     new
                     {
                         BookingId = booking.BookingId,
+                        SalonName = addonSalonName,
+                        CustomerName = addonCustomerName,
                         PrimaryArtistId = primaryArtistId,
                         PrimaryArtistName = primaryArtistName,
                         AddonNames = addonNames,
@@ -844,6 +863,8 @@ namespace Nailify.Capstone.Application.Services
                                      new
                                      {
                                          BookingId = booking.BookingId,
+                                         SalonName = addonSalonName,
+                                         CustomerName = addonCustomerName,
                                          PrimaryArtistId = primaryArtistId,
                                          PrimaryArtistName = primaryArtistName,
                                          AddonNames = addonNames,
@@ -1214,12 +1235,23 @@ namespace Nailify.Capstone.Application.Services
                 var secondaryArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(assignedArtistId.Value);
                 if (secondaryArtist != null)
                 {
+                    string handoffCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    string handoffSalonName = booking.Salon?.Name ?? "Salon";
+                    if (handoffSalonName == "Salon")
+                    {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                        if (salonObj != null) handoffSalonName = salonObj.Name;
+                    }
+
                     await _notificationService.SendNotificationToUserAsync(
                         secondaryArtist.AccountId.ToString(),
                         "MultiArtistHandoffAssigned",
                         new
                         {
                             BookingId = booking.BookingId,
+                            SalonName = handoffSalonName,
+                            CustomerName = handoffCustomerName,
+                            AddonNames = request.AddonItems.Select(x => x.ServiceId?.ToString() ?? x.NailVariantId?.ToString() ?? "Dịch vụ phát sinh").ToList(),
                             Message = $"Bạn được Lễ tân phân công tiếp nhận {request.AddonItems.Count} dịch vụ phát sinh (+{totalAddedDuration}p) cho khách hàng."
                         }
                     );

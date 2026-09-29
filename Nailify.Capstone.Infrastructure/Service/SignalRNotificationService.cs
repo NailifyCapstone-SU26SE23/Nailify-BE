@@ -31,5 +31,10 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             await _hubContext.Clients.Group($"Salon_{salonId}").SendAsync("ReceiveNotification", messageType, payload);
         }
+
+        public async Task SendNotificationToSalonReceptionistsAsync(string salonId, string messageType, object payload)
+        {
+            await _hubContext.Clients.Group($"Salon_{salonId}_Receptionist").SendAsync("ReceiveNotification", messageType, payload);
+        }
     }
 }

@@ -77,6 +77,9 @@ namespace Nailify.Capstone.Application.Services
             }
             foreach (var x in orderedBookings)
             {
+                string customerName = x.Customer?.User != null ? $"{x.Customer.User.FirstName} {x.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = x.Salon?.Name ?? "Salon";
+
                 var procedures = (await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(x.BookingId)).ToList();
                 var timeline = _schedulingService.BuildProcedureTimeline(procedures, x.StartTime);
 
@@ -137,10 +140,19 @@ namespace Nailify.Capstone.Application.Services
                         // Discard (Bien bo qua)
                         // Cố tình cho tác vụ này chạy ngầm ở background, hãy bỏ qua cảnh báo!
                         // Ko can cho cu chay ngam
+                        string newArtistName = $"{candidate.Account?.FirstName} {candidate.Account?.LastName}".Trim();
+
                         _ = _notificationService.SendNotificationToUserAsync(
                             x.CustomerId.ToString(),
-                             "Thông báo đổi thợ phụ trách",
-                            $"Lịch hẹn lúc {x.StartTime:hh\\:mm} ngày {targetDate:dd/MM/yyyy} của bạn đã được chuyển sang Thợ {candidate.Account?.FirstName} {candidate.Account?.LastName} (Đạt trình độ chuyên môn tương đương/cao hơn). Khung giờ không đổi.");
+                            "Thông báo đổi thợ phụ trách",
+                            new
+                            {
+                                BookingId = x.BookingId,
+                                SalonName = salonName,
+                                CustomerName = customerName,
+                                NewArtistName = newArtistName,
+                                Message = $"Lịch hẹn lúc {x.StartTime:hh\\:mm} ngày {targetDate:dd/MM/yyyy} của bạn tại {salonName} đã được chuyển sang Thợ {newArtistName} (Đạt trình độ chuyên môn tương đương/cao hơn). Khung giờ không đổi."
+                            });
 
                         reassigned = true;
                         break;
@@ -202,10 +214,20 @@ namespace Nailify.Capstone.Application.Services
                             detailDto.NewAssignedArtistId = candidate.NailArtistId;
                             detailDto.NewAssignedArtistName = candidate.Account?.FirstName + " " + candidate.Account.LastName;
                             response.ProcessingDetails.Add(detailDto);
+                            string newArtistName = $"{candidate.Account?.FirstName} {candidate.Account?.LastName}".Trim();
+
                             _ = _notificationService.SendNotificationToUserAsync(
                                 x.CustomerId.ToString(),
                                 "Đề xuất thay đổi giờ hẹn",
-                                $"Do sự cố thợ bận đột xuất, Salon đề xuất dời lịch của bạn sang {suggestedStartTime:hh\\:mm}. Vui lòng kiểm tra và xác nhận trên ứng dụng."
+                                new
+                                {
+                                    BookingId = x.BookingId,
+                                    SalonName = salonName,
+                                    CustomerName = customerName,
+                                    SuggestedStartTime = suggestedStartTime.ToString(@"hh\:mm"),
+                                    NewArtistName = newArtistName,
+                                    Message = $"Do sự cố thợ bận đột xuất, Salon {salonName} đề xuất dời lịch của bạn sang {suggestedStartTime:hh\\:mm} với thợ {newArtistName}. Vui lòng kiểm tra và xác nhận trên ứng dụng."
+                                }
                             );
                             rescheduleSuggested = true;
                             break;
@@ -247,10 +269,17 @@ namespace Nailify.Capstone.Application.Services
                 var cancelDetailDto = _mapper.Map<EmergencyBookingHandlingDetailDTO>(x);
                 cancelDetailDto.HandlingResult = EmergencyHandlingResult.Cancelled;
                 response.ProcessingDetails.Add(cancelDetailDto);
+
                 _ = _notificationService.SendNotificationToUserAsync(
                     x.CustomerId.ToString(),
                     "Thông báo Hủy lịch hẹn",
-                    $"Rất tiếc lịch hẹn lúc {x.StartTime:hh\\:mm} bị hủy do sự cố thợ bận đột xuất và chưa có thợ có trình độ tương đương làm mẫu móng này. Salon thành thật xin lỗi vì sự bất tiện này."
+                    new
+                    {
+                        BookingId = x.BookingId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Message = $"Rất tiếc lịch hẹn lúc {x.StartTime:hh\\:mm} tại {salonName} bị hủy do sự cố thợ bận đột xuất và chưa có thợ có trình độ tương đương làm mẫu móng này. Salon thành thật xin lỗi vì sự bất tiện này."
+                    }
                 );
             }
             return response;
