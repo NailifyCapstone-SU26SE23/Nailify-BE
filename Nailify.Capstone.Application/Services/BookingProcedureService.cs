@@ -440,16 +440,22 @@ namespace Nailify.Capstone.Application.Services
 
                     if (nextProcedure != null && nextProcedure.AssignedArtistId.HasValue)
                     {
-                        var currentArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
-                        var currentArtistName = currentArtist != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}".Trim() : "Thợ nail";
+                        var currentArtist = _unitOfWork.NailArtistRepository != null ? await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId) : null;
+                        var currentArtistName = currentArtist != null && currentArtist.Account != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}".Trim() : "Thợ nail";
 
                         var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(existbooking.BookingItem.BookingId);
                         var customerName = booking?.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
-                        var salonObj = booking?.Salon ?? await _unitOfWork.SalonRepository.GetByIdAsync(booking?.SalonId ?? Guid.Empty);
+                        var salonObj = booking?.Salon ?? (_unitOfWork.SalonRepository != null && booking != null ? await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId) : null);
                         string salonName = salonObj?.Name ?? "Salon";
-                        string nextArtistName = nextProcedure.AssignedArtist?.Account != null ? $"{nextProcedure.AssignedArtist.Account.FirstName} {nextProcedure.AssignedArtist.Account.LastName}".Trim() : "Thợ nail";
 
-                        var nextArtistAccountId = nextProcedure.AssignedArtist.AccountId;
+                        var nextArtist = nextProcedure.AssignedArtist;
+                        if (nextArtist == null && nextProcedure.AssignedArtistId.HasValue && _unitOfWork.NailArtistRepository != null)
+                        {
+                            nextArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(nextProcedure.AssignedArtistId.Value);
+                        }
+
+                        string nextArtistName = nextArtist?.Account != null ? $"{nextArtist.Account.FirstName} {nextArtist.Account.LastName}".Trim() : "Thợ nail";
+                        var nextArtistAccountId = nextArtist?.AccountId ?? nextProcedure.AssignedArtistId.Value;
 
                         await _notificationService.SendNotificationToUserAsync(
                             nextArtistAccountId.ToString(),

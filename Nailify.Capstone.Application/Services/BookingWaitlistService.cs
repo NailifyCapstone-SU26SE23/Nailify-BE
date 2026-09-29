@@ -33,13 +33,13 @@ namespace Nailify.Capstone.Application.Services
                                         IBookingProcedureService bookingProcedureService,
                                         IBookingSchedulingService bookingSchedulingService,
                                         IBookingCreationService bookingCreationService
-                                     )
+                                      )
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _loyaltyTierService = loyaltyTierService;
             _promotionService = promotionService;
-           _bookingProcedureService = bookingProcedureService;
+            _bookingProcedureService = bookingProcedureService;
             _bookingSchedulingService = bookingSchedulingService;
             _bookingCreationService = bookingCreationService;
         }
@@ -162,6 +162,17 @@ namespace Nailify.Capstone.Application.Services
             var dtos = paged.Items.Select(x => _mapper.Map<WaitlistResponseDTO>(x)).ToList();
             var response = new PagedList<WaitlistResponseDTO>(dtos, paged.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<WaitlistResponseDTO>>(response, "Lấy danh sách hàng chờ salon thành công.");
+        }
+
+        public async Task<ApiResult<WaitlistResponseDTO>> GetWaitlistByIdAsync(Guid waitlistId)
+        {
+            var detailedWaitlist = await _unitOfWork.BookingWaitlistRepository.GetWaitlistWithDetailsAsync(waitlistId);
+            if (detailedWaitlist == null)
+            {
+                return new ApiErrorResult<WaitlistResponseDTO>("Không tìm thấy thông tin hàng chờ.");
+            }
+            var response = _mapper.Map<WaitlistResponseDTO>(detailedWaitlist);
+            return new ApiSuccessResult<WaitlistResponseDTO>(response, "Lấy thông tin chi tiết hàng chờ thành công.");
         }
 
         public async Task<ApiResult<WaitlistResponseDTO>> JoinWaitlistAsync(Guid customerId, JoinWaitlistRequestDTO request)
