@@ -285,9 +285,9 @@ namespace Nailify.Capstone.Application.Services
             {
                 var term = searchTerm.Trim().ToLower();
                 predicate = u => u.Role == UserRole.Customer &&
-                                 (u.Email.ToLower().Contains(term) ||
-                                  u.FirstName.ToLower().Contains(term) ||
-                                  u.LastName.ToLower().Contains(term));
+                                 ((u.Email != null && u.Email.ToLower().Contains(term)) ||
+                                  (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
+                                  (u.LastName != null && u.LastName.ToLower().Contains(term)));
             }
 
             var pagedUsers = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
@@ -301,7 +301,7 @@ namespace Nailify.Capstone.Application.Services
 
                 if (customer != null)
                 {
-                    _mapper.Map(customer, profileDto);
+                    MapCustomerFieldsToDto(customer, profileDto);
                 }
                 customerProfiles.Add(profileDto);
             }
@@ -309,6 +309,7 @@ namespace Nailify.Capstone.Application.Services
             var resultPagedList = new PagedList<CustomerProfileDto>(customerProfiles, pagedUsers.MetaData.TotalItems, pageNumber, pageSize);
             return new ApiSuccessResult<PagedList<CustomerProfileDto>>(resultPagedList, "Lấy danh sách khách hàng phân trang thành công.");
         }
+
         public async Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
@@ -322,16 +323,11 @@ namespace Nailify.Capstone.Application.Services
 
             if (customer != null)
             {
-                _mapper.Map(customer, profileDto);
+                MapCustomerFieldsToDto(customer, profileDto);
                 // Deserialize các chuỗi JSON từ Database
                 profileDto.PreferredColors = DeserializeList(customer.PreferredColorsJson);
                 profileDto.PreferredStyles = DeserializeList(customer.PreferredStylesJson);
                 profileDto.PreferredOccasions = DeserializeList(customer.PreferredOccasionsJson);
-
-                profileDto.SkinShade = customer.SkinShade;
-                profileDto.HandShape = customer.HandShape;
-                profileDto.PreferredComplexity = customer.PreferredComplexity;
-                profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
 
                 // Lấy tên dáng móng
                 if (customer.PreferredNailShapeId.HasValue)
@@ -342,6 +338,19 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ khách hàng thành công.");
+        }
+
+        private static void MapCustomerFieldsToDto(Customer customer, CustomerProfileDto profileDto)
+        {
+            profileDto.LoyaltyPoint = customer.LoyaltyPoint;
+            profileDto.LifetimePoints = customer.LifetimePoints;
+            profileDto.SkinTone = customer.SkinTone;
+            profileDto.SkinShade = customer.SkinShade;
+            profileDto.HandShape = customer.HandShape;
+            profileDto.Occupation = customer.Occupation;
+            profileDto.NailCondition = customer.NailCondition;
+            profileDto.PreferredComplexity = customer.PreferredComplexity;
+            profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
         }
 
         public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerProfileByAdminAsync(Guid userId, CustomerProfileUpdateRequest request)

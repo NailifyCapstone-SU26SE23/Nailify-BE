@@ -63,14 +63,14 @@ namespace Nailify.Capstone.Domain.Entities
         /// <returns>True nếu StartTime được cập nhật sớm hơn; ngược lại False.</returns>
         public bool AdjustStartTimeIfEarlyArrival()
         {
-            if (ActualCheckInTime.HasValue && ActualCheckInTime.Value.Date == BookingDate.Date)
+            if (!ActualCheckInTime.HasValue) return false;
+            var checkInDate = ActualCheckInTime.Value.Date;
+            var checkInTimeOfDay = new TimeSpan(ActualCheckInTime.Value.TimeOfDay.Hours, ActualCheckInTime.Value.TimeOfDay.Minutes, 0);
+            if (checkInDate < BookingDate.Date || (checkInDate == BookingDate.Date && checkInTimeOfDay < StartTime))
             {
-                var checkInTimeOfDay = new TimeSpan(ActualCheckInTime.Value.TimeOfDay.Hours, ActualCheckInTime.Value.TimeOfDay.Minutes, 0);
-                if (checkInTimeOfDay < StartTime)
-                {
-                    StartTime = checkInTimeOfDay;
-                    return true;
-                }
+                BookingDate = checkInDate;     
+                StartTime = checkInTimeOfDay;
+                return true;
             }
             return false;
         }
