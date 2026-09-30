@@ -148,7 +148,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// Webhook nhận thông báo kết quả thanh toán từ PayOS.
         /// </summary>
         [HttpPost("webhook")]
-        public async Task<IActionResult> HandlePaymentWebhook([FromBody] PaymentWebhookDto webhookData)
+        public async Task<IActionResult> HandlePaymentWebhook([FromBody] PaymentWebhookDto? webhookData)
         {
             var result = await _paymentService.HandlePaymentWebhookAsync(webhookData);
 
