@@ -152,9 +152,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _paymentService.HandlePaymentWebhookAsync(webhookData);
 
+            /*
             if (!result.Success)
                 return BadRequest(new ApiErrorResult<object>(result.Message));
-
+            */
             return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
 
