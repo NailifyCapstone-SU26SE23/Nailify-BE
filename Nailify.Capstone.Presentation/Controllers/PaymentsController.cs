@@ -143,7 +143,7 @@ namespace Nailify.Capstone.Presentation.Controllers
 
             return Ok(new ApiSuccessResult<object?>(result.Transaction, result.Message));
         }
-
+        /*
         /// <summary>
         /// Webhook nhận thông báo kết quả thanh toán từ PayOS.
         /// </summary>
@@ -152,13 +152,11 @@ namespace Nailify.Capstone.Presentation.Controllers
         {
             var result = await _paymentService.HandlePaymentWebhookAsync(webhookData);
 
-            /*
             if (!result.Success)
                 return BadRequest(new ApiErrorResult<object>(result.Message));
-            */
             return Ok(new ApiSuccessResult<object?>(null, result.Message));
         }
-
+        */
         /// <summary>
         /// Kiểm tra trạng thái thanh toán theo mã đơn hàng.
         /// </summary>
