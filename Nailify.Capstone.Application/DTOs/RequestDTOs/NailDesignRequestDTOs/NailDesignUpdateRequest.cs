@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs
 {
@@ -10,7 +11,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs
         public string Description { get; set; } = string.Empty;
         public List<int> CategoryIds { get; set; } = new List<int>();
         public string? ExistingImageUrl { get; set; }
-
+        public ActiveStatusFilter? Status { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<NailDesignUpdateRequest, NailDesign>()
