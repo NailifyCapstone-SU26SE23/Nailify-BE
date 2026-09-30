@@ -36,11 +36,12 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailVariantDto>> GetNailVariantByIdAsync(int id, Guid? userId = null)
         {
             var variant = await _unitOfWork.NailVariantRepository.GetNailVariantDetailAsync(id);
+            /*
             if (variant == null)
             {
                 return new ApiErrorResult<NailVariantDto>("Không tìm thấy biến thể.");
             }
-
+            */
             var variantDto = _mapper.Map<NailVariantDto>(variant);
             await PopulateFavoriteStatusAsync(new[] { variantDto }, userId);
             return new ApiSuccessResult<NailVariantDto>(variantDto, "Lấy thông tin biến thể thành công.");

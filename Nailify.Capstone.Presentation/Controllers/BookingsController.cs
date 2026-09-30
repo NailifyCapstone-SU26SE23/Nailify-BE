@@ -125,7 +125,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _bookingService.CalculateBookingPriceAsync(
                 customerId,
                 request.BookingItems,
-                request.SelectedPromotionIds); 
+                request.SelectedPromotionIds,
+                request.WarrantyForBookingId); 
 
             return response.IsSucceeded ? Ok(response) : BadRequest(response);
         }

@@ -52,10 +52,12 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id, Guid? userId = null)
         {
             var design = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
-            if (design == null || design.Status == "Inactive")
+            /*
+             if (design == null || design.Status == "Inactive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
+            */
 
             var designDto = _mapper.Map<NailDesignDto>(design);
             await PopulateFavoriteStatusAsync(new[] { designDto }, userId);

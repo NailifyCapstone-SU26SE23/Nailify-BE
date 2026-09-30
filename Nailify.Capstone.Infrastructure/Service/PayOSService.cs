@@ -72,7 +72,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
                 }
 
-                var priceResult = await bookingCreationService.CalculateBookingPriceAsync(customerId, request.BookingItems, request.SelectedPromotionIds);
+                var priceResult = await bookingCreationService.CalculateBookingPriceAsync(customerId, request.BookingItems, request.SelectedPromotionIds, request.WarrantyForBookingId);
                 if (!priceResult.IsSucceeded)
                 {
                     return (false, priceResult.Message ?? "Lỗi tính giá.", null);
