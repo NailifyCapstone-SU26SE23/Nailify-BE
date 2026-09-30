@@ -20,10 +20,13 @@ namespace Nailify.Capstone.Presentation.Extensions
                 try
                 {
                     var script = dbContext.Database.GenerateCreateScript();
+                    /* 
                     if (!string.IsNullOrWhiteSpace(script))
                     {
                         dbContext.Database.ExecuteSqlRaw(script);
                     }
+                    */
+                    dbContext.Database.Migrate();
                 }
                 catch (Exception exCreate)
                 {

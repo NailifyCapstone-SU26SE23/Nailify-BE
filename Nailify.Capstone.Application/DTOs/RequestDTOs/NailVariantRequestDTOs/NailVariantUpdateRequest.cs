@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
 {
@@ -11,7 +12,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public int? NailSurfaceId { get; set; }
         public int? NailDesignId { get; set; }
         public string ColorJson { get; set; } = string.Empty;
-
+        public ActiveStatusFilter? Status { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<NailVariantUpdateRequest, NailVariant>()

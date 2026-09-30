@@ -65,9 +65,10 @@ namespace Nailify.Capstone.Presentation.Controllers
             Guid salonId,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] UserRole? role = null)
+            [FromQuery] UserRole? role = null,
+            [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role);
+            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role, status.ToString());
             return Ok(result);
         }
 
@@ -179,9 +180,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet("customers")]
         [ProducesResponseType(typeof(ApiResult<PagedList<CustomerProfileDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
+        public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null, [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm);
+            var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm, status.ToString());
             return Ok(result);
         }
 

@@ -21,6 +21,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.PromotionRequestDTOs
         public int? UsageLimit { get; set; }
         public int? UserLimit { get; set; }
         public int? PointsRequired { get; set; }
+        public ActiveStatusFilter? Status { get; set; }
 
         public void Mapping(Profile profile)
         {
