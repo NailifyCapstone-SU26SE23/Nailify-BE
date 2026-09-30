@@ -53,8 +53,17 @@ namespace Nailify.Capstone.Application.Services
             _nailVariantService = nailVariantService;
             _logger = logger;
         }
+        private static bool IsItemFromOldBooking(BookingItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId)
+            );
+        }
 
-        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null, Guid? warrantyForBookingId = null)
         {
             var normalizedItems = NormalizePriceRequestItems(bookingItems);
             var normalizedPromotionIds = selectedPromotionIds?
@@ -79,7 +88,28 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
             }
+            decimal calculatedPrice = calculation.Price;
 
+            if (warrantyForBookingId.HasValue)
+            {
+                var oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(warrantyForBookingId.Value);
+                if (oldBooking != null)
+                {
+                    foreach (var item in calculation.Items)
+                    {
+                        var reqItem = normalizedItems.FirstOrDefault(r =>
+                            (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
+                            (r.ServiceId.HasValue && r.ServiceId == item.ServiceId) ||
+                            (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
+
+                        if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
+                        {
+                            item.Price = 0;
+                        }
+                    }
+                    calculatedPrice = calculation.Items.Sum(x => x.Price);
+                }
+            }
             var promotionDiscountAmount = 0m;
             var loyaltyDiscountAmount = 0m;
             var appliedPromotionDiscounts = new List<BookingDiscount>();
@@ -106,7 +136,7 @@ namespace Nailify.Capstone.Application.Services
                     }, applicablePromotions);
 
                 loyaltyDiscountAmount = decimal.Round(
-                    calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    calculatedPrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
                     0,
                     MidpointRounding.AwayFromZero);
 
@@ -138,9 +168,9 @@ namespace Nailify.Capstone.Application.Services
             var totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
             var response = new BookingPriceResponseDTO
             {
-                Price = calculation.Price,
+                Price = calculatedPrice,
                 Discount = -totalDiscountAmount,
-                TotalPrice = Math.Max(0, calculation.Price - totalDiscountAmount),
+                TotalPrice = Math.Max(0, calculatedPrice - totalDiscountAmount),
                 TotalDuration = calculation.Duration,
                 DiscountBreakdown = discountBreakdown
             };
@@ -331,21 +361,28 @@ namespace Nailify.Capstone.Application.Services
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch gốc này đã được yêu cầu bảo hành trước đó.");
                 }
-                foreach (var item in request.BookingItems)
+                bool hasWarrantyItem = request.BookingItems.Any(item => IsItemFromOldBooking(item, oldBooking.BookingItems));
+                if (!hasWarrantyItem)
                 {
-                    bool isValidItem = oldBooking.BookingItems.Any(oldItem =>
-                                                                              (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
-                                                                              (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
-                                                                              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
-                                                                   );
-                    if (!isValidItem)
+                    return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một dịch vụ hoặc mẫu móng thuộc đơn hàng gốc để bảo hành.");
+                }
+
+
+                foreach (var item in calculation.Items)
+                {
+                    var reqItem = request.BookingItems.FirstOrDefault(r =>
+                        (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
+                        (r.ServiceId.HasValue && r.ServiceId == item.ServiceId) ||
+                        (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
+
+                    if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                     {
-                        return new ApiErrorResult<BookingResponseDTO>("Dịch vụ hoặc mẫu móng yêu cầu bảo hành không khớp với đơn đặt lịch gốc.");
+                        item.Price = 0;
                     }
                 }
-                bookingPrice.Price = 0;
-                bookingPrice.Discount = 0;
-                bookingPrice.TotalPrice = 0;
+                bookingPrice.Price = calculation.Items.Sum(x => x.Price);
+                bookingPrice.Discount = -totalDiscountAmount;
+                bookingPrice.TotalPrice = Math.Max(0, bookingPrice.Price - totalDiscountAmount);
             }
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
