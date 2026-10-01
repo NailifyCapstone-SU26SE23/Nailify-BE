@@ -16,12 +16,14 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IRecalculationService _recalculationService;
         #region Constructor
-        public CustomerNailService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService)
+        public CustomerNailService(IUnitOfWork unitOfWork, IMapper mapper, INotificationService notificationService, IRecalculationService recalculationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _notificationService = notificationService;
+            _recalculationService = recalculationService;
         }
         #endregion Constructor
         #region CRUD Operations
@@ -56,10 +58,9 @@ namespace Nailify.Capstone.Application.Services
             customerNail.UserId = userId.Value;
             customerNail.ImageUrl = imageUrl ?? string.Empty;
             customerNail.CreatedAt = DateTime.UtcNow;
-            customerNail.Price = await CalculateCustomerNailPriceAsync(request.NailShapeId, request.NailSurfaceId, null);
-            customerNail.Duration = await CalculateCustomerNailDurationAsync(request.NailShapeId, request.NailSurfaceId);
             await _unitOfWork.CustomerNailRepository.CreateAsync(customerNail);
             await _unitOfWork.SaveChangesAsync();
+            await _recalculationService.RecalculateCustomerNailAsync(customerNail.CustomerNailId);
 
             var createdCustomerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNail.CustomerNailId);
             return new ApiSuccessResult<CustomerNailDto>(_mapper.Map<CustomerNailDto>(createdCustomerNail), "Tạo móng tùy chỉnh thành công.");
@@ -110,10 +111,9 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<CustomerNailDto>("Khong co thong tin nao de cap nhat.");
             }
 
-            customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, id);
-            customerNail.Duration = await CalculateCustomerNailDurationAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, id);
             _unitOfWork.CustomerNailRepository.Update(customerNail);
             await _unitOfWork.SaveChangesAsync();
+            await _recalculationService.RecalculateCustomerNailAsync(id);
 
             var updatedCustomerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(id);
             return new ApiSuccessResult<CustomerNailDto>(_mapper.Map<CustomerNailDto>(updatedCustomerNail), "Cập nhật móng tùy chỉnh thành công.");
@@ -134,58 +134,9 @@ namespace Nailify.Capstone.Application.Services
         }
         #endregion CRUD Operations
         #region Additional Operations
-        public async Task RecalculateCustomerNailPriceAsync(int customerNailId)
+        public Task RecalculateCustomerNailPriceAsync(int customerNailId)
         {
-            var customerNailDetail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId);
-
-            if (customerNailDetail == null)
-            {
-                return;
-            }
-
-            var customerNail = customerNailDetail;
-            customerNail.Price = await CalculateCustomerNailPriceAsync(customerNail.NailShapeId, customerNail.NailSurfaceId, customerNailId);
-            customerNail.Duration = (customerNailDetail.NailSurface?.Duration ?? 0)
-              + customerNailDetail.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0);
-            _unitOfWork.CustomerNailRepository.Update(customerNail);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        private async Task<decimal> CalculateCustomerNailPriceAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId)
-        {
-            var nailSurface = nailSurfaceId.HasValue ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value) : null;
-            var componentPrice = 0m;
-
-            if (customerNailId.HasValue)
-            {
-                var customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId.Value);
-                componentPrice = customerNail?.CustomerNailComponents.Sum(component =>
-                    ((component.Component?.Price ?? 0m) + (component.CustomerComponent?.Price ?? 0m))
-                    * GetFingerPriceMultiplier(component.FingerIndex)) ?? 0m;
-            }
-
-            return (nailSurface?.Price ?? 0m) + componentPrice;
-        }
-
-        private static int GetFingerPriceMultiplier(int fingerIndex)
-        {
-            return fingerIndex == -1 ? 5 : 1;
-        }
-
-        private async Task<int?> CalculateCustomerNailDurationAsync(int? nailShapeId, int? nailSurfaceId, int? customerNailId = null)
-        {
-            var nailSurface = nailSurfaceId.HasValue
-                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(nailSurfaceId.Value)
-                : null;
-            var componentDuration = 0;
-
-            if (customerNailId.HasValue)
-            {
-                var nailComponent = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(customerNailId.Value);
-                componentDuration = nailComponent?.CustomerNailComponents.Sum(nailComponent => nailComponent.Component?.Duration ?? 0) ?? 0;
-            }
-
-            return (nailSurface?.Duration ?? 0) + componentDuration;
+            return _recalculationService.RecalculateCustomerNailAsync(customerNailId);
         }
 
         public async Task<ApiResult<CustomerNailRequestResponseDTO>> SubmitReviewAsync(CustomerNailRequestCreateRequest requestDto, Guid customerId)

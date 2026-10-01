@@ -12,11 +12,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IRecalculationService _recalculationService;
 
-        public NailSurfaceService(IUnitOfWork unitOfWork, IMapper mapper)
+        public NailSurfaceService(IUnitOfWork unitOfWork, IMapper mapper, IRecalculationService recalculationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _recalculationService = recalculationService;
         }
 
         public async Task<ApiResult<PagedList<NailSurfaceDto>>> GetPagedNailSurfacesAsync(int pageNumber, int pageSize, string? name = null, string? status = null)
@@ -59,7 +61,7 @@ namespace Nailify.Capstone.Application.Services
             _mapper.Map(request, surface);
             _unitOfWork.NailSurfaceRepository.Update(surface);
             await _unitOfWork.SaveChangesAsync();
-            await RecalculateAffectedNailVariantsAsync(id);
+            await _recalculationService.RecalculateByNailSurfaceIdAsync(id);
 
             return new ApiSuccessResult<NailSurfaceDto>(_mapper.Map<NailSurfaceDto>(surface), "Cập nhật bề mặt móng thành công.");
         }
@@ -77,32 +79,5 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<bool>(true, "Xóa bề mặt móng thành công.");
         }
-
-        private async Task RecalculateAffectedNailVariantsAsync(int nailSurfaceId)
-        {
-            var variants = await _unitOfWork.NailVariantRepository.GetAllNailVariantsAsync();
-            var affectedVariants = variants
-                .Where(variant => variant.NailSurfaceId == nailSurfaceId)
-                .ToList();
-
-            foreach (var variant in affectedVariants)
-            {
-                variant.Price = (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent =>
-                        nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
-                variant.Duration = (variant.NailSurface?.Duration ?? 0)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
-
-                _unitOfWork.NailVariantRepository.Update(variant);
-            }
-
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        private static int GetFingerPriceMultiplier(int fingerIndex)
-        {
-            return fingerIndex == -1 ? 5 : 1;
-        }
-
     }
 }
