@@ -92,14 +92,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<List<NailVariant>> GetNailVariantsByDesignIdAsync(int nailDesignId)
         {
             return await _dbSet
-                .Where(nv => nv.NailDesignId == nailDesignId && nv.Status == "Active")
+                .Where(nv => nv.NailDesignId == nailDesignId)
                 .ToListAsync();
         }
 
-        private IQueryable<NailVariant> BuildNailVariantQuery(string? status = "Active")
+        private IQueryable<NailVariant> BuildNailVariantQuery(string? status = null)
         {
             var query = _dbSet.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(status))
+            if (!string.IsNullOrWhiteSpace(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(nv => nv.Status == status);
             }

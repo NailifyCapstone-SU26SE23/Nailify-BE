@@ -120,7 +120,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, string? newImageUrl = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
-            if (existingDesign == null || existingDesign.Status == "Inactive")
+            if (existingDesign == null)
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
@@ -189,6 +189,7 @@ namespace Nailify.Capstone.Application.Services
             var designList = designs.ToList();
             var designIds = designList.Select(design => design.NailDesignId).ToHashSet();
             var variantIds = designList
+                .Where(design => design.NailVariants != null)
                 .SelectMany(design => design.NailVariants)
                 .Select(variant => variant.NailVariantId)
                 .ToHashSet();

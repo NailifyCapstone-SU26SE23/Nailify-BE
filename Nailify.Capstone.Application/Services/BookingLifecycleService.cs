@@ -56,7 +56,15 @@ namespace Nailify.Capstone.Application.Services
             _orderCodeGenerator = orderCodeGenerator;
             _refundService = refundService;
         }
-
+        private static bool IsItemFromOldBooking(BookingItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+            );
+        }
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
         {
             if (string.IsNullOrEmpty(qrToken))
@@ -615,12 +623,16 @@ namespace Nailify.Capstone.Application.Services
             decimal totalPrice = 0;
             var bookingItems = new List<BookingItem>();
             var newCustomNailRequests = new List<CustomerNailRequest>();
-
+            Booking? oldBooking = null;
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
             foreach (var x in request.BookingItems)
             {
                 CustomerNailRequest? createdCustomNailRequest = null;
                 CustomerNail? customerNail = null;
-
+                bool isWarrantyItem = oldBooking != null && IsItemFromOldBooking(x, oldBooking.BookingItems);
                 if (x.CustomerNailId.HasValue)
                 {
                     customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(x.CustomerNailId.Value);
@@ -667,7 +679,10 @@ namespace Nailify.Capstone.Application.Services
                     var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
                     if (variant != null)
                     {
-                        itemPrice += variant.Price;
+                        if (!isWarrantyItem)
+                        {
+                            itemPrice += variant.Price;
+                        }
                         itemDuration += (variant.Duration ?? 60);
                     }
                     else
@@ -711,7 +726,10 @@ namespace Nailify.Capstone.Application.Services
                         return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy mẫu móng custom của yêu cầu này.");
                     }
 
-                    itemPrice += customNailRequest.Price ?? customerNail.Price ?? 0;
+                    if (!isWarrantyItem)
+                    {
+                        itemPrice += customNailRequest.Price ?? customerNail.Price ?? 0;
+                    }
                     itemDuration += customNailRequest.Duration ?? customerNail.Duration ?? 60;
                 }
 
@@ -742,7 +760,10 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
 
-                    itemPrice += shapeMethodConfig.Price;
+                    if (!isWarrantyItem)
+                    {
+                        itemPrice += shapeMethodConfig.Price;
+                    }
                     itemDuration += shapeMethodConfig.Duration;
                 }
 

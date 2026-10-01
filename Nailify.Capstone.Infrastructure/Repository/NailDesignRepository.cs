@@ -16,14 +16,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<List<NailDesign>> GetNailDesignsByCategoryAsync(int categoryId)
         {
             return await BuildNailDesignQuery()
-                .Where(nd => nd.NailCategories.Any(nc => nc.CategoryId == categoryId) && nd.Status == "Active")
+                .Where(nd => nd.NailCategories.Any(nc => nc.CategoryId == categoryId))
                 .ToListAsync();
         }
 
         public async Task<NailDesign?> GetNailDesignWithCategoriesAsync(int nailDesignId)
         {
             return await BuildNailDesignQuery()
-                .FirstOrDefaultAsync(nd => nd.NailDesignId == nailDesignId && nd.Status == "Active");
+                .FirstOrDefaultAsync(nd => nd.NailDesignId == nailDesignId);
         }
 
         public async Task<NailSummaryDto?> GetNailDesignSummaryAsync(int nailDesignId)
@@ -73,7 +73,7 @@ namespace Nailify.Capstone.Infrastructure.Repository
             string? status = null)
         {
             var query = BuildNailDesignQuery();
-            if (!string.IsNullOrWhiteSpace(status))
+            if (!string.IsNullOrWhiteSpace(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(nd => nd.Status == status);
             }
