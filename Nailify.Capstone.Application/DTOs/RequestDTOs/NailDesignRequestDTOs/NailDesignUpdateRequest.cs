@@ -18,8 +18,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailDesignRequestDTOs
                 .ForMember(dest => dest.NailDesignId, opt => opt.Ignore())
                 .ForMember(dest => dest.NailCategories, opt => opt.Ignore())
                 .ForMember(dest => dest.ImageUrl, opt => opt.Ignore())
-                .ForMember(dest => dest.NailVariants, opt => opt.Ignore())
-                .ForMember(dest => dest.Status, opt => opt.Ignore());
+                .ForMember(dest => dest.NailVariants, opt => opt.Ignore());
         }
     }
 }

@@ -95,13 +95,10 @@ namespace Nailify.Capstone.Application.Services
                 var oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(warrantyForBookingId.Value);
                 if (oldBooking != null)
                 {
-                    foreach (var item in calculation.Items)
+                    for (int i = 0; i < calculation.Items.Count; i++)
                     {
-                        var reqItem = normalizedItems.FirstOrDefault(r =>
-                         (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
-                         (r.CustomerNailId.HasValue && item.CustomerNailRequest != null && item.CustomerNailRequest.CustomerNailId == r.CustomerNailId) ||
-                         (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
-
+                        var item = calculation.Items[i];
+                        var reqItem = normalizedItems.ElementAtOrDefault(i);
                         if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                         {
                             item.Price = 0;
@@ -368,15 +365,10 @@ namespace Nailify.Capstone.Application.Services
                 }
 
 
-                foreach (var item in calculation.Items)
+                for (int i = 0; i < calculation.Items.Count; i++)
                 {
-                    var reqItem = request.BookingItems.FirstOrDefault(r =>
-                           (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
-                           (r.CustomerNailId.HasValue && item.CustomerNailRequest != null && item.CustomerNailRequest.CustomerNailId == r.CustomerNailId) ||
-                           (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
-
-
-
+                    var item = calculation.Items[i];
+                    var reqItem = request.BookingItems.ElementAtOrDefault(i);
                     if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                     {
                         item.Price = 0;
@@ -574,8 +566,9 @@ namespace Nailify.Capstone.Application.Services
             catch (Exception ex)
             {
                 await _unitOfWork.RollbackTransactionAsync();
-                _logger.LogError(ex, "Lỗi xảy ra khi CreateBookingAsync");
-                return new ApiErrorResult<BookingResponseDTO>("Có lỗi hệ thống xảy ra khi lưu đơn hàng.");
+                _logger.LogError(ex, "Lỗi xảy ra khi CreateBookingAsync: {Message}", ex.Message);
+                var detailMsg = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+                return new ApiErrorResult<BookingResponseDTO>($"Có lỗi hệ thống xảy ra khi lưu đơn hàng: {detailMsg}");
             }
         }
 
