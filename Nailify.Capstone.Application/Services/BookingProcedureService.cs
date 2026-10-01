@@ -36,6 +36,15 @@ namespace Nailify.Capstone.Application.Services
             _bookingSchedulingService = bookingSchedulingService;
         }
 
+        private static bool IsItemFromOldBooking(AddonItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+            );
+        }
         public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
         {
             var procedure = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId, trackChanges: true);
@@ -661,6 +670,11 @@ namespace Nailify.Capstone.Application.Services
                                                                                             .ToDictionary(x => x.CustomerNailId)
                                                         : new Dictionary<int, CustomerNail>();
 
+            Booking? oldBooking = null;
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
 
             var addonNames = new List<string>();
             int totalDurationMinutes = 0;
@@ -679,7 +693,12 @@ namespace Nailify.Capstone.Application.Services
                 {
                     addonNames.Add(qty > 1 ? $"{variant.Name} (x{qty})" : variant.Name);
                     totalDurationMinutes += (variant.Duration ?? 60) * qty;
-                    totalAddonPrice += variant.Price * qty;
+                    decimal price = variant.Price;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    totalAddonPrice += price * qty;
                 }
                 if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeConfig))
                 {
@@ -693,6 +712,10 @@ namespace Nailify.Capstone.Application.Services
 
                     int duration = customRequest.Duration ?? customNail?.Duration ?? 60;
                     decimal price = customRequest.Price ?? customNail?.Price ?? 0;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
+                    {
+                        price = 0;
+                    }
                     string name = customNail?.Name ?? "Mẫu móng custom";
 
                     addonNames.Add(qty > 1 ? $"Mẫu custom: {name} (x{qty})" : $"Mẫu custom: {name}");
@@ -703,6 +726,10 @@ namespace Nailify.Capstone.Application.Services
                 {
                     int duration = directCustomNail.Duration ?? 60;
                     decimal price = directCustomNail.Price ?? 0;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
+                    {
+                        price = 0;
+                    }
                     string name = directCustomNail.Name ?? "Mẫu móng custom";
 
                     addonNames.Add(qty > 1 ? $"Mẫu custom: {name} (x{qty})" : $"Mẫu custom: {name}");
@@ -936,7 +963,11 @@ namespace Nailify.Capstone.Application.Services
             int totalAddedDuration = 0;
             decimal totalAddedPrice = 0;
             var createdProcedures = new List<BookingProcedure>();
-
+            Booking? oldBookingConfirm = null;
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                oldBookingConfirm = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
             foreach (var item in request.AddonItems)
             {
                 int qty = Math.Max(1, item.Quantity);
@@ -952,7 +983,12 @@ namespace Nailify.Capstone.Application.Services
                 if (item.NailVariantId.HasValue && variantsMap.TryGetValue(item.NailVariantId.Value, out var variant))
                 {
                     itemDuration += (variant.Duration ?? 60) * qty;
-                    itemPrice += variant.Price * qty;
+                    decimal price = variant.Price;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    itemPrice += price * qty;
                 }
                 if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeConfig))
                 {
@@ -964,13 +1000,23 @@ namespace Nailify.Capstone.Application.Services
                 {
                     customNailsMap.TryGetValue(customRequest.CustomerNailId, out var customNail);
                     itemDuration += (customRequest.Duration ?? customNail?.Duration ?? 60) * qty;
-                    itemPrice += (customRequest.Price ?? customNail?.Price ?? 0) * qty;
+                    decimal price = customRequest.Price ?? customNail?.Price ?? 0;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    itemPrice += price * qty;
                 }
                 // 5. Mẫu móng custom trực tiếp (CustomerNail)
                 if (item.CustomerNailId.HasValue && customNailsMap.TryGetValue(item.CustomerNailId.Value, out var directCustomNail))
                 {
                     itemDuration += (directCustomNail.Duration ?? 60) * qty;
-                    itemPrice += (directCustomNail.Price ?? 0) * qty;
+                    decimal price = directCustomNail.Price ?? 0;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    itemPrice += price * qty;
                 }
                 if (itemDuration == 0 && itemPrice == 0)
                 {

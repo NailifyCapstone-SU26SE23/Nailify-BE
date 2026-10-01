@@ -56,11 +56,11 @@ namespace Nailify.Capstone.Application.Services
         private static bool IsItemFromOldBooking(BookingItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
         {
             return oldBookingItems.Any(oldItem =>
-                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
-                (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
-                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
-                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId)
-            );
+              (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+              (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+          );
         }
 
         public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null, Guid? warrantyForBookingId = null)
@@ -98,9 +98,9 @@ namespace Nailify.Capstone.Application.Services
                     foreach (var item in calculation.Items)
                     {
                         var reqItem = normalizedItems.FirstOrDefault(r =>
-                            (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
-                            (r.ServiceId.HasValue && r.ServiceId == item.ServiceId) ||
-                            (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
+                         (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
+                         (r.CustomerNailId.HasValue && item.CustomerNailRequest != null && item.CustomerNailRequest.CustomerNailId == r.CustomerNailId) ||
+                         (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
 
                         if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                         {
@@ -371,9 +371,11 @@ namespace Nailify.Capstone.Application.Services
                 foreach (var item in calculation.Items)
                 {
                     var reqItem = request.BookingItems.FirstOrDefault(r =>
-                        (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
-                        (r.ServiceId.HasValue && r.ServiceId == item.ServiceId) ||
-                        (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
+                           (r.NailVariantId.HasValue && r.NailVariantId == item.NailVariantId) ||
+                           (r.CustomerNailId.HasValue && item.CustomerNailRequest != null && item.CustomerNailRequest.CustomerNailId == r.CustomerNailId) ||
+                           (r.CustomerNailRequestId.HasValue && r.CustomerNailRequestId == item.CustomerNailRequestId));
+
+
 
                     if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                     {
