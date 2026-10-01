@@ -24,17 +24,10 @@ namespace Nailify.Capstone.Application.Services
 
             foreach (var variant in variants)
             {
-                var recalculatedPrice = (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent =>
-                        nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
-
-                if (variant.Price != recalculatedPrice)
+                if (await ApplyNailVariantTotalsAsync(variant.NailVariantId))
                 {
-                    variant.Price = recalculatedPrice;
                     updatedVariants++;
                 }
-
-                _unitOfWork.NailVariantRepository.Update(variant);
             }
 
             await _unitOfWork.SaveChangesAsync();
@@ -57,18 +50,10 @@ namespace Nailify.Capstone.Application.Services
 
             foreach (var customerNail in customerNails)
             {
-                var recalculatedPrice = (customerNail.NailSurface?.Price ?? 0m)
-                    + customerNail.CustomerNailComponents.Sum(component =>
-                        ((component.Component?.Price ?? 0m) + (component.CustomerComponent?.Price ?? 0m))
-                        * GetFingerPriceMultiplier(component.FingerIndex));
-
-                if (customerNail.Price != recalculatedPrice)
+                if (await ApplyCustomerNailTotalsAsync(customerNail.CustomerNailId))
                 {
-                    customerNail.Price = recalculatedPrice;
                     updatedCustomerNails++;
                 }
-
-                _unitOfWork.CustomerNailRepository.Update(customerNail);
             }
 
             await _unitOfWork.SaveChangesAsync();
@@ -82,6 +67,137 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<CustomerNailPriceRecalculationResponseDTO>(
                 response,
                 "Recalculate all customer nail prices successfully.");
+        }
+
+        public async Task RecalculateNailVariantAsync(int nailVariantId)
+        {
+            await ApplyNailVariantTotalsAsync(nailVariantId);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task RecalculateCustomerNailAsync(int customerNailId)
+        {
+            await ApplyCustomerNailTotalsAsync(customerNailId);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task RecalculateNailVariantsByComponentIdAsync(int componentId)
+        {
+            var nailVariantIds = await _unitOfWork.NailComponentRepository.GetNailVariantIdsByComponentIdAsync(componentId);
+            foreach (var nailVariantId in nailVariantIds)
+            {
+                await ApplyNailVariantTotalsAsync(nailVariantId);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task RecalculateCustomerNailsByComponentIdAsync(int componentId)
+        {
+            var customerNailIds = await _unitOfWork.CustomerNailComponentRepository.GetCustomerNailIdsByComponentIdAsync(componentId);
+            foreach (var customerNailId in customerNailIds)
+            {
+                await ApplyCustomerNailTotalsAsync(customerNailId);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task RecalculateByNailSurfaceIdAsync(int nailSurfaceId)
+        {
+            var nailVariantIds = await _unitOfWork.NailVariantRepository.GetNailVariantIdsByNailSurfaceIdAsync(nailSurfaceId);
+            foreach (var nailVariantId in nailVariantIds)
+            {
+                await ApplyNailVariantTotalsAsync(nailVariantId);
+            }
+
+            var customerNailIds = await _unitOfWork.CustomerNailRepository.GetCustomerNailIdsByNailSurfaceIdAsync(nailSurfaceId);
+            foreach (var customerNailId in customerNailIds)
+            {
+                await ApplyCustomerNailTotalsAsync(customerNailId);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task<bool> ApplyNailVariantTotalsAsync(int nailVariantId)
+        {
+            var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(nailVariantId);
+            if (variant == null)
+            {
+                return false;
+            }
+
+            var surface = variant.NailSurfaceId.HasValue
+                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(variant.NailSurfaceId.Value)
+                : null;
+            var nailComponents = await _unitOfWork.NailComponentRepository.GetByNailVariantIdAsync(nailVariantId);
+
+            var componentPrice = 0m;
+            var componentDuration = 0;
+            foreach (var nailComponent in nailComponents)
+            {
+                if (!IsActive(nailComponent.Component?.Status))
+                {
+                    continue;
+                }
+
+                var multiplier = GetFingerPriceMultiplier(nailComponent.FingerIndex);
+                componentPrice += (nailComponent.Component?.Price ?? 0m) * multiplier;
+                componentDuration += (nailComponent.Component?.Duration ?? 0) * multiplier;
+            }
+
+            var recalculatedPrice = (surface?.Price ?? 0m) + componentPrice;
+            var recalculatedDuration = (surface?.Duration ?? 0) + componentDuration;
+            var hasChanges = variant.Price != recalculatedPrice || variant.Duration != recalculatedDuration;
+
+            variant.Price = recalculatedPrice;
+            variant.Duration = recalculatedDuration;
+            _unitOfWork.NailVariantRepository.Update(variant);
+
+            return hasChanges;
+        }
+
+        private async Task<bool> ApplyCustomerNailTotalsAsync(int customerNailId)
+        {
+            var customerNail = await _unitOfWork.CustomerNailRepository.GetByIdAsync(customerNailId);
+            if (customerNail == null)
+            {
+                return false;
+            }
+
+            var surface = customerNail.NailSurfaceId.HasValue
+                ? await _unitOfWork.NailSurfaceRepository.GetByIdAsync(customerNail.NailSurfaceId.Value)
+                : null;
+            var nailComponents = await _unitOfWork.CustomerNailComponentRepository.GetByCustomerNailIdAsync(customerNailId);
+
+            var componentPrice = 0m;
+            var componentDuration = 0;
+            foreach (var nailComponent in nailComponents)
+            {
+                var multiplier = GetFingerPriceMultiplier(nailComponent.FingerIndex);
+
+                if (IsActive(nailComponent.Component?.Status))
+                {
+                    componentPrice += (nailComponent.Component?.Price ?? 0m) * multiplier;
+                    componentDuration += (nailComponent.Component?.Duration ?? 0) * multiplier;
+                }
+            }
+
+            var recalculatedPrice = (surface?.Price ?? 0m) + componentPrice;
+            var recalculatedDuration = (surface?.Duration ?? 0) + componentDuration;
+            var hasChanges = customerNail.Price != recalculatedPrice || customerNail.Duration != recalculatedDuration;
+
+            customerNail.Price = recalculatedPrice;
+            customerNail.Duration = recalculatedDuration;
+            _unitOfWork.CustomerNailRepository.Update(customerNail);
+
+            return hasChanges;
+        }
+
+        private static bool IsActive(string? status)
+        {
+            return string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase);
         }
 
         private static int GetFingerPriceMultiplier(int fingerIndex)

@@ -12,13 +12,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly ICustomerNailService _customerNailService;
+        private readonly IRecalculationService _recalculationService;
 
-        public CustomerNailComponentService(IUnitOfWork unitOfWork, IMapper mapper, ICustomerNailService customerNailService)
+        public CustomerNailComponentService(IUnitOfWork unitOfWork, IMapper mapper, IRecalculationService recalculationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-            _customerNailService = customerNailService;
+            _recalculationService = recalculationService;
         }
 
         public async Task<ApiResult<PagedList<CustomerNailComponentDto>>> GetPagedCustomerNailComponentsAsync(int pageNumber, int pageSize, int? customerNailId = null)
@@ -52,7 +52,7 @@ namespace Nailify.Capstone.Application.Services
             var customerNailComponent = _mapper.Map<CustomerNailComponent>(request);
             await _unitOfWork.CustomerNailComponentRepository.CreateAsync(customerNailComponent);
             await _unitOfWork.SaveChangesAsync();
-            await _customerNailService.RecalculateCustomerNailPriceAsync(request.CustomerNailId);
+            await _recalculationService.RecalculateCustomerNailAsync(request.CustomerNailId);
 
             var createdCustomerNailComponent = await _unitOfWork.CustomerNailComponentRepository.GetCustomerNailComponentDetailAsync(customerNailComponent.CustomerNailComponentId);
             return new ApiSuccessResult<CustomerNailComponentDto>(_mapper.Map<CustomerNailComponentDto>(createdCustomerNailComponent), "Tạo thành phần trên móng tùy chỉnh thành công.");
@@ -76,10 +76,10 @@ namespace Nailify.Capstone.Application.Services
             _mapper.Map(request, customerNailComponent);
             _unitOfWork.CustomerNailComponentRepository.Update(customerNailComponent);
             await _unitOfWork.SaveChangesAsync();
-            await _customerNailService.RecalculateCustomerNailPriceAsync(previousCustomerNailId);
+            await _recalculationService.RecalculateCustomerNailAsync(previousCustomerNailId);
             if (previousCustomerNailId != request.CustomerNailId)
             {
-                await _customerNailService.RecalculateCustomerNailPriceAsync(request.CustomerNailId);
+                await _recalculationService.RecalculateCustomerNailAsync(request.CustomerNailId);
             }
 
             var updatedCustomerNailComponent = await _unitOfWork.CustomerNailComponentRepository.GetCustomerNailComponentDetailAsync(id);
@@ -97,7 +97,7 @@ namespace Nailify.Capstone.Application.Services
             var customerNailId = customerNailComponent.CustomerNailId;
             _unitOfWork.CustomerNailComponentRepository.Delete(customerNailComponent);
             await _unitOfWork.SaveChangesAsync();
-            await _customerNailService.RecalculateCustomerNailPriceAsync(customerNailId);
+            await _recalculationService.RecalculateCustomerNailAsync(customerNailId);
 
             return new ApiSuccessResult<bool>(true, "Xóa thành phần trên móng tùy chỉnh thành công.");
         }

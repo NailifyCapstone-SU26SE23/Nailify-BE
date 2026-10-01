@@ -8,5 +8,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<List<NailComponent>> GetAllNailComponentsAsync();
         Task<PagedList<NailComponent>> GetPagedNailComponentsAsync(int pageNumber, int pageSize);
         Task<NailComponent?> GetNailComponentDetailAsync(int nailComponentId);
+        Task<List<NailComponent>> GetByNailVariantIdAsync(int nailVariantId);
+        Task<List<int>> GetNailVariantIdsByComponentIdAsync(int componentId);
     }
 }
