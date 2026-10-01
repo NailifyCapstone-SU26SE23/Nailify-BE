@@ -236,7 +236,7 @@ namespace Nailify.Capstone.Application.Services
 
                 if (activeNailProcedures != null && activeNailProcedures.Any())
                 {
-                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure?.Duration ?? 0);
+                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0);
 
                     if (targetDuration > 0 && totalCatalogDuration > 0 && targetDuration != totalCatalogDuration)
                     {
@@ -247,7 +247,7 @@ namespace Nailify.Capstone.Application.Services
                         for (int i = 0; i < count; i++)
                         {
                             var x = activeNailProcedures[i];
-                            int catalogDuration = x.Procedure?.Duration ?? 0;
+                            int catalogDuration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0;
                             int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
                             if (i == count - 1)
@@ -259,21 +259,22 @@ namespace Nailify.Capstone.Application.Services
                                 accumulatedDuration += scaledDuration;
                             }
 
-                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round((x.Procedure?.ActiveDuration ?? 0) * scaleFactor)));
+                            int activeMins = x.Procedure?.ActiveDuration ?? (x.EstimatedMinutes ?? scaledDuration);
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(activeMins * scaleFactor)));
                             int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
 
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure?.Name ?? string.Empty,
+                                ProcedureName = !string.IsNullOrWhiteSpace(x.Name) ? x.Name : (x.Procedure?.Name ?? "Công đoạn custom"),
                                 StepOrder = currentStepOrder++,
                                 Duration = scaledDuration,
                                 ActiveDuration = scaledActive,
                                 PassiveDuration = scaledPassive,
                                 CanOverlap = x.Procedure?.CanOverlap ?? false,
-                                IsRequired = x.Procedure?.IsRequired ?? false,
-                                IsMainStep = x.Procedure?.IsMainStep ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? true,
+                                IsMainStep = x.Procedure?.IsMainStep ?? true,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -283,18 +284,22 @@ namespace Nailify.Capstone.Application.Services
                     {
                         foreach (var x in activeNailProcedures)
                         {
+                            int itemDuration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0;
+                            int activeMins = x.Procedure?.ActiveDuration ?? itemDuration;
+                            int passiveMins = x.Procedure?.PassiveDuration ?? 0;
+
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure?.Name ?? string.Empty,
+                                ProcedureName = !string.IsNullOrWhiteSpace(x.Name) ? x.Name : (x.Procedure?.Name ?? "Công đoạn custom"),
                                 StepOrder = currentStepOrder++,
-                                Duration = x.Procedure?.Duration ?? 0,
-                                ActiveDuration = x.Procedure?.ActiveDuration ?? 0,
-                                PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                Duration = itemDuration,
+                                ActiveDuration = activeMins,
+                                PassiveDuration = passiveMins,
                                 CanOverlap = x.Procedure?.CanOverlap ?? false,
-                                IsRequired = x.Procedure?.IsRequired ?? false,
-                                IsMainStep = x.Procedure?.IsMainStep ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? true,
+                                IsMainStep = x.Procedure?.IsMainStep ?? true,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);

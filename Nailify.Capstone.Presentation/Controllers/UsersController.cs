@@ -68,7 +68,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] UserRole? role = null,
             [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role, status.ToString());
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role, statusStr);
             return Ok(result);
         }
 
