@@ -47,6 +47,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync(nv => nv.NailVariantId == nailVariantId);
         }
 
+        public async Task<List<int>> GetNailVariantIdsByNailSurfaceIdAsync(int nailSurfaceId)
+        {
+            return await _dbSet
+                .Where(nv => nv.NailSurfaceId == nailSurfaceId)
+                .Select(nv => nv.NailVariantId)
+                .ToListAsync();
+        }
+
         public async Task<NailSummaryDto?> GetNailVariantSummaryAsync(int nailVariantId)
         {
             var exists = await _dbSet.AnyAsync(nv => nv.NailVariantId == nailVariantId && nv.Status == "Active");

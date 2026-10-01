@@ -17,7 +17,11 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         {
             profile.CreateMap<NailVariantUpdateRequest, NailVariant>()
                 .ForMember(dest => dest.NailVariantId, opt => opt.Ignore())
-                .ForMember(dest => dest.Duration, opt => opt.Ignore());
+                .ForMember(dest => dest.Price, opt => opt.Ignore())
+                .ForMember(dest => dest.Duration, opt => opt.Ignore())
+                .ForMember(dest => dest.NailShapeId, opt => opt.Condition(src => src.NailShapeId.HasValue))
+                .ForMember(dest => dest.NailSurfaceId, opt => opt.Condition(src => src.NailSurfaceId.HasValue))
+                .ForMember(dest => dest.NailDesignId, opt => opt.Condition(src => src.NailDesignId.HasValue));
         }
     }
 }

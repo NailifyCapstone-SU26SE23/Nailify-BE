@@ -36,6 +36,25 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .FirstOrDefaultAsync(component => component.CustomerNailComponentId == customerNailComponentId);
         }
 
+        public async Task<List<CustomerNailComponent>> GetByCustomerNailIdAsync(int customerNailId)
+        {
+            return await _dbSet
+                .AsNoTracking()
+                .Include(component => component.Component)
+                .Include(component => component.CustomerComponent)
+                .Where(component => component.CustomerNailId == customerNailId)
+                .ToListAsync();
+        }
+
+        public async Task<List<int>> GetCustomerNailIdsByComponentIdAsync(int componentId)
+        {
+            return await _dbSet
+                .Where(component => component.ComponentId == componentId)
+                .Select(component => component.CustomerNailId)
+                .Distinct()
+                .ToListAsync();
+        }
+
         private IQueryable<CustomerNailComponent> BuildCustomerNailComponentQuery()
         {
             return _dbSet

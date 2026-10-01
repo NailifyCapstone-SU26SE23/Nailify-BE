@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs
         public void Mapping(Profile profile)
         {
             profile.CreateMap<NailVariantCreateRequest, NailVariant>()
+                .ForMember(dest => dest.Price, opt => opt.Ignore())
                 .ForMember(dest => dest.Duration, opt => opt.Ignore());
         }
     }

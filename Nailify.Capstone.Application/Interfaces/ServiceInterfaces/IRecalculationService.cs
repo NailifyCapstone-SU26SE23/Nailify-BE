@@ -8,6 +8,11 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     {
         Task<ApiResult<NailVariantPriceRecalculationResponseDTO>> RecalculateAllAsync();
         Task<ApiResult<CustomerNailPriceRecalculationResponseDTO>> RecalculateAllCustomerNailsAsync();
+        Task RecalculateNailVariantAsync(int nailVariantId);
+        Task RecalculateCustomerNailAsync(int customerNailId);
+        Task RecalculateNailVariantsByComponentIdAsync(int componentId);
+        Task RecalculateCustomerNailsByComponentIdAsync(int componentId);
+        Task RecalculateByNailSurfaceIdAsync(int nailSurfaceId);
         Task<ProcessAllBookingsResult> ProcessAllCompletedBookingsAsync();
 
     }
