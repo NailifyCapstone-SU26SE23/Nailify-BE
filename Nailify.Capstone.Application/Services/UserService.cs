@@ -70,14 +70,14 @@ namespace Nailify.Capstone.Application.Services
 
             if (role.HasValue)
             {
-                predicate = u => u.SalonId == salonId && u.Role == role.Value && u.Status == status;
+                predicate = u => u.SalonId == salonId && u.Role == role.Value;
             }
             else
             {
-                predicate = u => u.SalonId == salonId && (u.Role == UserRole.Manager || u.Role == UserRole.Receptionist || u.Role == UserRole.Staff_Artist) && u.Status == status;
+                predicate = u => u.SalonId == salonId && (u.Role == UserRole.Manager || u.Role == UserRole.Receptionist || u.Role == UserRole.Staff_Artist);
             }
 
-            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, null);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
