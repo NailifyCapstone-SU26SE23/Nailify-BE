@@ -153,7 +153,7 @@ namespace Nailify.Capstone.Application.Services
                         variantTargetDuration = variant?.Duration ?? 0;
                     }
 
-                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure.Duration ?? 0);
+                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure?.Duration ?? 0);
 
                     if (variantTargetDuration > 0 && totalCatalogDuration > 0 && variantTargetDuration != totalCatalogDuration)
                     {
@@ -164,7 +164,7 @@ namespace Nailify.Capstone.Application.Services
                         for (int i = 0; i < count; i++)
                         {
                             var x = activeNailProcedures[i];
-                            int catalogDuration = x.Procedure.Duration ?? 0;
+                            int catalogDuration = x.Procedure?.Duration ?? 0;
                             int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
                             if (i == count - 1)
@@ -176,21 +176,21 @@ namespace Nailify.Capstone.Application.Services
                                 accumulatedDuration += scaledDuration;
                             }
 
-                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(x.Procedure.ActiveDuration * scaleFactor)));
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round((x.Procedure?.ActiveDuration ?? 0) * scaleFactor)));
                             int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
 
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
                                 StepOrder = currentStepOrder++,
                                 Duration = scaledDuration,
                                 ActiveDuration = scaledActive,
                                 PassiveDuration = scaledPassive,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -204,14 +204,14 @@ namespace Nailify.Capstone.Application.Services
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
                                 StepOrder = currentStepOrder++,
-                                Duration = x.Procedure.Duration ?? 0,
-                                ActiveDuration = x.Procedure.ActiveDuration,
-                                PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                Duration = x.Procedure?.Duration ?? 0,
+                                ActiveDuration = x.Procedure?.ActiveDuration ?? 0,
+                                PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -1047,7 +1047,7 @@ namespace Nailify.Capstone.Application.Services
                 {
                     variantProcs = variantProcs.OrderBy(x => x.StepOrder).ToList();
                     int variantTargetDuration = variantsMap.TryGetValue(item.NailVariantId.Value, out var v) ? (v.Duration ?? 60) * qty : itemDuration;
-                    int totalCatalogDuration = variantProcs.Sum(x => x.Procedure.Duration ?? 0);
+                    int totalCatalogDuration = variantProcs.Sum(x => x.Procedure?.Duration ?? 0);
                     if (variantTargetDuration > 0 && totalCatalogDuration > 0 && variantTargetDuration != totalCatalogDuration)
                     {
                         double scaleFactor = (double)variantTargetDuration / totalCatalogDuration;
@@ -1056,11 +1056,11 @@ namespace Nailify.Capstone.Application.Services
                         for (int i = 0; i < count; i++)
                         {
                             var x = variantProcs[i];
-                            int catalogDuration = x.Procedure.Duration ?? 0;
+                            int catalogDuration = x.Procedure?.Duration ?? 0;
                             int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
                             if (i == count - 1) scaledDuration = Math.Max(1, variantTargetDuration - accumulatedDuration);
                             else accumulatedDuration += scaledDuration;
-                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(x.Procedure.ActiveDuration * scaleFactor)));
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round((x.Procedure?.ActiveDuration ?? 0) * scaleFactor)));
                             int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
                             var newProc = new BookingProcedure
                             {
@@ -1091,14 +1091,14 @@ namespace Nailify.Capstone.Application.Services
                                 BookingProcedureId = Guid.NewGuid(),
                                 BookingItemId = bookingItem.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
                                 StepOrder = nextStepOrder++,
-                                Duration = x.Procedure.Duration ?? 0,
-                                ActiveDuration = x.Procedure.ActiveDuration,
-                                PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                Duration = x.Procedure?.Duration ?? 0,
+                                ActiveDuration = x.Procedure?.ActiveDuration ?? 0,
+                                PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
                                 Status = BookingProcedureStatus.Pending,
                                 AssignedArtistId = assignedArtistId
                             };
