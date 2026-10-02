@@ -1319,5 +1319,11 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<List<BookingProcedureResponseDTO>>(allProcedures.OrderBy(x => x.StepOrder).ToList());
             return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, $"Thêm {request.AddonItems.Count} dịch vụ phát sinh thành công!");
         }
+        public async Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingIdAsync(Guid bookingId)
+        {
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId);
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
+            return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách quy trình theo mã đặt lịch thành công.");
+        }
     }
 }
