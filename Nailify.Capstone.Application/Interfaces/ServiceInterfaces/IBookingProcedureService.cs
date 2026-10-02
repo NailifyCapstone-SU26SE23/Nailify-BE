@@ -29,5 +29,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<List<BookingProcedureResponseDTO>>> GetClaimableProceduresAsync(Guid salonId);
         Task<ApiResult<OnsiteAddonSimulationResponseDTO>> SimulateOnsiteAddonAsync(SimulateOnsiteAddonRequestDTO request);
         Task<ApiResult<List<BookingProcedureResponseDTO>>> ConfirmOnsiteAddonAsync(ConfirmOnsiteAddonRequestDTO request);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingIdAsync(Guid bookingId);
     }
 }

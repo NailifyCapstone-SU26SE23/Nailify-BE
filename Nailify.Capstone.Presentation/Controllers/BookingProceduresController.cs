@@ -147,5 +147,15 @@ namespace Nailify.Capstone.Presentation.Controllers
             var result = await _bookingProcedureService.ConfirmOnsiteAddonAsync(request);
             return result.IsSucceeded ? Ok(result) : BadRequest(result);
         }
+        /// <summary>
+        /// Lấy toàn bộ danh sách các bước quy trình của một đơn đặt lịch (Booking).
+        /// </summary>
+        [HttpGet("booking/{bookingId}")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetByBookingId(Guid bookingId)
+        {
+            var result = await _bookingProcedureService.GetProceduresByBookingIdAsync(bookingId);
+            return Ok(result);
+        }
     }
 }

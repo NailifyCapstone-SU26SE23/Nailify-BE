@@ -26,10 +26,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
         // Các trường mới bổ sung
         public Guid? AssignedArtistId { get; set; }
         public string? AssignedArtistName { get; set; }
-        public TimeSpan? EstimatedStartTime { get; set; }
-        public TimeSpan? EstimatedEndTime { get; set; }
-        public TimeSpan? ActualStartTime { get; set; }
-        public TimeSpan? ActualEndTime { get; set; }
+        public string? EstimatedStartTime { get; set; }
+        public string? EstimatedEndTime { get; set; }
+        public string? ActualStartTime { get; set; }
+        public string? ActualEndTime { get; set; }
         public int Duration { get; set; }
         public int ActiveDuration { get; set; }
         public int PassiveDuration { get; set; }
@@ -46,8 +46,10 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
             profile.CreateMap<BookingProcedure, BookingProcedureResponseDTO>()
                    .IgnoreAllNonExisting()
                    .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
-                   .ForMember(dest => dest.ActualStartTime, opt => opt.MapFrom(src => src.ActualStartTime.HasValue ? src.ActualStartTime.Value.TimeOfDay : (TimeSpan?)null))
-                   .ForMember(dest => dest.ActualEndTime, opt => opt.MapFrom(src => src.ActualEndTime.HasValue ? src.ActualEndTime.Value.TimeOfDay : (TimeSpan?)null))
+                   .ForMember(dest => dest.EstimatedStartTime, opt => opt.MapFrom(src => src.EstimatedStartTime.HasValue ? src.EstimatedStartTime.Value.ToString(@"hh\:mm") : null))
+                   .ForMember(dest => dest.EstimatedEndTime, opt => opt.MapFrom(src => src.EstimatedEndTime.HasValue ? src.EstimatedEndTime.Value.ToString(@"hh\:mm") : null))
+                   .ForMember(dest => dest.ActualStartTime, opt => opt.MapFrom(src => src.ActualStartTime.HasValue ? src.ActualStartTime.Value.ToString("HH:mm") : null))
+                   .ForMember(dest => dest.ActualEndTime, opt => opt.MapFrom(src => src.ActualEndTime.HasValue ? src.ActualEndTime.Value.ToString("HH:mm") : null))
                    .ForMember(dest => dest.CompletedByName, opt => opt.MapFrom(x =>
                         x.CompletedBy != null && x.CompletedBy.Account != null
                         ? $"{x.CompletedBy.Account.FirstName} {x.CompletedBy.Account.LastName}"
