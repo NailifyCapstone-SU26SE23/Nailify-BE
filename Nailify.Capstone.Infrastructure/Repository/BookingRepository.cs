@@ -42,6 +42,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .Include(x => x.BookingItems)
                                        .ThenInclude(x => x.CustomerNailRequest)
                                            .ThenInclude(x => x.CustomerNail)
+                                    .Include(x => x.BookingItems)
+                                       .ThenInclude(x => x.BookingProcedures)
                                     .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
                                     .Include(x => x.Chair)
@@ -159,6 +161,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(x => x.CustomerNailRequest)
                         .ThenInclude(x => x.CustomerNail)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.BookingProcedures)
                 .Include(x => x.BookingDiscounts);
         }
 

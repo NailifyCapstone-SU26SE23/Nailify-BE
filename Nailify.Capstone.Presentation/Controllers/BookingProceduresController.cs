@@ -39,6 +39,17 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy toàn bộ danh sách các bước quy trình của một đơn đặt lịch (Booking).
+        /// </summary>
+        [HttpGet("booking/{bookingId}")]
+        [ProducesResponseType(typeof(ApiResult<List<BookingProcedureResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetByBookingId(Guid bookingId)
+        {
+            var result = await _bookingProcedureService.GetProceduresByBookingIdAsync(bookingId);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Cập nhật trạng thái thực hiện của một bước quy trình làm móng cho Booking.
         /// </summary>
         /// <param name="bookingProcedureId">ID của bước quy trình thực tế.</param>

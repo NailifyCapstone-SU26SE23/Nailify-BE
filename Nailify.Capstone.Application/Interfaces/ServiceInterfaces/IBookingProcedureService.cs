@@ -14,6 +14,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
     public interface IBookingProcedureService
     {
         Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingItemIdAsync(Guid bookingItemId);
+        Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingIdAsync(Guid bookingId);
 
         Task<ApiResult<BookingProcedureResponseDTO>> UpdateProcedureStatusAsync(
             Guid bookingProcedureId,

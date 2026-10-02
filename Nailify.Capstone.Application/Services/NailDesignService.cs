@@ -53,7 +53,7 @@ namespace Nailify.Capstone.Application.Services
         {
             var design = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
             /*
-             if (design == null || design.Status == "Inactive")
+            if (design == null || design.Status == "Inactive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
@@ -120,7 +120,7 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<NailDesignDto>> UpdateNailDesignAsync(int id, NailDesignUpdateRequest request, string? newImageUrl = null)
         {
             var existingDesign = await _unitOfWork.NailDesignRepository.GetNailDesignWithCategoriesAsync(id);
-            if (existingDesign == null)
+            if (existingDesign == null || existingDesign.Status == "Inactive")
             {
                 return new ApiErrorResult<NailDesignDto>("Không tìm thấy mẫu nail.");
             }
@@ -179,14 +179,14 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<List<NailDesignDto>>(designDtos, "Lấy danh sách mẫu nail theo danh mục thành công.");
         }
 
-        private async Task PopulateFavoriteStatusAsync(IEnumerable<NailDesignDto> designs, Guid? userId)
+        private async Task PopulateFavoriteStatusAsync(IEnumerable<NailDesignDto>? designs, Guid? userId)
         {
-            if (userId == null)
+            if (userId == null || designs == null)
             {
                 return;
             }
 
-            var designList = designs.ToList();
+            var designList = designs.Where(d => d != null).ToList();
             var designIds = designList.Select(design => design.NailDesignId).ToHashSet();
             var variantIds = designList
                 .Where(design => design.NailVariants != null)
