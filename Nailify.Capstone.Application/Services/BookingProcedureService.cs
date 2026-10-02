@@ -334,7 +334,7 @@ namespace Nailify.Capstone.Application.Services
                     var bookingProcedure = new BookingProcedure
                     {
                         BookingItemId = item.BookingItemId,
-                        ProcedureName = $"Tạo dáng & làm móng: {shapeMethodConfig.Name}",
+                        ProcedureName = $"{shapeMethodConfig.Name}",
                         StepOrder = currentStepOrder++,
                         Duration = shapeMethodConfig.Duration,
                         ActiveDuration = shapeMethodConfig.Duration,
