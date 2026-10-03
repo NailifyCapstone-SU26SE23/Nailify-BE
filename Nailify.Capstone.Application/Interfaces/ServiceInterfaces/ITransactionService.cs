@@ -1,4 +1,5 @@
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Domain.Entities;
 
@@ -22,5 +23,6 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             TransactionStatus? status = null);
         Task<ApiResult<TransactionResponseDto>> GetByIdAsync(int id);
         Task<ApiResult<IEnumerable<TransactionResponseDto>>> GetByBookingIdAsync(Guid bookingId);
+        Task<ApiResult<IEnumerable<BookingPaymentHistoryDto>>> GetPaymentHistoryByBookingIdAsync(Guid bookingId);
     }
 }

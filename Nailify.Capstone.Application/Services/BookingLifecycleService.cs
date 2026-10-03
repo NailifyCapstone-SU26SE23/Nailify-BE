@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.Common.Helpers;
+using Nailify.Capstone.Application.Common.Models.Scheduling;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.WalkInQueueRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
@@ -29,6 +30,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IPromotionService _promotionService;
         private readonly IOrderCodeGenerator _orderCodeGenerator;
+        private readonly IRefundService _refundService;
         public BookingLifecycleService(
                                          IUnitOfWork unitOfWork,
                                          IMapper mapper,
@@ -39,7 +41,8 @@ namespace Nailify.Capstone.Application.Services
                                          IBookingProcedureService bookingProcedureService,
                                          INotificationService notificationService,
                                          IPromotionService promotionService,
-                                         IOrderCodeGenerator orderCodeGenerator)
+                                         IOrderCodeGenerator orderCodeGenerator,
+                                         IRefundService refundService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -51,8 +54,17 @@ namespace Nailify.Capstone.Application.Services
             _notificationService = notificationService;
             _promotionService = promotionService;
             _orderCodeGenerator = orderCodeGenerator;
+            _refundService = refundService;
         }
-
+        private static bool IsItemFromOldBooking(BookingItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+            );
+        }
         public async Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
         {
             if (string.IsNullOrEmpty(qrToken))
@@ -110,7 +122,7 @@ namespace Nailify.Capstone.Application.Services
                 if (procedures.Any())
                 {
                     var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
-                    foreach(var segment in timeline)
+                    foreach (var segment in timeline)
                     {
                         var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
                         procedure.EstimatedStartTime = segment.StartTime;
@@ -122,7 +134,7 @@ namespace Nailify.Capstone.Application.Services
                 _unitOfWork.BookingRepository.Update(booking);
                 //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
                 await _unitOfWork.SaveChangesAsync();
-                
+
                 if (!booking.IsLateArrival)
                 {
                     await _bookingSchedulingService.HandleOverlappingOnCheckInAsync(booking);
@@ -149,7 +161,7 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật ảnh tình trạng bàn tay thành công.");
         }
@@ -181,12 +193,12 @@ namespace Nailify.Capstone.Application.Services
             booking.CheckInWithoutImage(actorId);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
-            
+
             if (!booking.IsLateArrival)
             {
                 await _bookingSchedulingService.HandleOverlappingOnCheckInAsync(booking);
             }
-            
+
             if (booking.IsLateArrival)
             {
                 var originalArtistId = booking.NailArtistId;
@@ -318,7 +330,34 @@ namespace Nailify.Capstone.Application.Services
                 booking.AmountDue = Math.Max(0m, (booking.TotalPrice ?? amountPaid) - amountPaid);
             }
             _unitOfWork.BookingRepository.Update(booking);
-            //await _unitOfWork.BookingHistoryRepository.CreateAsync(history);
+            if (booking.AmountPaid.HasValue && booking.TotalPrice.HasValue && booking.AmountPaid.Value > booking.TotalPrice.Value)
+            {
+                decimal overpaidAmount = booking.AmountPaid.Value - booking.TotalPrice.Value;
+                var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(booking.CustomerId);
+                if (wallet != null)
+                {
+                    var balanceBefore = wallet.Balance;
+                    wallet.Balance += overpaidAmount;
+                    wallet.UpdatedAt = DateTime.UtcNow;
+                    var walletTx = new WalletTransaction
+                    {
+                        WalletId = wallet.WalletId,
+                        Amount = overpaidAmount,
+                        BalanceBefore = balanceBefore,
+                        BalanceAfter = wallet.Balance,
+                        Type = WalletTransactionType.BookingRefund,
+                        Status = WalletTransactionStatus.Completed,
+                        ReferenceId = booking.BookingId.ToString(),
+                        ReferenceType = WalletReferenceType.Booking,
+                        Description = $"Hoàn lại tiền cọc dư ({overpaidAmount:N0}đ) do giảm dịch vụ đơn hàng {booking.BookingId}",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                    _unitOfWork.CustomerWalletRepository.Update(wallet);
+
+                    booking.AmountPaid = booking.TotalPrice.Value;
+                }
+            }
             await _unitOfWork.SaveChangesAsync();
 
             var response = _mapper.Map<BookingResponseDTO>(booking);
@@ -337,7 +376,7 @@ namespace Nailify.Capstone.Application.Services
             }
             var activeChairs = await _unitOfWork.ChairRepository.GetActiveChairsBySalonAsync(booking.SalonId);
             var activeChairCount = activeChairs.Count();
-            if(activeChairCount > 0)
+            if (activeChairCount > 0)
             {
                 var approvedOverlapCount = await _unitOfWork.BookingRepository.CountApprovedOverlappingAsync(
                     booking.SalonId,
@@ -345,7 +384,7 @@ namespace Nailify.Capstone.Application.Services
                     booking.StartTime,
                     booking.TotalDuration,
                     excludeBookingId: bookingId);
-                if(approvedOverlapCount >= activeChairCount)
+                if (approvedOverlapCount >= activeChairCount)
                 {
                     return new ApiErrorResult<BookingResponseDTO>(
                          $"Không thể duyệt: Salon đã có {approvedOverlapCount}/{activeChairCount} " +
@@ -378,13 +417,27 @@ namespace Nailify.Capstone.Application.Services
             await _unitOfWork.SaveChangesAsync();
             try
             {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+                string bookingCode = bookingId.ToString().Substring(0, 8).ToUpper();
+
                 await _notificationService.SendNotificationToUserAsync(
                     booking.CustomerId.ToString(),
                     "BookingConfirmed",
                     new
                     {
                         BookingId = bookingId,
-                        Message = "Đơn đặt lịch của bạn đã được Salon xác nhận."
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        ArtistName = artistName,
+                        CustomerName = customerName,
+                        Message = $"Đơn đặt lịch #{bookingCode} của bạn đã được Salon xác nhận."
                     });
             }
             catch (Exception ex)
@@ -408,13 +461,56 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ có thể từ chối đơn ở trạng thái 'Pending'. Trạng thái hiện tại: '{booking.Status}'.");
             }
+            var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                bookingId,
+                "Hoàn toàn bộ tiền cọc do lịch hẹn bị từ chối.",
+                forceFullRefund: true);
+            if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+            {
+                return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+            if (booking.BookingDiscounts != null && booking.BookingDiscounts.Any())
+            {
+                await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
+            }
+
             booking.Reject(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
+                await _notificationService.SendNotificationToUserAsync(
+                    booking.CustomerId.ToString(),
+                    "BookingRejected",
+                    new
+                    {
+                        BookingId = booking.BookingId,
+                        BookingCode = bookingCode,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Reason = request.Reason,
+                        Message = $"Đơn đặt lịch #{bookingCode} của bạn tại Salon {salonName} đã bị từ chối. Lý do: {request.Reason}"
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationError] Failed to send booking rejected notification: {ex.Message}");
+            }
+
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Từ chối đơn đặt lịch thành công.");
         }
-        public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
+        public async Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid actorId, CancelBookingRequestDTO request, bool isCustomerActor = false)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(bookingId, trackChanges: true);
             if (booking == null)
@@ -422,35 +518,82 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch không tồn tại.");
             }
 
-            // if (booking.CustomerId != customerId)
-            // {
-            //     return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
-            // }
+            if (isCustomerActor && booking.CustomerId != actorId)
+            {
+                return new ApiErrorResult<BookingResponseDTO>("Bạn không có quyền hủy lịch hẹn của người khác.");
+            }
 
             if (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Approved)
             {
                 return new ApiErrorResult<BookingResponseDTO>($"Chỉ được hủy đơn ở trạng thái 'Pending' hoặc 'Approved'. Trạng thái hiện tại: '{booking.Status}'.");
             }
 
-            booking.Cancel(customerId, request.Reason);
+            var policyRefund = isCustomerActor || request.CustomerRequest == true;
+            var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                bookingId,
+                policyRefund ? request.Reason : $"Hoàn toàn bộ tiền cọc do Salon hủy lịch. Lý do: {request.Reason}",
+                forceFullRefund: !policyRefund);
+            if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+            {
+                return new ApiErrorResult<BookingResponseDTO>(refundResult.Message);
+            }
+            if (booking.BookingDiscounts != null && booking.BookingDiscounts.Any())
+            {
+                await _promotionService.RollbackUsageAsync(booking.CustomerId, booking.BookingDiscounts);
+            }
+
+            booking.Cancel(actorId, request.Reason);
             _unitOfWork.BookingRepository.Update(booking);
             await _unitOfWork.SaveChangesAsync();
             try
             {
-                await _notificationService.SendNotificationToUserAsync(
-                    booking.CustomerId.ToString(),
-                    "BookingRejected",
-                    new
-                    {
-                        BookingId = booking.BookingId,
-                        Reason = request.Reason,
-                        Message = $"Đơn đặt lịch của bạn đã bị Salon từ chối. Lý do: {request.Reason}"
-                    }
-                );
+                string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = booking.Salon?.Name ?? "Salon";
+                if (salonName == "Salon" && _unitOfWork.SalonRepository != null)
+                {
+                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                    if (salonObj != null) salonName = salonObj.Name;
+                }
+                string bookingCode = booking.BookingId.ToString().Substring(0, 8).ToUpper();
+
+                if (policyRefund)
+                {
+                    // Khách hàng hủy -> Gửi thông báo SignalR tới Lễ tân / Staff của Salon
+                    await _notificationService.SendNotificationToSalonStaffAsync(
+                        booking.SalonId.ToString(),
+                        "BookingCancelled",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            BookingCode = bookingCode,
+                            SalonName = salonName,
+                            CustomerName = customerName,
+                            Reason = request.Reason,
+                            Message = $"Khách hàng {customerName} đã hủy đơn đặt lịch #{bookingCode}. Lý do: {request.Reason}"
+                        }
+                    );
+                }
+                else
+                {
+                    // Salon / Manager hủy -> Gửi thông báo SignalR tới Khách hàng
+                    await _notificationService.SendNotificationToUserAsync(
+                        booking.CustomerId.ToString(),
+                        "BookingRejected",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            BookingCode = bookingCode,
+                            SalonName = salonName,
+                            CustomerName = customerName,
+                            Reason = request.Reason,
+                            Message = $"Đơn đặt lịch #{bookingCode} của bạn tại Salon {salonName} đã bị Salon hủy. Lý do: {request.Reason}"
+                        }
+                    );
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[NotificationError] Failed to send booking rejected notification: {ex.Message}");
+                Console.WriteLine($"[NotificationError] Failed to send booking cancelled/rejected notification: {ex.Message}");
             }
             var response = _mapper.Map<BookingResponseDTO>(booking);
             return new ApiSuccessResult<BookingResponseDTO>(response, "Hủy đơn đặt lịch thành công.");
@@ -480,12 +623,16 @@ namespace Nailify.Capstone.Application.Services
             decimal totalPrice = 0;
             var bookingItems = new List<BookingItem>();
             var newCustomNailRequests = new List<CustomerNailRequest>();
-
+            Booking? oldBooking = null;
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
             foreach (var x in request.BookingItems)
             {
                 CustomerNailRequest? createdCustomNailRequest = null;
                 CustomerNail? customerNail = null;
-
+                bool isWarrantyItem = oldBooking != null && IsItemFromOldBooking(x, oldBooking.BookingItems);
                 if (x.CustomerNailId.HasValue)
                 {
                     customerNail = await _unitOfWork.CustomerNailRepository.GetCustomerNailDetailAsync(x.CustomerNailId.Value);
@@ -532,7 +679,10 @@ namespace Nailify.Capstone.Application.Services
                     var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(x.NailVariantId.Value);
                     if (variant != null)
                     {
-                        itemPrice += variant.Price;
+                        if (!isWarrantyItem)
+                        {
+                            itemPrice += variant.Price;
+                        }
                         itemDuration += (variant.Duration ?? 60);
                     }
                     else
@@ -576,7 +726,10 @@ namespace Nailify.Capstone.Application.Services
                         return new ApiErrorResult<BookingResponseDTO>("Không tìm thấy mẫu móng custom của yêu cầu này.");
                     }
 
-                    itemPrice += customNailRequest.Price ?? customerNail.Price ?? 0;
+                    if (!isWarrantyItem)
+                    {
+                        itemPrice += customNailRequest.Price ?? customerNail.Price ?? 0;
+                    }
                     itemDuration += customNailRequest.Duration ?? customerNail.Duration ?? 60;
                 }
 
@@ -607,7 +760,10 @@ namespace Nailify.Capstone.Application.Services
                         }
                     }
 
-                    itemPrice += shapeMethodConfig.Price;
+                    if (!isWarrantyItem)
+                    {
+                        itemPrice += shapeMethodConfig.Price;
+                    }
                     itemDuration += shapeMethodConfig.Duration;
                 }
 
@@ -643,169 +799,359 @@ namespace Nailify.Capstone.Application.Services
                 var mockProcs = await _bookingSchedulingService.GenerateMockBookingProceduresAsync(request.BookingItems.ToList(), booking.SalonId);
                 var timeline = _bookingSchedulingService.BuildProcedureTimeline(mockProcs, request.StartTime);
                 var isConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
-                request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
+                    request.NailArtistId.Value, request.BookingDate, timeline, capacity, bookingId);
                 if (isConflict)
                 {
-                    return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ đã bận, xin chọn giờ khác.");
+                    // Quét thợ phụ rảnh hỗ trợ các bước bị lố của thợ chính
+                    var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+                    var candidateSecondary = activeArtists.Where(x => x.NailArtistId != request.NailArtistId.Value)
+                                                          .ToList();
+
+                    bool hasSecondaryFallback = false;
+                    foreach (var candidate in candidateSecondary)
+                    {
+                        var isSecondaryConflict = await _bookingSchedulingService.HasCapacityConflictAsync(
+                                                                                                            candidate.NailArtistId,
+                                                                                                            request.BookingDate,
+                                                                                                            timeline,
+                                                                                                            candidate.ConcurrentCapacity,
+                                                                                                            bookingId
+                                                                                                          );
+                        if (!isSecondaryConflict)
+                        {
+                            hasSecondaryFallback = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasSecondaryFallback)
+                    {
+                        return new ApiErrorResult<BookingResponseDTO>("Khoảng thời gian này thợ chính và thợ phụ đều bận, xin chọn giờ khác.");
+                    }
                 }
             }
-
-            var selectedPromotionIds = request.SelectedPromotionIds?
-                .Where(id => id > 0)
-                .Distinct()
-                .ToList()
-                ?? booking.BookingDiscounts
-                    .Where(discount => discount.PromotionId.HasValue && !discount.IsAutoApplied)
-                    .Select(discount => discount.PromotionId!.Value)
-                    .Distinct()
-                    .ToList();
-            var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
-                booking.CustomerId,
-                bookingItems,
-                selectedPromotionIds.Any() ? selectedPromotionIds : null);
-            var (promotionDiscountAmount, appliedBookingDiscounts) =
-                await _promotionService.CalculateDiscountsAsync(new Booking
-                {
-                    BookingId = bookingId,
-                    CustomerId = booking.CustomerId,
-                    BookingItems = bookingItems
-                }, applicablePromotions);
-
-            var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(booking.CustomerId);
-            if (!loyaltyResult.IsSucceeded)
+            var existingLoyaltyDiscount = booking.BookingDiscounts.FirstOrDefault(d => d.LoyaltyTierId.HasValue);
+            /*
+            var existingPromoDiscount = booking.BookingDiscounts.FirstOrDefault(d => d.PromotionId.HasValue);
+            */
+            decimal promotionDiscountAmount = 0m;
+            var appliedBookingDiscounts = new List<BookingDiscount>();
+            /*
+            if (request.SelectedPromotionIds == null && existingPromoDiscount != null && existingPromoDiscount.DiscountAmount > 0)
             {
-                return new ApiErrorResult<BookingResponseDTO>(loyaltyResult.Message);
-            }
+                promotionDiscountAmount = Math.Min(totalPrice, existingPromoDiscount.DiscountAmount);
 
-            var loyaltyDiscountAmount = decimal.Round(
-                totalPrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
-                0,
-                MidpointRounding.AwayFromZero);
-
-            if (loyaltyDiscountAmount > 0)
-            {
                 appliedBookingDiscounts.Add(new BookingDiscount
                 {
                     BookingId = bookingId,
-                    Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
-                    DiscountAmount = loyaltyDiscountAmount,
-                    IsAutoApplied = true,
+                    Name = existingPromoDiscount.Name,
+                    DiscountAmount = promotionDiscountAmount,
+                    IsAutoApplied = existingPromoDiscount.IsAutoApplied,
                     AppliedDate = DateTime.UtcNow.AddHours(7),
-                    LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                    PromotionId = existingPromoDiscount.PromotionId
                 });
             }
 
-            var totalDiscountAmount = promotionDiscountAmount + loyaltyDiscountAmount;
-
-            // BẮT ĐẦU TRANSACTION AN TOÀN TRÁNH RACE CONDITION KHI CẬP NHẬT BOOKING
-            await _unitOfWork.BeginTransactionAsync();
-            try
+            else
             {
-                // 1. Tạo các CustomerNailRequest mới (nếu có)
-                foreach (var req in newCustomNailRequests)
-                {
-                    await _unitOfWork.CustomerNailRequestRepository.CreateAsync(req);
-                }
-
-                // 2. Xóa các items cũ khỏi DB trước
-                var oldItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
-                foreach (var oldItem in oldItems)
-                {
-                    oldItem.Booking = null!;
-                    oldItem.NailVariant = null;
-                    oldItem.Service = null;
-                    oldItem.CustomerNailRequest = null;
-                    _unitOfWork.BookingItemRepository.Delete(oldItem);
-                }
-
-                booking.BookingDate = request.BookingDate;
-                booking.StartTime = request.StartTime;
-                booking.NailArtistId = request.NailArtistId;
-
-                booking.Price = totalPrice;
-                booking.Discount = -totalDiscountAmount;
-                booking.TotalPrice = Math.Max(0, totalPrice - totalDiscountAmount);
-                booking.AmountDue = Math.Max(0, (booking.TotalPrice ?? 0) - (booking.AmountPaid ?? 0));
-                booking.TotalDuration = totalDuration;
-                booking.UpdatedAt = DateTime.UtcNow;
-
-                // Clear list trong memory của booking
-                booking.BookingItems.Clear();
-                var oldDiscounts = await _unitOfWork.BookingDiscountRepository.GetByBookingIdAsync(bookingId);
-                foreach (var oldDiscount in oldDiscounts)
-                {
-                    oldDiscount.Booking = null!;
-                    oldDiscount.Promotion = null;
-                    oldDiscount.LoyaltyTier = null;
-                    oldDiscount.LoyaltyTransaction = null;
-                    _unitOfWork.BookingDiscountRepository.Delete(oldDiscount);
-                }
-                booking.BookingDiscounts.Clear();
-
-                booking.Updated(oldPrice, oldDuration, actorId);
-
-                booking.Customer = null!;
-                booking.Salon = null!;
-                booking.NailArtist = null;
-                booking.BookingHistories.Clear();
-
-                _unitOfWork.BookingRepository.Update(booking);
-
-                // 3. Tạo các BookingItem mới
-                foreach (var item in bookingItems)
-                {
-                    await _unitOfWork.BookingItemRepository.CreateAsync(item);
-                }
-
-                foreach (var discount in appliedBookingDiscounts)
-                {
-                    await _unitOfWork.BookingDiscountRepository.CreateAsync(discount);
-                }
-
-                await _unitOfWork.SaveChangesAsync();
-
-                // 4. Tạo các quy trình (Procedures) mặc định cho booking sau khi cập nhật
-                foreach (var item in bookingItems)
-                {
-                    await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
-                }
-                await _unitOfWork.SaveChangesAsync();
-
-                // 5. Tính toán timeline và gán ngay lập tức nếu đã chọn thợ
-                if (booking.NailArtistId.HasValue)
-                {
-                    var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
-                    if (procedures.Any())
+            */
+                var selectedPromotionIds = request.SelectedPromotionIds?
+                   .Where(id => id > 0)
+                   .Distinct()
+                   .ToList()
+                   ?? booking.BookingDiscounts
+                       .Where(discount => discount.PromotionId.HasValue)
+                       .Select(discount => discount.PromotionId!.Value)
+                       .Distinct()
+                       .ToList();
+            if(selectedPromotionIds.Any())
+            {    
+                var applicablePromotions = await _promotionService.GetApplicablePromotionsAsync(
+                    booking.CustomerId,
+                    bookingItems,
+                    selectedPromotionIds);
+                var (promoAmount, promoDiscounts) =
+                    await _promotionService.CalculateDiscountsAsync(new Booking
                     {
-                        var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
-                        foreach (var segment in timeline)
-                        {
-                            var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
-                            procedure.EstimatedStartTime = segment.StartTime;
-                            procedure.EstimatedEndTime = segment.EndTime;
-                            if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
-                            {
-                                procedure.AssignedArtistId = booking.NailArtistId.Value;
-                            }
-                            _unitOfWork.BookingProcedureRepository.Update(procedure);
-                        }
-                        await _unitOfWork.SaveChangesAsync();
-                    }
+                        BookingId = bookingId,
+                        CustomerId = booking.CustomerId,
+                        BookingItems = bookingItems
+                    }, applicablePromotions);
+
+                promotionDiscountAmount = promoAmount;
+                appliedBookingDiscounts.AddRange(promoDiscounts);
+            }
+
+            decimal loyaltyDiscountAmount = 0m;
+            if (existingLoyaltyDiscount != null && existingLoyaltyDiscount.DiscountAmount > 0)
+            {
+                loyaltyDiscountAmount = Math.Min(totalPrice, existingLoyaltyDiscount.DiscountAmount);
+                appliedBookingDiscounts.Add(new BookingDiscount
+                {
+                    BookingId = bookingId,
+                    Name = existingLoyaltyDiscount.Name,
+                    DiscountAmount = loyaltyDiscountAmount,
+                    IsAutoApplied = true,
+                    AppliedDate = existingLoyaltyDiscount.AppliedDate,
+                    LoyaltyTierId = existingLoyaltyDiscount.LoyaltyTierId
+                });
+            }
+            else
+            {
+                var loyaltyResult = await _loyaltyTierService.GetMyLoyaltyAsync(booking.CustomerId);
+                if (!loyaltyResult.IsSucceeded)
+                {
+                    return new ApiErrorResult<BookingResponseDTO>(loyaltyResult.Message);
                 }
 
-                await _unitOfWork.CommitTransactionAsync();
+                loyaltyDiscountAmount = decimal.Round(
+                    totalPrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    0,
+                    MidpointRounding.AwayFromZero);
 
-                var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
-                var response = _mapper.Map<BookingResponseDTO>(savedBooking);
-                return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật đơn đặt lịch thành công.");
+                if (loyaltyDiscountAmount > 0)
+                {
+                    appliedBookingDiscounts.Add(new BookingDiscount
+                    {
+                        BookingId = bookingId,
+                        Name = $"{loyaltyResult.Data.LoyaltyTier.Name} Tier",
+                        DiscountAmount = loyaltyDiscountAmount,
+                        IsAutoApplied = true,
+                        AppliedDate = DateTime.UtcNow.AddHours(7),
+                        LoyaltyTierId = loyaltyResult.Data.LoyaltyTier.LoyaltyTierId
+                    });
+                }
             }
-            catch (Exception ex)
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                _logger.LogError(ex, "Lỗi xảy ra khi UpdateBookingAsync");
-                return new ApiErrorResult<BookingResponseDTO>("Có lỗi hệ thống xảy ra khi cập nhật đơn hàng.");
+
+                var totalDiscountAmount = Math.Min(totalPrice, promotionDiscountAmount + loyaltyDiscountAmount);
+
+
+                // BẮT ĐẦU TRANSACTION AN TOÀN TRÁNH RACE CONDITION KHI CẬP NHẬT BOOKING
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    // 1. Tạo các CustomerNailRequest mới (nếu có)
+                    foreach (var req in newCustomNailRequests)
+                    {
+                        await _unitOfWork.CustomerNailRequestRepository.CreateAsync(req);
+                    }
+
+                    // 2. Xóa các items cũ khỏi DB trước
+                    var oldItems = await _unitOfWork.BookingItemRepository.GetBookingItemsByBookingIdAsync(bookingId);
+                    foreach (var oldItem in oldItems)
+                    {
+                        oldItem.Booking = null!;
+                        oldItem.NailVariant = null;
+                        oldItem.Service = null;
+                        oldItem.CustomerNailRequest = null;
+                        _unitOfWork.BookingItemRepository.Delete(oldItem);
+                    }
+
+                    booking.BookingDate = request.BookingDate;
+                    booking.StartTime = request.StartTime;
+                    booking.NailArtistId = request.NailArtistId;
+
+                    booking.Price = totalPrice;
+                    booking.Discount = -totalDiscountAmount;
+                    booking.TotalPrice = Math.Max(0, totalPrice - totalDiscountAmount);
+                    booking.AmountDue = Math.Max(0, (booking.TotalPrice ?? 0) - (booking.AmountPaid ?? 0));
+                    booking.TotalDuration = totalDuration;
+                    booking.UpdatedAt = DateTime.UtcNow;
+
+                    // Clear list trong memory của booking
+                    booking.BookingItems.Clear();
+                    var oldDiscounts = await _unitOfWork.BookingDiscountRepository.GetByBookingIdAsync(bookingId);
+                    foreach (var oldDiscount in oldDiscounts)
+                    {
+                        oldDiscount.Booking = null!;
+                        oldDiscount.Promotion = null;
+                        oldDiscount.LoyaltyTier = null;
+                        oldDiscount.LoyaltyTransaction = null;
+                        _unitOfWork.BookingDiscountRepository.Delete(oldDiscount);
+                    }
+                    booking.BookingDiscounts.Clear();
+
+                    booking.Updated(oldPrice, oldDuration, actorId);
+
+                    booking.Customer = null!;
+                    booking.Salon = null!;
+                    booking.NailArtist = null;
+                    booking.BookingHistories.Clear();
+
+                    _unitOfWork.BookingRepository.Update(booking);
+
+                    // 3. Tạo các BookingItem mới
+                    foreach (var item in bookingItems)
+                    {
+                        await _unitOfWork.BookingItemRepository.CreateAsync(item);
+                    }
+
+                    foreach (var discount in appliedBookingDiscounts)
+                    {
+                        await _unitOfWork.BookingDiscountRepository.CreateAsync(discount);
+                    }
+
+                    await _unitOfWork.SaveChangesAsync();
+
+                    // 4. Tạo các quy trình (Procedures) mặc định cho booking sau khi cập nhật
+                    foreach (var item in bookingItems)
+                    {
+                        await _bookingProcedureService.DuplicateProceduresForBookingItemAsync(item);
+                    }
+                    await _unitOfWork.SaveChangesAsync();
+
+                    // 5. Tính toán timeline và gán ngay lập tức nếu đã chọn thợ
+                    if (booking.NailArtistId.HasValue)
+                    {
+                        var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId, trackChanges: true);
+                        if (procedures.Any())
+                        {
+                            var timeline = _bookingSchedulingService.BuildProcedureTimeline(procedures, booking.StartTime);
+                            var primaryArtistId = booking.NailArtistId.Value;
+                            var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+                            var allArtistIds = activeArtists.Select(x => x.NailArtistId).ToList();
+                            var allBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync(
+                                allArtistIds, booking.BookingDate, excludingBookingId: booking.BookingId);
+                            var busySegmentsByArtist = allBusySegments.GroupBy(x => x.AssignedArtistId!.Value)
+                                .ToDictionary(g => g.Key, g => g.ToList());
+                            var primaryBusySegments = busySegmentsByArtist.GetValueOrDefault(primaryArtistId) ?? new List<ProcedureScheduleSegment>();
+
+                            var secondaryAssignments = new List<(NailArtist SecondaryArtist, string ProcedureName, TimeSpan StartTime, TimeSpan EndTime)>();
+
+                            foreach (var segment in timeline)
+                            {
+                                var procedure = procedures.First(x => x.BookingProcedureId == segment.BookingProcedureId);
+                                procedure.EstimatedStartTime = segment.StartTime;
+                                procedure.EstimatedEndTime = segment.EndTime;
+                                if (procedure.ActiveDuration > 0 && procedure.IsMainStep)
+                                {
+                                    bool primaryHasConflictForSegment = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                        primaryArtistId, primaryBusySegments, new List<ProcedureScheduleSegment> { segment }, capacity: 1);
+                                    if (!primaryHasConflictForSegment)
+                                    {
+                                        procedure.AssignedArtistId = primaryArtistId;
+                                    }
+                                    else
+                                    {
+                                        NailArtist? chosenSecondary = null;
+                                        if (request.SecondaryArtistId.HasValue)
+                                        {
+                                            chosenSecondary = activeArtists.FirstOrDefault(x => x.NailArtistId == request.SecondaryArtistId.Value);
+                                        }
+
+                                        chosenSecondary ??= activeArtists.FirstOrDefault(candidate =>
+                                            candidate.NailArtistId != primaryArtistId &&
+                                            !_bookingSchedulingService.HasCapacityConflictInMemory(
+                                                candidate.NailArtistId,
+                                                busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
+                                                new List<ProcedureScheduleSegment> { segment },
+                                                candidate.ConcurrentCapacity)
+                                        );
+
+                                        procedure.AssignedArtistId = chosenSecondary?.NailArtistId ?? primaryArtistId;
+
+                                        if (chosenSecondary != null)
+                                        {
+                                            secondaryAssignments.Add((chosenSecondary, procedure.ProcedureName, segment.StartTime, segment.EndTime));
+                                        }
+                                    }
+                                }
+                                _unitOfWork.BookingProcedureRepository.Update(procedure);
+                            }
+                            await _unitOfWork.SaveChangesAsync();
+
+                            // Bắn thông báo SignalR cho Lễ tân và Thợ phụ khi có công đoạn bị phân công cho thợ phụ
+                            foreach (var assign in secondaryAssignments)
+                            {
+                                var secName = assign.SecondaryArtist.Account != null
+                                    ? $"{assign.SecondaryArtist.Account.FirstName} {assign.SecondaryArtist.Account.LastName}".Trim()
+                                    : "Thợ phụ";
+
+                                var customerName = booking.Customer?.User != null
+                                    ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim()
+                                    : "Khách hàng";
+
+                                int overflowMinutes = (int)(assign.EndTime - assign.StartTime).TotalMinutes;
+
+                                var availableSecondaryList = activeArtists
+                                    .Where(candidate => candidate.NailArtistId != primaryArtistId &&
+                                        !_bookingSchedulingService.HasCapacityConflictInMemory(
+                                            candidate.NailArtistId,
+                                            busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>(),
+                                            timeline.Where(t => t.StartTime == assign.StartTime && t.EndTime == assign.EndTime).ToList(),
+                                            candidate.ConcurrentCapacity))
+                                    .Select(candidate => new
+                                    {
+                                        NailArtistId = candidate.NailArtistId,
+                                        FullName = candidate.Account != null
+                                            ? $"{candidate.Account.FirstName} {candidate.Account.LastName}".Trim()
+                                            : "Thợ phụ"
+                                    })
+                                    .ToList();
+
+                                string primaryArtistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ chính";
+                                string salonName = booking.Salon?.Name ?? "Salon";
+                                if (salonName == "Salon")
+                                {
+                                    var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                                    if (salonObj != null) salonName = salonObj.Name;
+                                }
+
+                                await _notificationService.SendNotificationToSalonReceptionistsAsync(
+                                    booking.SalonId.ToString(),
+                                    "BookingUpdatedWithSecondaryArtistNotification",
+                                    new
+                                    {
+                                        BookingId = booking.BookingId,
+                                        SalonName = salonName,
+                                        CustomerName = customerName,
+                                        PrimaryArtistId = primaryArtistId,
+                                        PrimaryArtistName = primaryArtistName,
+                                        SecondaryArtistId = assign.SecondaryArtist.NailArtistId,
+                                        SecondaryArtistName = secName,
+                                        ProcedureName = assign.ProcedureName,
+                                        StartTime = assign.StartTime,
+                                        EndTime = assign.EndTime,
+                                        OverflowMinutes = overflowMinutes,
+                                        AvailableSecondaryArtists = availableSecondaryList,
+                                        Message = $"Khách {customerName} đổi dịch vụ bị lố {overflowMinutes} phút. Hệ thống gợi ý {secName} làm thợ phụ từ {assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm}."
+                                    }
+                                );
+
+                                if (request.SecondaryArtistId.HasValue && assign.SecondaryArtist.AccountId != Guid.Empty)
+                                {
+                                    await _notificationService.SendNotificationToUserAsync(
+                                        assign.SecondaryArtist.AccountId.ToString(),
+                                        "SecondaryArtistTaskAssignedNotification",
+                                        new
+                                        {
+                                            BookingId = booking.BookingId,
+                                            SalonName = salonName,
+                                            CustomerName = customerName,
+                                            ProcedureName = assign.ProcedureName,
+                                            StartTime = assign.StartTime,
+                                            EndTime = assign.EndTime,
+                                            Message = $"Bạn được phân công làm thợ phụ hỗ trợ ca lố đơn {booking.BookingId}, công đoạn '{assign.ProcedureName}' ({assign.StartTime:hh\\:mm} - {assign.EndTime:hh\\:mm})."
+                                        }
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    var savedBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.BookingId);
+                    var response = _mapper.Map<BookingResponseDTO>(savedBooking);
+                    return new ApiSuccessResult<BookingResponseDTO>(response, "Cập nhật đơn đặt lịch thành công.");
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Lỗi xảy ra khi UpdateBookingAsync");
+                    return new ApiErrorResult<BookingResponseDTO>("Có lỗi hệ thống xảy ra khi cập nhật đơn hàng.");
+                }
             }
-        }
         private async Task<DiscountedPriceCalculation> CalculateDiscountedPriceAsync(
         Guid customerId,
         decimal price)
@@ -896,8 +1242,24 @@ namespace Nailify.Capstone.Application.Services
                     booking.NailArtistId = newArtist.NailArtistId;
                     _unitOfWork.BookingRepository.Update(booking);
 
+                    string newAssignCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    string newAssignSalonName = booking.Salon?.Name ?? "Salon";
+                    if (newAssignSalonName == "Salon")
+                    {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                        if (salonObj != null) newAssignSalonName = salonObj.Name;
+                    }
+
                     await _notificationService.SendNotificationToUserAsync(
-                        newArtist.NailArtistId.ToString(), "NewAssignment", "Bạn có ca mới được assign do thợ trước bị kẹt khách."
+                        newArtist.AccountId.ToString(),
+                        "NewAssignment",
+                        new
+                        {
+                            BookingId = booking.BookingId,
+                            SalonName = newAssignSalonName,
+                            CustomerName = newAssignCustomerName,
+                            Message = $"Bạn có ca mới được assign cho đơn #{booking.BookingId.ToString().Substring(0, 8).ToUpper()} do thợ trước bị kẹt khách."
+                        }
                     );
                     break;
                 case DelayCustomerDecision.Reschedule:

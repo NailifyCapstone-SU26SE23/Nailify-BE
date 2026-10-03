@@ -19,16 +19,21 @@ namespace Nailify.Capstone.Application.Services
             _mapper = mapper;
         }
 
-        public Task<ApiResult<List<LoyaltyTierDto>>> GetAllAsync()
+        public async Task<ApiResult<PagedList<LoyaltyTierDto>>> GetAllAsync(int pageNumber, int pageSize, string? status = null)
         {
-            var tiers = _unitOfWork.LoyaltyTierRepository.FindAll()
-                .OrderBy(t => t.SortOrder)
-                .ThenBy(t => t.MinLifetimePoints)
-                .ToList();
-            return Task.FromResult<ApiResult<List<LoyaltyTierDto>>>(
-                new ApiSuccessResult<List<LoyaltyTierDto>>(
-                    _mapper.Map<List<LoyaltyTierDto>>(tiers),
-                    "Lấy danh sách hạng thành viên thành công."));
+            var pagedResult = await _unitOfWork.LoyaltyTierRepository.GetPagedAsync(pageNumber,
+                                                                                    pageSize,
+                                                                                    predicate: null,
+                                                                                    statusFilter: status,
+                                                                                    orderBy: "SortOrder asc");
+            var mappedItems = _mapper.Map<List<LoyaltyTierDto>>(pagedResult.Items);
+            var response = new PagedList<LoyaltyTierDto>(
+                mappedItems,
+                pagedResult.MetaData.TotalItems,
+                pageNumber,
+                pageSize
+            );
+            return new ApiSuccessResult<PagedList<LoyaltyTierDto>>(response, "Lấy danh sách hạng thành viên thành công.");
         }
 
         public async Task<ApiResult<LoyaltyTierDto>> GetByIdAsync(int id)
@@ -84,11 +89,15 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<LoyaltyTierDto>> UpdateAsync(int id, LoyaltyTierRequest request, string? imageUrl = null)
         {
             var tier = await _unitOfWork.LoyaltyTierRepository.GetByIdAsync(id);
-            if (tier == null) return new ApiErrorResult<LoyaltyTierDto>("Không tìm thấy hạng thành viên.");
-
+            if (tier == null)
+            {
+                return new ApiErrorResult<LoyaltyTierDto>("Không tìm thấy hạng thành viên.");
+            }
             var validationError = await ValidateAsync(request, id);
-            if (validationError != null) return new ApiErrorResult<LoyaltyTierDto>(validationError);
-
+            if (validationError != null)
+            {
+                return new ApiErrorResult<LoyaltyTierDto>(validationError);
+            }
             _mapper.Map(request, tier);
             if (imageUrl != null)
             {

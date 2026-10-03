@@ -106,6 +106,10 @@ namespace Nailify.Capstone.Application.Services
 
                 if (isNegative || request.OverallScore <= 2)
                 {
+                    string customerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    string salonName = booking.Salon?.Name ?? "Salon";
+                    string artistName = booking.NailArtist?.Account != null ? $"{booking.NailArtist.Account.FirstName} {booking.NailArtist.Account.LastName}".Trim() : "Thợ nail";
+
                     // Bắn cảnh báo SignalR cho Salon Manager về đánh giá tiêu cực
                     await _notificationService.SendNotificationToSalonStaffAsync(
                         booking.SalonId.ToString(),
@@ -114,9 +118,12 @@ namespace Nailify.Capstone.Application.Services
                         {
                             BookingId = booking.BookingId,
                             CustomerId = customerId,
+                            CustomerName = customerName,
+                            SalonName = salonName,
+                            ArtistName = artistName,
                             Stars = request.OverallScore,
                             Comment = request.Comment,
-                            Message = $"CẢNH BÁO: Đánh giá tiêu cực vừa được gửi từ khách hàng cho đơn #{booking.BookingId}!"
+                            Message = $"CẢNH BÁO: Đánh giá tiêu cực vừa được gửi từ khách hàng {customerName} cho đơn #{booking.BookingId}!"
                         }
                     );
                 }
@@ -194,7 +201,7 @@ namespace Nailify.Capstone.Application.Services
             var rating = await _unitOfWork.BookingRatingRepository.GetDetailByIdAsync(id, true);
             if (rating == null) return new ApiErrorResult<bool>("Không tìm thấy đánh giá.");
 
-            rating.Status = "InActive";
+            rating.Status = "Inactive";
             rating.DeletedAt = DateTime.UtcNow;
             rating.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.BookingRatingRepository.Update(rating);

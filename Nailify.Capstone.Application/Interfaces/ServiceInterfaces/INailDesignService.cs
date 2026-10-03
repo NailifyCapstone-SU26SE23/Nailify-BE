@@ -11,7 +11,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
             int pageSize,
             string? name = null,
             IEnumerable<int>? categoryIds = null,
-            Guid? userId = null);
+            Guid? userId = null,
+            string? status = null);
         Task<ApiResult<NailDesignDto>> GetNailDesignByIdAsync(int id, Guid? userId = null);
         Task<ApiResult<NailSummaryDto>> GetNailDesignSummaryAsync(int id);
         Task<ApiResult<NailDesignDto>> CreateNailDesignAsync(NailDesignCreateRequest request, string? imageUrl = null);

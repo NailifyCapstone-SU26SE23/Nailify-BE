@@ -1,10 +1,11 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailShapeRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 
 namespace Nailify.Capstone.Presentation.Controllers
@@ -38,9 +39,10 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<NailShapeDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? name = null)
+        public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? name = null, [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _nailShapeService.GetPagedNailShapesAsync(pageNumber, pageSize, name);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _nailShapeService.GetPagedNailShapesAsync(pageNumber, pageSize, name, statusStr);
             return Ok(result);
         }
 

@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ComponentRequestDTOs
 {
@@ -10,7 +11,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.ComponentRequestDTOs
         public ComponentType ComponentType { get; set; }
         public decimal Price { get; set; }
         public int? Duration { get; set; }
-
+        public ActiveStatusFilter Status { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<ComponentUpdateRequest, Component>()

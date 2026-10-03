@@ -24,6 +24,7 @@ namespace Nailify.Capstone.Application.Services
         private readonly IEmailService _emailService;
         private readonly IBookingSkillMatchingService _skillMatchingService;
         private readonly IPromotionService _promotionService;
+        private readonly IRefundService _refundService;
 
         public NailArtistEmergencyService(
             IUnitOfWork unitOfWork,
@@ -32,7 +33,8 @@ namespace Nailify.Capstone.Application.Services
             INotificationService notificationService,
             IEmailService emailService,
             IBookingSkillMatchingService skillMatchingService,
-            IPromotionService promotionService)
+            IPromotionService promotionService,
+            IRefundService refundService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -41,12 +43,13 @@ namespace Nailify.Capstone.Application.Services
             _emailService = emailService;
             _skillMatchingService = skillMatchingService;
             _promotionService = promotionService;
+            _refundService = refundService;
         }
 
         public async Task<EmergencyOffResultDTO> ProcessAffectedBookingsForDateAsync(Guid artistId, DateTime targetDate, string reason)
         {
             // Lấy tất cả  các lịch hẹn Approve của thợ trong ngày
-            var affectedBookings = await _unitOfWork.BookingRepository.GetApprovedBookingsWithDetailsByArtistAndDateAsync(artistId, targetDate);
+            var affectedBookings = await _unitOfWork.BookingRepository.GetApprovedBookingsWithDetailsByArtistAndDateAsync(artistId, targetDate, trackChanges: true);
 
             var orderedBookings = affectedBookings.OrderBy(x => x.StartTime).ToList();
 
@@ -74,6 +77,9 @@ namespace Nailify.Capstone.Application.Services
             }
             foreach (var x in orderedBookings)
             {
+                string customerName = x.Customer?.User != null ? $"{x.Customer.User.FirstName} {x.Customer.User.LastName}".Trim() : "Khách hàng";
+                string salonName = x.Salon?.Name ?? "Salon";
+
                 var procedures = (await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(x.BookingId)).ToList();
                 var timeline = _schedulingService.BuildProcedureTimeline(procedures, x.StartTime);
 
@@ -134,10 +140,19 @@ namespace Nailify.Capstone.Application.Services
                         // Discard (Bien bo qua)
                         // Cố tình cho tác vụ này chạy ngầm ở background, hãy bỏ qua cảnh báo!
                         // Ko can cho cu chay ngam
+                        string newArtistName = $"{candidate.Account?.FirstName} {candidate.Account?.LastName}".Trim();
+
                         _ = _notificationService.SendNotificationToUserAsync(
                             x.CustomerId.ToString(),
-                             "Thông báo đổi thợ phụ trách",
-                            $"Lịch hẹn lúc {x.StartTime:hh\\:mm} ngày {targetDate:dd/MM/yyyy} của bạn đã được chuyển sang Thợ {candidate.Account?.FirstName} {candidate.Account?.LastName} (Đạt trình độ chuyên môn tương đương/cao hơn). Khung giờ không đổi.");
+                            "Thông báo đổi thợ phụ trách",
+                            new
+                            {
+                                BookingId = x.BookingId,
+                                SalonName = salonName,
+                                CustomerName = customerName,
+                                NewArtistName = newArtistName,
+                                Message = $"Lịch hẹn lúc {x.StartTime:hh\\:mm} ngày {targetDate:dd/MM/yyyy} của bạn tại {salonName} đã được chuyển sang Thợ {newArtistName} (Đạt trình độ chuyên môn tương đương/cao hơn). Khung giờ không đổi."
+                            });
 
                         reassigned = true;
                         break;
@@ -199,10 +214,20 @@ namespace Nailify.Capstone.Application.Services
                             detailDto.NewAssignedArtistId = candidate.NailArtistId;
                             detailDto.NewAssignedArtistName = candidate.Account?.FirstName + " " + candidate.Account.LastName;
                             response.ProcessingDetails.Add(detailDto);
+                            string newArtistName = $"{candidate.Account?.FirstName} {candidate.Account?.LastName}".Trim();
+
                             _ = _notificationService.SendNotificationToUserAsync(
                                 x.CustomerId.ToString(),
                                 "Đề xuất thay đổi giờ hẹn",
-                                $"Do sự cố thợ bận đột xuất, Salon đề xuất dời lịch của bạn sang {suggestedStartTime:hh\\:mm}. Vui lòng kiểm tra và xác nhận trên ứng dụng."
+                                new
+                                {
+                                    BookingId = x.BookingId,
+                                    SalonName = salonName,
+                                    CustomerName = customerName,
+                                    SuggestedStartTime = suggestedStartTime.ToString(@"hh\:mm"),
+                                    NewArtistName = newArtistName,
+                                    Message = $"Do sự cố thợ bận đột xuất, Salon {salonName} đề xuất dời lịch của bạn sang {suggestedStartTime:hh\\:mm} với thợ {newArtistName}. Vui lòng kiểm tra và xác nhận trên ứng dụng."
+                                }
                             );
                             rescheduleSuggested = true;
                             break;
@@ -220,8 +245,21 @@ namespace Nailify.Capstone.Application.Services
 
                 // LUỒNG HỦY ĐƠN & HOÀN CỌC + VOUCHER KHI KHÔNG CÓ THỢ NÀO THAY THẾ
                 string cancelReason = $"[Tự động hủy] Sự cố thợ bận đột xuất ({reason}) - Không có thợ/slot có kỹ năng phù hợp thay thế.";
+                var refundResult = await _refundService.RefundToWalletByBookingAsync(
+                    x.BookingId,
+                    $"Hoàn toàn bộ tiền cọc do Salon hủy lịch khẩn cấp. Lý do: {cancelReason}",
+                    forceFullRefund: true);
+                if (!refundResult.Success && refundResult.Message != "Paid transaction not found for this booking")
+                {
+                    throw new InvalidOperationException(refundResult.Message);
+                }
+
                 x.Cancel(Guid.Empty, cancelReason);
                 _unitOfWork.BookingRepository.Update(x);
+                if (x.BookingDiscounts != null && x.BookingDiscounts.Any())
+                {
+                    await _promotionService.RollbackUsageAsync(x.CustomerId, x.BookingDiscounts);
+                }
 
                 // Tự động cộng Voucher đền bù hủy đơn cho khách hàng
                 await _promotionService.AddVoucherForCancelledAsync(x.BookingId);
@@ -231,10 +269,17 @@ namespace Nailify.Capstone.Application.Services
                 var cancelDetailDto = _mapper.Map<EmergencyBookingHandlingDetailDTO>(x);
                 cancelDetailDto.HandlingResult = EmergencyHandlingResult.Cancelled;
                 response.ProcessingDetails.Add(cancelDetailDto);
+
                 _ = _notificationService.SendNotificationToUserAsync(
                     x.CustomerId.ToString(),
                     "Thông báo Hủy lịch hẹn",
-                    $"Rất tiếc lịch hẹn lúc {x.StartTime:hh\\:mm} bị hủy do sự cố thợ bận đột xuất và chưa có thợ có trình độ tương đương làm mẫu móng này. Salon thành thật xin lỗi vì sự bất tiện này."
+                    new
+                    {
+                        BookingId = x.BookingId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Message = $"Rất tiếc lịch hẹn lúc {x.StartTime:hh\\:mm} tại {salonName} bị hủy do sự cố thợ bận đột xuất và chưa có thợ có trình độ tương đương làm mẫu móng này. Salon thành thật xin lỗi vì sự bất tiện này."
+                    }
                 );
             }
             return response;

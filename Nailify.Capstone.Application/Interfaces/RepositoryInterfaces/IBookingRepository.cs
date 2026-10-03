@@ -29,7 +29,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         Task<int> CountServingBookingsAsync(Guid artistId, DateTime date);
         Task<int> CountUpcomingBookingsAsync(Guid artistId, DateTime date, TimeSpan startTime, TimeSpan thresholdTime);
         Task<List<Booking>> GetCompletedBookingsWithDetailsAsync(Guid customerId);
-        Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date);
+        Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date, bool trackChanges = false);
         /// <summary>
         /// Lấy danh sách booking đang chiếm ghế tại thời điểm chỉ định (CheckedIn / InProgress),
         /// bao gồm thông tin Customer để hiển thị trên dashboard ghế.
@@ -62,5 +62,7 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
         /// Lấy đơn đặt lịch tiếp theo (Approved/Pending) của một thợ sau một mốc thời gian cụ thể.
         /// </summary>
         Task<Booking?> GetNextBookingForArtistAsync(Guid artistId, DateTime date, TimeSpan afterTime, bool trackChanges = false);
+
+        Task<Dictionary<Guid, int>> GetBookingCountsByArtistIdsAndDateAsync(IEnumerable<Guid> artistIds, DateTime date);
     }
 }

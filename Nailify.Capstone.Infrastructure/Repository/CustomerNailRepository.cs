@@ -50,6 +50,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await BuildCustomerNailQuery().ToListAsync();
         }
 
+        public async Task<List<int>> GetCustomerNailIdsByNailSurfaceIdAsync(int nailSurfaceId)
+        {
+            return await _dbSet
+                .Where(nail => nail.NailSurfaceId == nailSurfaceId)
+                .Select(nail => nail.CustomerNailId)
+                .ToListAsync();
+        }
+
         private IQueryable<CustomerNail> BuildCustomerNailQuery()
         {
             return _dbSet

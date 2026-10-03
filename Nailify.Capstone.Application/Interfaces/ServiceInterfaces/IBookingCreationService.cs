@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using System;
@@ -15,6 +15,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(
             Guid? customerId,
             IEnumerable<BookingItemRequestDTO> bookingItems,
-            List<int>? selectedPromotionIds = null);
+            List<int>? selectedPromotionIds = null,
+            Guid? warrantyForBookingId = null);
     }
 }

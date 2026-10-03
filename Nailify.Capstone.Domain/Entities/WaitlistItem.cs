@@ -12,12 +12,15 @@ namespace Nailify.Capstone.Domain.Entities
         public Guid WaitlistId { get; set; }
         public int? NailVariantId { get; set; }
         public Guid? ServiceId { get; set; }
-        public int? CustomerNailId { get; set; } 
+        public int? CustomerNailId { get; set; }
+        public int? ShapeMethodConfigId { get; set; }
+        public Guid? CustomerNailRequestId { get; set; }
         public int Quantity { get; set; } = 1;
         public virtual BookingWaitlist BookingWaitlist { get; set; } = null!;
         public virtual NailVariant? NailVariant { get; set; }
         public virtual Nailify.Capstone.Domain.Entities.Services? Service { get; set; }
         public virtual CustomerNail? CustomerNail { get; set; }
-
+        public virtual CustomerNailRequest? CustomerNailRequest { get; set; }
+        public virtual ShapeMethodConfig? ShapeMethodConfig { get; set; }
     }
 }

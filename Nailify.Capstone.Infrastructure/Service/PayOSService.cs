@@ -13,10 +13,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.BookingRequestDTOs;
+using static Nailify.Capstone.Infrastructure.Configuration.PayOS.PayOutDto;
 
 namespace Nailify.Capstone.Infrastructure.Service
 {
-    public class PayOSService
+    public class PayOSService : IPayOSPaymentService
     {
         private readonly HttpClient _httpClient;
         private readonly IPayOSSettings _paymentSettings;
@@ -71,7 +72,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                     }
                 }
 
-                var priceResult = await bookingCreationService.CalculateBookingPriceAsync(customerId, request.BookingItems, request.SelectedPromotionIds);
+                var priceResult = await bookingCreationService.CalculateBookingPriceAsync(customerId, request.BookingItems, request.SelectedPromotionIds, request.WarrantyForBookingId);
                 if (!priceResult.IsSucceeded)
                 {
                     return (false, priceResult.Message ?? "Lỗi tính giá.", null);
@@ -92,18 +93,52 @@ namespace Nailify.Capstone.Infrastructure.Service
                     // But for consistency with your flow, we handle it if needed. Let's assume there's an amount to pay.
                     if (amountDue > 0) finalAmountDue = amountDue; // Fallback if 20% calculation somehow goes wrong
                 }
-
-                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
-                var amount = (int)Math.Round(finalAmountDue, MidpointRounding.AwayFromZero);
-                if (amount <= 0)
+                decimal walletPaidAmount = 0m;
+                if (request.UseWalletBalance && finalAmountDue > 0)
                 {
-                     return (false, "So tien thanh toan khong hop le.", null);
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdAsync(customerId);
+                    if(wallet != null)
+                    {
+                        var availableBalance = Math.Max(0m, wallet.Balance - wallet.FrozenBalance);
+                        walletPaidAmount = Math.Min(availableBalance, finalAmountDue);
+                        }
+                    }
+
+                decimal remainingAmountToPayOnline = finalAmountDue - walletPaidAmount;
+
+                if(remainingAmountToPayOnline <= 0)
+                {
+                    var createBookingResult = await bookingCreationService.CreateBookingAsync(customerId, request);
+                    if (!createBookingResult.IsSucceeded || createBookingResult.Data == null)
+                    {
+                        return (false, createBookingResult.Message ?? "Lỗi tạo đơn đặt lịch.", null);
+                    }
+
+                    var createdBookingId = createBookingResult.Data.BookingId;
+                    // Không tạo fake Transaction ở đây nữa vì BookingCreationService đã tạo WalletTransaction.
+
+                    return (true, "Thanh toán cọc bằng Ví thành công! Đơn đặt lịch đã được xác nhận.", new PaymentResponseDto
+                    {
+                        OrderCode = 0,
+                        Amount = 0,
+                        QrCode = string.Empty,
+                        Status = "PAID",
+                        BookingId = createdBookingId
+                    });
                 }
 
-                var description = $"Coc don {orderCode}";
-                var itemName = $"Coc don {orderCode}";
-                var signature = CreatePaymentRequestSignature(amount, description, orderCode);
 
+                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                var amount = (int)Math.Round(remainingAmountToPayOnline, MidpointRounding.AwayFromZero);
+                if (amount <= 0)
+                {
+                     return (false, "Số tiền thanh toán không hợp lệ.", null);
+                }
+
+                var description = $"Cọc đơn {orderCode}";
+                var itemName = $"Cọc đơn {orderCode}";
+                var signature = CreatePaymentRequestSignature(amount, description, orderCode);
+                
                 var paymentRequest = new
                 {
                     orderCode,
@@ -132,12 +167,12 @@ namespace Nailify.Capstone.Infrastructure.Service
                 if (paymentResult.TryGetProperty("code", out var codeElement) && codeElement.GetString() != "00")
                 {
                     var desc = paymentResult.TryGetProperty("desc", out var descElement) ? descElement.GetString() : responseContent;
-                    return (false, $"Loi tu PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
+                    return (false, $"Lỗi từ PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
                 }
 
                 if (!paymentResult.TryGetProperty("data", out var data))
                 {
-                    return (false, $"PayOS response khong co data: {responseContent}", null);
+                    return (false, $"PayOS response không có data: {responseContent}", null);
                 }
 
                 var pendingData = new PendingBookingPaymentData
@@ -154,7 +189,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 {
                     BookingId = null,
                     OrderCode = orderCode.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    Amount = finalAmountDue,
+                    Amount = amount,
                     PaymentLinkId = GetString(data, "paymentLinkId"),
                     CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
                     QrCode = GetString(data, "qrCode") ?? string.Empty,
@@ -167,15 +202,177 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
-                return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
+                return (true, "Tạo link thanh toán thành công!", ToResponse(transaction));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Loi khi tao link thanh toan cho request.");
-                return (false, $"Loi khi tao link thanh toan: {ex.Message}", null);
+                _logger.LogError(ex, "Lỗi khi tạo link thanh toán cho request.");
+                return (false, $"Lỗi khi tạo link thanh toán: {ex.Message}", null);
             }
+        }
+
+        public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateWalletDepositPaymentLinkAsync(Guid walletId, decimal amount)
+        {
+            try
+            {
+                var wallet = await _unitOfWork.CustomerWalletRepository.GetByIdAsync(walletId);
+                if (wallet == null)
+                {
+                    return (false, "Không tìm thấy ví của khách hàng.", null);
+                }
+
+                var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
+                var amountInt = (int)Math.Round(amount, MidpointRounding.AwayFromZero);
+                if (amountInt <= 0)
+                {
+                    return (false, "Số tiền nạp không hợp lệ.", null);
+                }
+
+                var description = $"Nap vi {orderCode}";
+                var itemName = $"Nap tien vi {orderCode}";
+                var signature = CreatePaymentRequestSignature(amountInt, description, orderCode);
+
+                var paymentRequest = new
+                {
+                    orderCode,
+                    amount = amountInt,
+                    description,
+                    items = new[]
+                    {
+                        new { name = itemName, quantity = 1, price = amountInt }
+                    },
+                    cancelUrl = _paymentUrls.CancelUrl,
+                    returnUrl = _paymentUrls.ReturnUrl,
+                    signature
+                };
+
+                using var content = new StringContent(JsonSerializer.Serialize(paymentRequest, JsonOptions), Encoding.UTF8, "application/json");
+                ApplyAuthenticationHeaders();
+
+                var response = await _httpClient.PostAsync($"{PayOSBaseUrl}/v2/payment-requests", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, $"Lỗi từ PayOS: {responseContent}", null);
+                }
+
+                var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                if (paymentResult.TryGetProperty("code", out var codeElement) && codeElement.GetString() != "00")
+                {
+                    var desc = paymentResult.TryGetProperty("desc", out var descElement) ? descElement.GetString() : responseContent;
+                    return (false, $"Lỗi từ PayOS - Code: {codeElement.GetString()}, Message: {desc}", null);
+                }
+
+                if (!paymentResult.TryGetProperty("data", out var data))
+                {
+                    return (false, $"PayOS response không có data: {responseContent}", null);
+                }
+
+                var transaction = new Transaction
+                {
+                    BookingId = null,
+                    WalletId = walletId,
+                    PaymentType = PaymentType.WalletDeposit,
+                    OrderCode = orderCode.ToString(CultureInfo.InvariantCulture),
+                    Amount = amount,
+                    PaymentLinkId = GetString(data, "paymentLinkId"),
+                    CheckoutUrl = GetString(data, "checkoutUrl") ?? string.Empty,
+                    QrCode = GetString(data, "qrCode") ?? string.Empty,
+                    Status = TransactionStatus.Pending,
+                    Policy = "Nạp tiền vào ví cá nhân",
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                    WebhookPayload = string.Empty
+                };
+
+                await _unitOfWork.TransactionRepository.CreateAsync(transaction);
+                await _unitOfWork.SaveChangesAsync();
+
+                return (true, "Tạo link nạp tiền ví thành công!", ToResponse(transaction));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo link nạp tiền ví cho wallet {WalletId}.", walletId);
+                return (false, $"Lỗi khi tạo link nạp tiền: {ex.Message}", null);
+            }
+        }
+
+        public async Task<(bool Success, string Message, PayoutResponseDto? Payout)> CreateWalletWithdrawalPayoutAsync(
+            Guid withdrawalRequestId,
+            string bankCode,
+            string accountNumber,
+            string accountHolderName,
+            decimal amount)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_paymentSettings.PayoutClientId) ||
+                    string.IsNullOrWhiteSpace(_paymentSettings.PayoutApiKey))
+                {
+                    return (false, "PayOS payout credentials are not configured.", null);
+                }
+
+                var amountInt = (int)Math.Round(amount, MidpointRounding.AwayFromZero);
+                if (amountInt <= 0)
+                {
+                    return (false, "Số tiền rút không hợp lệ.", null);
+                }
+
+                var referenceId = $"withdrawal_{withdrawalRequestId}_{DateTime.UtcNow:yyyyMMddHHmmss}";
+                var payoutRequest = new
+                {
+                    referenceId,
+                    amount = amountInt,
+                    description = "Wallet withdrawal",
+                    toBin = GetBankBin(bankCode),
+                    toAccountNumber = accountNumber,
+                    category = new[] { "withdrawal" }
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"{PayOSBaseUrl}/v1/payouts");
+                request.Headers.Add("x-client-id", _paymentSettings.PayoutClientId);
+                request.Headers.Add("x-api-key", _paymentSettings.PayoutApiKey);
+                request.Headers.Add("x-idempotency-key", referenceId);
+                request.Headers.Add("x-signature", GeneratePayoutSignature(payoutRequest));
+                request.Content = new StringContent(JsonSerializer.Serialize(payoutRequest, JsonOptions), Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, $"Lỗi từ PayOS payout: {responseContent}", null);
+                }
+
+                var payoutResponse = JsonSerializer.Deserialize<PayOSPayoutResponse>(responseContent, JsonOptions);
+                if (payoutResponse?.Code == "00" && payoutResponse.Data != null)
+                {
+                    return (true, payoutResponse.Desc ?? "Tạo payout rút tiền thành công.", new PayoutResponseDto
+                    {
+                        PayoutId = payoutResponse.Data.Id,
+                        ReferenceId = payoutResponse.Data.ReferenceId,
+                        ApprovalState = payoutResponse.Data.ApprovalState
+                    });
+                }
+
+                return (false, payoutResponse?.Desc ?? "PayOS payout failed.", null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo PayOS payout cho withdrawal {WithdrawalRequestId}.", withdrawalRequestId);
+                return (false, $"Lỗi khi tạo payout rút tiền: {ex.Message}", null);
+            }
+        }
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingPaymentLinkAsync(Guid bookingId)
+            => CreatePaymentLinkAsync(bookingId);
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateBookingRequestPaymentLinkAsync(Guid customerId, CreateBookingRequestDTO request)
+            => CreatePaymentLinkForBookingRequestAsync(customerId, request);
+
+        public Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreateDynamicPaymentLinkAsync(PayOSPaymentContextRequest request)
+        {
+            throw new NotImplementedException("Dynamic payment context link is not enabled.");
         }
 
         public async Task<(bool Success, string Message, PaymentResponseDto? Payment)> CreatePaymentLinkAsync(Guid bookingId)
@@ -185,7 +382,7 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var booking = await _unitOfWork.BookingRepository.GetByIdAsync(bookingId);
                 if (booking == null)
                 {
-                    return (false, "Khong tim thay lich hen.", null);
+                    return (false, "Không tìm thấy lịch hẹn.", null);
                 }
 
                 var depositRate = 1m;
@@ -194,32 +391,55 @@ namespace Nailify.Capstone.Infrastructure.Service
                     var salon = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
                     if (salon == null)
                     {
-                        return (false, "Khong tim thay salon.", null);
+                        return (false, "Không tìm thấy salon.", null);
                     }
 
                     depositRate = salon.DepositConfig;
                 }
-
+                /*
                 var amountDue = booking.Status == BookingStatus.ServiceCompleted
                     ? booking.AmountDue ?? booking.TotalPrice ?? 0m
                     : booking.TotalPrice * depositRate ?? 0m;
                 if (amountDue <= 0)
                 {
-                    return (false, $"So tien khong hop le: {amountDue}.", null);
+                    return (false, $"Số tiền không hợp lệ: {amountDue}.", null);
                 }
+                */
+                decimal amountDue;
+                if(booking.Status == BookingStatus.ServiceCompleted)
+                {
+                    amountDue = booking.AmountDue ?? booking.TotalPrice ?? 0m;
+                }
+                else
+                {
+                    var totalDepositRequired = (booking.TotalPrice ?? 0m) * depositRate;
+                    var amountAlreadyPaid = booking.AmountPaid ?? 0m;
 
+                    amountDue = Math.Max(0m, totalDepositRequired - amountAlreadyPaid);
+                }
+                if (amountDue <= 0 && booking.Status != BookingStatus.ServiceCompleted)
+                {
+                    return (true, "Tiền cọc đã được thanh toán hoàn tất bằng Ví cá nhân.", new PaymentResponseDto
+                    {
+                        OrderCode = 0,
+                        Amount = 0,
+                        QrCode = string.Empty,
+                        Status = "PAID",
+                        BookingId = bookingId
+                    });
+                }
                 var existing = await _unitOfWork.TransactionRepository
-                    .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
-                    .OrderByDescending(t => t.CreatedAt)
-                    .FirstOrDefaultAsync();
+                        .FindByCondition(t => t.BookingId == bookingId && t.Status == TransactionStatus.Pending)
+                        .OrderByDescending(t => t.CreatedAt)
+                        .FirstOrDefaultAsync();
                 if (existing != null && existing.ExpiresAt > DateTime.UtcNow)
                 {
-                    return (true, "Link thanh toan da ton tai.", ToResponse(existing));
+                    return (true, "Link thanh toán đã tồn tại.", ToResponse(existing));
                 }
 
                 var orderCode = await _payOSHelper.GenerateUniqueOrderCodeAsync();
                 var amount = (int)Math.Round(amountDue, MidpointRounding.AwayFromZero);
-                var description = $"Thanh toan don {orderCode}";
+                var description = $"Thanh toán đơn {orderCode}";
                 var itemName = $"Ma don {orderCode}";
                 var signature = CreatePaymentRequestSignature(amount, description, orderCode);
 
@@ -284,7 +504,6 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await _unitOfWork.TransactionRepository.CreateAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                StartStatusPolling(orderCode, transaction.ExpiresAt);
 
                 return (true, "Tao link thanh toan thanh cong!", ToResponse(transaction));
             }
@@ -322,14 +541,42 @@ namespace Nailify.Capstone.Infrastructure.Service
                 transaction.WebhookPayload = JsonSerializer.Serialize(webhookDto, JsonOptions);
                 transaction.Reference = webhookDto.Data?.Reference;
                 transaction.PaymentLinkId = webhookDto.Data?.PaymentLinkId ?? transaction.PaymentLinkId;
-                transaction.Status = webhookDto.Code == "00" && webhookDto.Success
+                var webhookStatus = webhookDto.Code == "00" && webhookDto.Success
                     ? TransactionStatus.Paid
                     : TransactionStatus.Cancelled;
-                transaction.PaidAt = transaction.Status == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
-                if (transaction.Status == TransactionStatus.Paid)
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus == TransactionStatus.Paid)
                 {
-                    await EnsureBookingForPaidTransactionAsync(transaction);
-                    await ApplyPaidAmountToBookingAsync(transaction);
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Webhook da duoc xu ly truoc do.");
+                }
+
+                if (transaction.Status == TransactionStatus.Paid && webhookStatus != TransactionStatus.Paid)
+                {
+                    _logger.LogWarning(
+                        "PayOS webhook attempted to move paid transaction {OrderCode} to {WebhookStatus}. Payload: {@Payload}",
+                        transaction.OrderCode,
+                        webhookStatus,
+                        webhookDto);
+                    _unitOfWork.TransactionRepository.Update(transaction);
+                    await _unitOfWork.SaveChangesAsync();
+                    return (true, "Giao dich da thanh toan, bo qua webhook khong thanh cong.");
+                }
+
+                transaction.Status = webhookStatus;
+                transaction.PaidAt = webhookStatus == TransactionStatus.Paid ? DateTime.UtcNow : transaction.PaidAt;
+                if (webhookStatus == TransactionStatus.Paid)
+                {
+                    if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
+                    {
+                        await CreditWalletForPaidTransactionAsync(transaction);
+                    }
+                    else
+                    {
+                        await EnsureBookingForPaidTransactionAsync(transaction);
+                        await ApplyPaidAmountToBookingAsync(transaction);
+                    }
                 }
 
                 _unitOfWork.TransactionRepository.Update(transaction);
@@ -347,12 +594,22 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             try
             {
+                var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(orderCode.ToString(CultureInfo.InvariantCulture), trackChanges: false);
+                if (transaction != null && (transaction.PaymentLinkId == "WALLET_PAYMENT" || transaction.Status == TransactionStatus.Paid))
+                {
+                    return (true, "Lấy trạng thái thanh toán thành công!", transaction.Status.ToString().ToUpper());
+                }
+
                 ApplyAuthenticationHeaders();
                 var response = await _httpClient.GetAsync($"{PayOSBaseUrl}/v2/payment-requests/{orderCode}");
                 var responseContent = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
-                    return (false, $"Loi tu PayOS: {responseContent}", null);
+                    if (transaction != null)
+                    {
+                        return (true, "Lấy trạng thái từ hệ thống thành công!", transaction.Status.ToString().ToUpper());
+                    }
+                    return (false, $"Lỗi từ PayOS: {responseContent}", null);
                 }
 
                 var paymentResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
@@ -361,11 +618,11 @@ namespace Nailify.Capstone.Infrastructure.Service
 
                 await SyncLocalTransactionStatusAsync(orderCode, status);
 
-                return (true, "Lay trang thai thanh toan thanh cong!", status);
+                return (true, "Lấy trạng thái thanh toán thành công!", status);
             }
             catch (Exception ex)
             {
-                return (false, $"Loi khi lay trang thai thanh toan: {ex.Message}", null);
+                return (false, $"Lỗi khi lấy trạng thái thanh toán: {ex.Message}", null);
             }
         }
 
@@ -376,16 +633,16 @@ namespace Nailify.Capstone.Infrastructure.Service
                 var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(orderCode.ToString(CultureInfo.InvariantCulture), trackChanges: true);
                 if (transaction == null)
                 {
-                    return (false, "Khong tim thay giao dich tuong ung.");
+                    return (false, "Không tìm thấy giao dịch tương ứng.");
                 }
 
                 if (transaction.Status == TransactionStatus.Paid)
                 {
-                    return (false, "Khong the huy giao dich da thanh toan.");
+                    return (false, "Không thể hủy giao dịch đã thanh toán.");
                 }
 
                 ApplyAuthenticationHeaders();
-                var cancelRequest = new { cancellationReason = "Huy boi nguoi dung" };
+                var cancelRequest = new { cancellationReason = "Hủy bởi người dùng" };
                 using var content = new StringContent(JsonSerializer.Serialize(cancelRequest), Encoding.UTF8, "application/json");
 
                 var response = await _httpClient.PostAsync($"{PayOSBaseUrl}/v2/payment-requests/{orderCode}/cancel", content);
@@ -399,11 +656,11 @@ namespace Nailify.Capstone.Infrastructure.Service
                 _unitOfWork.TransactionRepository.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return (true, "Huy link thanh toan thanh cong!");
+                return (true, "Hủy link thanh toán thành công!");
             }
             catch (Exception ex)
             {
-                return (false, $"Loi khi huy link thanh toan: {ex.Message}");
+                return (false, $"Lỗi khi hủy link thanh toán: {ex.Message}");
             }
         }
 
@@ -466,6 +723,55 @@ namespace Nailify.Capstone.Infrastructure.Service
             return Convert.ToHexString(hash).ToLowerInvariant();
         }
 
+        private string GeneratePayoutSignature(object? data)
+        {
+            if (data == null)
+            {
+                return string.Empty;
+            }
+
+            var json = JsonSerializer.Serialize(data, JsonOptions);
+            var dataDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)
+                ?? new Dictionary<string, JsonElement>();
+
+            var queryString = string.Join("&", dataDict.OrderBy(kv => kv.Key).Select(kv =>
+            {
+                var key = Uri.EscapeDataString(kv.Key);
+                var value = kv.Value.ValueKind switch
+                {
+                    JsonValueKind.Array => Uri.EscapeDataString(kv.Value.ToString()),
+                    JsonValueKind.Object => Uri.EscapeDataString(kv.Value.ToString()),
+                    JsonValueKind.String => Uri.EscapeDataString(kv.Value.GetString() ?? string.Empty),
+                    _ => Uri.EscapeDataString(kv.Value.ToString())
+                };
+                return $"{key}={value}";
+            }));
+
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_paymentSettings.PayoutChecksumKey));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(queryString));
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private static string GetBankBin(string bankCode)
+        {
+            var bankBins = new Dictionary<string, string>
+            {
+                { "VCB", "970436" }, { "BIDV", "970418" }, { "VIB", "970441" },
+                { "MB", "970422" }, { "TCB", "970407" }, { "ACB", "970416" },
+                { "VPB", "970432" }, { "TPB", "970423" }, { "HDB", "970437" },
+                { "MSB", "970426" }, { "SCB", "970429" }, { "OCB", "970448" },
+                { "SHB", "970443" }, { "EIB", "970431" }, { "VAB", "970425" },
+                { "NAB", "970428" }, { "BAB", "970409" }, { "PGB", "970430" },
+                { "GPB", "970408" }, { "AGB", "970405" }, { "LVB", "970434" },
+                { "KLB", "970452" }, { "VBSP", "970427" },
+                { "CTG", "970415" }, { "ICB", "970415" }, { "VIETINBANK", "970415" },
+                { "VIETIN", "970415" },
+                { "STB", "970403" }, { "SACOMBANK", "970403" }
+            };
+
+            return bankBins.GetValueOrDefault(bankCode.ToUpperInvariant(), "970436");
+        }
+
         private void ApplyAuthenticationHeaders()
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -523,12 +829,68 @@ namespace Nailify.Capstone.Infrastructure.Service
             }
             if (newStatus == TransactionStatus.Paid)
             {
-                await EnsureBookingForPaidTransactionAsync(transaction);
-                await ApplyPaidAmountToBookingAsync(transaction);
+                if (transaction.PaymentType == PaymentType.WalletDeposit || transaction.WalletId.HasValue)
+                {
+                    await CreditWalletForPaidTransactionAsync(transaction);
+                }
+                else
+                {
+                    await EnsureBookingForPaidTransactionAsync(transaction);
+                    await ApplyPaidAmountToBookingAsync(transaction);
+                }
             }
 
             _unitOfWork.TransactionRepository.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task CreditWalletForPaidTransactionAsync(Transaction transaction)
+        {
+            if (!transaction.WalletId.HasValue)
+            {
+                _logger.LogError("WalletDeposit transaction {OrderCode} missing WalletId.", transaction.OrderCode);
+                return;
+            }
+
+            var existingTx = await _unitOfWork.WalletTransactionRepository
+                .FindByCondition(t => t.WalletId == transaction.WalletId.Value && t.ReferenceId == transaction.OrderCode)
+                .FirstOrDefaultAsync();
+
+            if (existingTx != null)
+            {
+                return;
+            }
+
+            var wallet = await _unitOfWork.CustomerWalletRepository.GetByWalletIdForUpdateAsync(transaction.WalletId.Value);
+            if (wallet == null)
+            {
+                _logger.LogError("Wallet {WalletId} not found for deposit order {OrderCode}.", transaction.WalletId, transaction.OrderCode);
+                return;
+            }
+
+            var balanceBefore = wallet.Balance;
+            wallet.Balance += transaction.Amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            var walletTx = new WalletTransaction
+            {
+                WalletId = wallet.WalletId,
+                Amount = transaction.Amount,
+                BalanceBefore = balanceBefore,
+                BalanceAfter = wallet.Balance,
+                Type = WalletTransactionType.Deposit,
+                Status = WalletTransactionStatus.Completed,
+                ReferenceId = transaction.OrderCode,
+                ReferenceType = WalletReferenceType.PayOs,
+                Description = $"Nạp tiền vào ví qua PayOS (Mã GD: {transaction.OrderCode})",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _unitOfWork.CustomerWalletRepository.Update(wallet);
+            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+            await _unitOfWork.SaveChangesAsync();
+            _logger.LogInformation("Successfully credited {Amount} VND to Wallet {WalletId}. New Balance: {Balance}",
+                transaction.Amount, wallet.WalletId, wallet.Balance);
         }
 
         private async Task EnsureBookingForPaidTransactionAsync(Transaction transaction)
@@ -570,98 +932,24 @@ namespace Nailify.Capstone.Infrastructure.Service
             await _cache.RemoveAsync(cacheKey);
         }
 
-        private async Task ApplyPaidAmountToBookingAsync(Transaction transaction)
+        private Task ApplyPaidAmountToBookingAsync(Transaction transaction)
         {
             if (transaction.Booking == null || !transaction.BookingId.HasValue)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            var paidAmountBeforeCurrentTransaction = await _unitOfWork.TransactionRepository
-                .FindByCondition(t =>
-                    t.BookingId == transaction.BookingId &&
-                    t.TransactionId != transaction.TransactionId &&
-                    t.Status == TransactionStatus.Paid)
-                .SumAsync(t => t.Amount);
-
-            var amountPaid = paidAmountBeforeCurrentTransaction + transaction.Amount;
+            var currentAmountPaid = transaction.Booking.AmountPaid ?? 0m;
             var totalPrice = transaction.Booking.TotalPrice ?? 0m;
 
-            transaction.Booking.AmountPaid = amountPaid;
-            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - amountPaid);
+            var newAmountPaid = currentAmountPaid + transaction.Amount;
+            transaction.Booking.AmountPaid = newAmountPaid;
+            transaction.Booking.AmountDue = Math.Max(0m, totalPrice - newAmountPaid);
             if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
             {
                 transaction.Booking.CheckOut(Guid.Empty);
             }
-        }
-
-        private void StartStatusPolling(long orderCode, DateTime expiresAt)
-        {
-            _ = Task.Run(async () =>
-            {
-                var maxDuration = expiresAt - DateTime.UtcNow;
-                if (maxDuration < TimeSpan.FromMinutes(1))
-                {
-                    maxDuration = TimeSpan.FromMinutes(1);
-                }
-
-                var deadline = DateTime.UtcNow.Add(maxDuration);
-                var delay = TimeSpan.FromSeconds(10);
-
-                var attempt = 0;
-                while (DateTime.UtcNow < deadline)
-                {
-                    attempt++;
-                    try
-                    {
-                        using var scope = _scopeFactory.CreateScope();
-                        var scopedPaymentService = scope.ServiceProvider.GetRequiredService<PayOSService>();
-                        var (_, _, status) = await scopedPaymentService.GetPaymentStatusAsync(orderCode);
-                        if (IsTerminalPayOSStatus(status))
-                        {
-                            return;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(
-                            ex,
-                            "Auto status poll failed for order code {OrderCode} on attempt {Attempt}.",
-                            orderCode,
-                            attempt);
-                    }
-
-                    if (DateTime.UtcNow < deadline)
-                    {
-                        await Task.Delay(delay);
-                    }
-                }
-
-                using var overdueScope = _scopeFactory.CreateScope();
-                var overduePaymentService = overdueScope.ServiceProvider.GetRequiredService<PayOSService>();
-                await overduePaymentService.MarkTransactionOverdueAsync(orderCode);
-            });
-        }
-
-        private async Task MarkTransactionOverdueAsync(long orderCode)
-        {
-            var transaction = await _unitOfWork.TransactionRepository.GetByOrderCodeAsync(
-                orderCode.ToString(CultureInfo.InvariantCulture),
-                trackChanges: true);
-
-            if (transaction == null || transaction.Status == TransactionStatus.Paid || transaction.Status == TransactionStatus.Cancelled || transaction.Status == TransactionStatus.Overdue)
-            {
-                return;
-            }
-
-            transaction.Status = TransactionStatus.Overdue;
-            _unitOfWork.TransactionRepository.Update(transaction);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        private static bool IsTerminalPayOSStatus(string? status)
-        {
-            return status?.ToUpperInvariant() is "PAID" or "CANCELLED" or "CANCELED" or "EXPIRED";
+            return Task.CompletedTask;
         }
 
         private PaymentResponseDto ToResponse(Transaction transaction)

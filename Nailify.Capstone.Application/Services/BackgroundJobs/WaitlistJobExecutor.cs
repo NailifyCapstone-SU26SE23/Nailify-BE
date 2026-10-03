@@ -34,10 +34,21 @@ namespace Nailify.Capstone.Application.Services.BackgroundJobs
                 _unitOfWork.BookingWaitlistRepository.Update(waitlist);
                 await _unitOfWork.SaveChangesAsync();
                 // Gửi thông báo SignalR cho khách hàng báo lịch hẹn đã hết hạn xác nhận
+                var customerUser = await _unitOfWork.UserRepository.GetByIdAsync(waitlist.CustomerId);
+                var salon = await _unitOfWork.SalonRepository.GetByIdAsync(waitlist.SalonId);
+                string customerName = customerUser != null ? $"{customerUser.FirstName} {customerUser.LastName}".Trim() : "Khách hàng";
+                string salonName = salon?.Name ?? "Salon";
+
                 await _notificationService.SendNotificationToUserAsync(
                     waitlist.CustomerId.ToString(),
                     "WaitlistExpired",
-                    new { Message = "Thời gian xác nhận lịch hẹn từ hàng chờ (15 phút) đã hết hạn." }
+                    new
+                    {
+                        WaitlistId = waitlist.WailistId,
+                        SalonName = salonName,
+                        CustomerName = customerName,
+                        Message = "Thời gian xác nhận lịch hẹn từ hàng chờ (15 phút) đã hết hạn." 
+                    }
                 );
             }
         }

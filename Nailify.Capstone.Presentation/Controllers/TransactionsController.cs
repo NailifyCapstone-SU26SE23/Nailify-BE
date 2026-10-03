@@ -1,12 +1,16 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nailify.Capstone.Application.Common;
+using Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
 using Nailify.Capstone.Domain.Entities;
 
 namespace Nailify.Capstone.Presentation.Controllers
 {
+    /// <summary>
+    /// API quản lý giao dịch.
+    /// </summary>
     [Route("api/[controller]")]
     public class TransactionsController : BaseApiController
     {
@@ -17,6 +21,9 @@ namespace Nailify.Capstone.Presentation.Controllers
             _transactionService = transactionService;
         }
 
+        /// <summary>
+        /// Lấy danh sách giao dịch có phân trang.
+        /// </summary>
         [Authorize]
         [HttpGet]
         [ProducesResponseType(typeof(ApiResult<PagedList<TransactionResponseDto>>), StatusCodes.Status200OK)]
@@ -38,6 +45,9 @@ namespace Nailify.Capstone.Presentation.Controllers
                 salonId));
         }
 
+        /// <summary>
+        /// Lấy danh sách giao dịch của người dùng hiện tại.
+        /// </summary>
         [Authorize]
         [HttpGet("me")]
         [ProducesResponseType(typeof(ApiResult<PagedList<TransactionResponseDto>>), StatusCodes.Status200OK)]
@@ -57,6 +67,9 @@ namespace Nailify.Capstone.Presentation.Controllers
                 status));
         }
 
+        /// <summary>
+        /// Lấy chi tiết giao dịch theo ID.
+        /// </summary>
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(ApiResult<TransactionResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
@@ -66,12 +79,25 @@ namespace Nailify.Capstone.Presentation.Controllers
             return result.IsSucceeded ? Ok(result) : NotFound(result);
         }
 
+        /// <summary>
+        /// Lấy danh sách giao dịch theo ID lịch hẹn.
+        /// </summary>
         [HttpGet("booking/{bookingId:guid}")]
         [ProducesResponseType(typeof(ApiResult<IEnumerable<TransactionResponseDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetByBookingId(Guid bookingId)
         {
             return Ok(await _transactionService.GetByBookingIdAsync(bookingId));
+        }
+        /// <summary>
+        /// Lấy tổng hợp lịch sử giao dịch thanh toán (PayOS + Wallet) theo ID lịch hẹn.
+        /// </summary>
+        [HttpGet("booking/{bookingId:guid}/payment-history")]
+        [ProducesResponseType(typeof(ApiResult<IEnumerable<BookingPaymentHistoryDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetPaymentHistoryByBookingId(Guid bookingId)
+        {
+            return Ok(await _transactionService.GetPaymentHistoryByBookingIdAsync(bookingId));
         }
     }
 }

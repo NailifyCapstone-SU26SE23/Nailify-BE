@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.ServiceRequestDTOs;
 using System;
 using System.Collections.Generic;
@@ -21,8 +21,8 @@ namespace Nailify.Capstone.Application.Validation.ServiceRequestDTOs
                 .GreaterThan(0).WithMessage("Thời lượng dịch vụ phải lớn hơn 0 phút.");
             RuleFor(x => x.Status)
                 .NotEmpty().WithMessage("Trạng thái dịch vụ không được để trống.")
-                .Must(status => status == "Active" || status == "InActive")
-                .WithMessage("Trạng thái phải là 'Active' hoặc 'InActive'.");
+                .Must(status => status == "Active" || status == "Inactive")
+                .WithMessage("Trạng thái phải là 'Active' hoặc 'Inactive'.");
         }
     }
 }

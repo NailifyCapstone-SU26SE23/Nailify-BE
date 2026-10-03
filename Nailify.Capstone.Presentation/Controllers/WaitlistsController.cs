@@ -83,6 +83,20 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy chi tiết thông tin lượt hàng chờ theo ID (Bao gồm danh sách WaitlistItems).
+        /// </summary>
+        /// <param name="id">Mã định danh (ID) của hàng chờ.</param>
+        /// <returns>Thông tin chi tiết của hàng chờ và các vật phẩm chọn trong hàng chờ.</returns>
+        [HttpGet("{id}")]
+        [ProducesResponseType(typeof(ApiResult<WaitlistResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var result = await _waitlistService.GetWaitlistByIdAsync(id);
+            return result.IsSucceeded ? Ok(result) : BadRequest(result);
+        }
+
+        /// <summary>
         /// Lấy danh sách hàng chờ phân trang theo chi nhánh Salon.
         /// </summary>
         /// <param name="salonId">Mã định danh (ID) của chi nhánh Salon.</param>

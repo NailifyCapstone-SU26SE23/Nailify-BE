@@ -44,9 +44,11 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageSize = 10, 
             [FromQuery] string? searchTerm = null,
             [FromQuery] UserRole? role = null,
+            [FromQuery] ActiveStatusFilter? status = null,
             [FromQuery] Guid? salonId = null)
         {
-            var result = await _userService.GetPagedUsersAsync(pageNumber, pageSize, searchTerm, role, salonId);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _userService.GetPagedUsersAsync(pageNumber, pageSize, searchTerm, role, statusStr, salonId);
             return Ok(result);
         }
 
@@ -63,9 +65,11 @@ namespace Nailify.Capstone.Presentation.Controllers
             Guid salonId,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] UserRole? role = null)
+            [FromQuery] UserRole? role = null,
+            [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role);
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _userService.GetSalonStaffAsync(salonId, pageNumber, pageSize, role, statusStr);
             return Ok(result);
         }
 
@@ -155,7 +159,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         }
 
         /// <summary>
-        /// Xóa người dùng (Chuyển trạng thái hoạt động thành InActive).
+        /// Xóa người dùng (Chuyển trạng thái hoạt động thành Inactive).
         /// </summary>
         /// <param name="id">ID của người dùng cần xóa.</param>
         /// <returns>Kết quả xóa thành công.</returns>
@@ -177,9 +181,9 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// </summary>
         [HttpGet("customers")]
         [ProducesResponseType(typeof(ApiResult<PagedList<CustomerProfileDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null)
+        public async Task<IActionResult> GetCustomersPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] string? searchTerm = null, [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm);
+            var result = await _userService.GetPagedCustomersAsync(pageNumber, pageSize, searchTerm, status.ToString());
             return Ok(result);
         }
 

@@ -103,14 +103,18 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<bool>(true, "Hủy yêu cầu nghỉ thành công.");
         }
 
-        public async Task<ApiResult<PagedList<NailArtistBreakResponseDTO>>> GetPagedBreaksAsync(int pageNumber, int pageSize, Guid? artistId = null, DateTime? date = null, string? status = null,
+        public async Task<ApiResult<PagedList<NailArtistBreakResponseDTO>>> GetPagedBreaksAsync(int pageNumber, int pageSize, Guid? artistId = null, Guid? salonId = null, DateTime? date = null, string? status = null,
           string? orderBy = null)
         {
             var paged = await _unitOfWork.NailArtistBreakRepository.GetPagedAsync(
                        pageNumber,
                        pageSize,
                        x => (!artistId.HasValue || x.NailArtistId == artistId.Value) &&
-                            (!date.HasValue || x.BreakDate.Date == date.Value.Date), status, orderBy
+                            (!salonId.HasValue || x.NailArtist.Account.SalonId == salonId.Value) &&
+                            (!date.HasValue || x.BreakDate.Date == date.Value.Date),
+                       status,
+                       orderBy,
+                       x => x.NailArtist.Account
                    );
             var mapped = _mapper.Map<List<NailArtistBreakResponseDTO>>(paged.Items);
             var response = new PagedList<NailArtistBreakResponseDTO>(mapped, paged.MetaData.TotalItems, pageNumber, pageSize);

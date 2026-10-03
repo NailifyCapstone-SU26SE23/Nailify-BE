@@ -18,9 +18,9 @@ namespace Nailify.Capstone.Infrastructure.Repository
             return await BuildNailVariantQuery().ToListAsync();
         }
 
-        public async Task<PagedList<NailVariant>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null)
+        public async Task<PagedList<NailVariant>> GetPagedNailVariantsAsync(int pageNumber, int pageSize, int? nailDesignId = null, string? name = null, string? status = null)
         {
-            var query = BuildNailVariantQuery();
+            var query = BuildNailVariantQuery(status);
             if (nailDesignId.HasValue)
             {
                 query = query.Where(nv => nv.NailDesignId == nailDesignId.Value);
@@ -45,6 +45,14 @@ namespace Nailify.Capstone.Infrastructure.Repository
         {
             return await BuildNailVariantQuery()
                 .FirstOrDefaultAsync(nv => nv.NailVariantId == nailVariantId);
+        }
+
+        public async Task<List<int>> GetNailVariantIdsByNailSurfaceIdAsync(int nailSurfaceId)
+        {
+            return await _dbSet
+                .Where(nv => nv.NailSurfaceId == nailSurfaceId)
+                .Select(nv => nv.NailVariantId)
+                .ToListAsync();
         }
 
         public async Task<NailSummaryDto?> GetNailVariantSummaryAsync(int nailVariantId)
@@ -92,14 +100,19 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<List<NailVariant>> GetNailVariantsByDesignIdAsync(int nailDesignId)
         {
             return await _dbSet
-                .Where(nv => nv.NailDesignId == nailDesignId && nv.Status == "Active")
+                .Where(nv => nv.NailDesignId == nailDesignId)
                 .ToListAsync();
         }
 
-        private IQueryable<NailVariant> BuildNailVariantQuery()
+        private IQueryable<NailVariant> BuildNailVariantQuery(string? status = null)
         {
-            return _dbSet
-                .Where(nv => nv.Status == "Active")
+            var query = _dbSet.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(nv => nv.Status == status);
+            }
+
+            return query
                 .Include(nv => nv.NailShape)
                     .ThenInclude(ns => ns.ShapeMethodConfigs)
                 .Include(nv => nv.NailShape)

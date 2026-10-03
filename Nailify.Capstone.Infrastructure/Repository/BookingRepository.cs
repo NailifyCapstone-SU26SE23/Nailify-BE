@@ -42,6 +42,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                     .Include(x => x.BookingItems)
                                        .ThenInclude(x => x.CustomerNailRequest)
                                            .ThenInclude(x => x.CustomerNail)
+                                    .Include(x => x.BookingItems)
+                                       .ThenInclude(x => x.BookingProcedures)
                                     .Include(x => x.BookingDiscounts)
                                     .Include(x => x.BookingHistories)
                                     .Include(x => x.Chair)
@@ -95,7 +97,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.ChairId != null
                                          && x.Status != BookingStatus.Cancelled
                                          && x.Status != BookingStatus.Rejected
-                                         && x.Status != BookingStatus.ServiceCompleted)
+                                         && x.Status != BookingStatus.ServiceCompleted
+                                         && x.Status != BookingStatus.Completed)
                                      .Include(x => x.Customer)
                                          .ThenInclude(c => c.User)
                                      .ToListAsync();
@@ -159,6 +162,8 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.BookingItems)
                     .ThenInclude(x => x.CustomerNailRequest)
                         .ThenInclude(x => x.CustomerNail)
+                .Include(x => x.BookingItems)
+                    .ThenInclude(x => x.BookingProcedures)
                 .Include(x => x.BookingDiscounts);
         }
 
@@ -250,14 +255,15 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                 .ThenInclude(c => c.Category)
                 .ToListAsync();
         }
-        public async Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date)
+        public async Task<List<Booking>> GetApprovedBookingsWithDetailsByArtistAndDateAsync(Guid artistId, DateTime date, bool trackChanges = false)
         {
             var range = GetDateRangeUtc(date);
             return await FindByCondition(x =>
                 x.NailArtistId == artistId
                 && x.BookingDate >= range.start
                 && x.BookingDate <= range.end
-                && x.Status == BookingStatus.Approved)
+                && x.Status == BookingStatus.Approved,
+                trackChanges)
                 .Include(x => x.Customer)
                     .ThenInclude(x => x.User)
                 .Include(x => x.BookingItems)
@@ -360,6 +366,25 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                            && b.StartTime >= afterTime, trackChanges)
                 .OrderBy(b => b.StartTime)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<Dictionary<Guid, int>> GetBookingCountsByArtistIdsAndDateAsync(IEnumerable<Guid> artistIds, DateTime date)
+        {
+            var idList = artistIds.Distinct().ToList();
+            if (!idList.Any())
+            {
+                return new Dictionary<Guid, int>();
+            }
+            var range = GetDateRangeUtc(date);
+            return await FindByCondition(x => x.NailArtistId.HasValue 
+                                              && idList.Contains(x.NailArtistId.Value) 
+                                              && x.BookingDate >= range.start 
+                                              && x.BookingDate <= range.end 
+                                              && x.Status != BookingStatus.Cancelled 
+                                              && x.Status != BookingStatus.Rejected)
+                        .GroupBy(x => x.NailArtistId!.Value)
+                        .Select(g => new { ArtistId = g.Key,  Count = g.Count() })
+                        .ToDictionaryAsync(x => x.ArtistId, x => x.Count);
         }
     }
 }

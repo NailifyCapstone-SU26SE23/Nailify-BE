@@ -28,6 +28,7 @@ namespace Nailify.Capstone.Test
         private readonly Mock<INotificationService> _notificationServiceMock;
         private readonly Mock<IPromotionService> _promotionServiceMock;
         private readonly Mock<IOrderCodeGenerator> _orderCodeGeneratorMock;
+        private readonly Mock<IRefundService> _refundServiceMock;
 
         private readonly BookingLifecycleService _service;
 
@@ -44,8 +45,16 @@ namespace Nailify.Capstone.Test
             _notificationServiceMock = new Mock<INotificationService>();
             _promotionServiceMock = new Mock<IPromotionService>();
             _orderCodeGeneratorMock = new Mock<IOrderCodeGenerator>();
+            _refundServiceMock = new Mock<IRefundService>();
 
             _unitOfWorkMock.Setup(u => u.BookingRepository).Returns(_bookingRepoMock.Object);
+            _refundServiceMock
+                .Setup(r => r.RefundToWalletByBookingAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<bool>()))
+                .ReturnsAsync(new PayoutResult
+                {
+                    Success = false,
+                    Message = "Paid transaction not found for this booking"
+                });
 
             _service = new BookingLifecycleService(
                 _unitOfWorkMock.Object,
@@ -57,7 +66,8 @@ namespace Nailify.Capstone.Test
                 _bookingProcedureServiceMock.Object,
                 _notificationServiceMock.Object,
                 _promotionServiceMock.Object,
-                _orderCodeGeneratorMock.Object
+                _orderCodeGeneratorMock.Object,
+                _refundServiceMock.Object
             );
         }
 
@@ -364,6 +374,74 @@ namespace Nailify.Capstone.Test
             booking.Status.Should().Be(BookingStatus.Cancelled);
 
             _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CancelBookingAsync_CustomerActor_UsesPolicyRefund()
+        {
+            var bookingId = Guid.NewGuid();
+            var customerId = Guid.NewGuid();
+            var request = new CancelBookingRequestDTO { Reason = "Customer emergency" };
+            var booking = CreateSampleBooking(bookingId, customerId, BookingStatus.Approved);
+            var responseDto = new BookingResponseDTO { BookingId = bookingId, Status = BookingStatus.Cancelled.ToString() };
+
+            _bookingRepoMock.Setup(r => r.GetBookingDetailAsync(bookingId, true)).ReturnsAsync(booking);
+            _mapperMock.Setup(m => m.Map<BookingResponseDTO>(booking)).Returns(responseDto);
+
+            var result = await _service.CancelBookingAsync(bookingId, customerId, request, isCustomerActor: true);
+
+            result.IsSucceeded.Should().BeTrue();
+            booking.Status.Should().Be(BookingStatus.Cancelled);
+            _refundServiceMock.Verify(r => r.RefundToWalletByBookingAsync(
+                bookingId,
+                request.Reason,
+                false), Times.Once);
+        }
+
+        [Fact]
+        public async Task CancelBookingAsync_ManagerCancellation_UsesFullRefundByDefault()
+        {
+            var bookingId = Guid.NewGuid();
+            var actorId = Guid.NewGuid();
+            var customerId = Guid.NewGuid();
+            var request = new CancelBookingRequestDTO { Reason = "staff_unavailable" };
+            var booking = CreateSampleBooking(bookingId, customerId, BookingStatus.Approved);
+            var responseDto = new BookingResponseDTO { BookingId = bookingId, Status = BookingStatus.Cancelled.ToString() };
+
+            _bookingRepoMock.Setup(r => r.GetBookingDetailAsync(bookingId, true)).ReturnsAsync(booking);
+            _mapperMock.Setup(m => m.Map<BookingResponseDTO>(booking)).Returns(responseDto);
+
+            var result = await _service.CancelBookingAsync(bookingId, actorId, request);
+
+            result.IsSucceeded.Should().BeTrue();
+            booking.Status.Should().Be(BookingStatus.Cancelled);
+            _refundServiceMock.Verify(r => r.RefundToWalletByBookingAsync(
+                bookingId,
+                It.Is<string>(reason => reason.Contains("Hoàn toàn bộ tiền cọc do Salon hủy lịch")),
+                true), Times.Once);
+        }
+
+        [Fact]
+        public async Task CancelBookingAsync_ManagerCustomerRequest_UsesPolicyRefund()
+        {
+            var bookingId = Guid.NewGuid();
+            var actorId = Guid.NewGuid();
+            var customerId = Guid.NewGuid();
+            var request = new CancelBookingRequestDTO { Reason = "customer_request", CustomerRequest = true };
+            var booking = CreateSampleBooking(bookingId, customerId, BookingStatus.Approved);
+            var responseDto = new BookingResponseDTO { BookingId = bookingId, Status = BookingStatus.Cancelled.ToString() };
+
+            _bookingRepoMock.Setup(r => r.GetBookingDetailAsync(bookingId, true)).ReturnsAsync(booking);
+            _mapperMock.Setup(m => m.Map<BookingResponseDTO>(booking)).Returns(responseDto);
+
+            var result = await _service.CancelBookingAsync(bookingId, actorId, request);
+
+            result.IsSucceeded.Should().BeTrue();
+            booking.Status.Should().Be(BookingStatus.Cancelled);
+            _refundServiceMock.Verify(r => r.RefundToWalletByBookingAsync(
+                bookingId,
+                request.Reason,
+                false), Times.Once);
         }
     }
 }

@@ -36,6 +36,11 @@ namespace Nailify.Capstone.Infrastructure.Service
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"Salon_{salonId}");
         }
+        public async Task JoinSalonReceptionistGroup(string salonId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"Salon_{salonId}_Receptionist");
+        }
+
         public async Task LeaveSalonGroup(string salonId)
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Salon_{salonId}");

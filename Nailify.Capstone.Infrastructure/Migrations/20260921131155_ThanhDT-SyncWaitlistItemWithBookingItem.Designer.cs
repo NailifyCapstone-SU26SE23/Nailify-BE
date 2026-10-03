@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Nailify.Capstone.Infrastructure.Migrations
 {
     [DbContext(typeof(NailifyDbContext))]
-    [Migration("20260904035602_ThanhDT-AddVirtualWalletAndPromotions")]
-    partial class ThanhDTAddVirtualWalletAndPromotions
+    [Migration("20260921131155_ThanhDT-SyncWaitlistItemWithBookingItem")]
+    partial class ThanhDTSyncWaitlistItemWithBookingItem
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -895,6 +895,40 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.ToTable("CustomerQuizAnswers");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerWallet", b =>
+                {
+                    b.Property<Guid>("WalletId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("FrozenBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("WalletId");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerWallets");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.FavoriteNail", b =>
                 {
                     b.Property<int>("FavoriteNailId")
@@ -1012,8 +1046,7 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasKey("LoyaltyTransactionId");
 
-                    b.HasIndex("BookingId")
-                        .IsUnique();
+                    b.HasIndex("BookingId");
 
                     b.HasIndex("CustomerId");
 
@@ -1413,6 +1446,44 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasIndex("NailSurfaceId");
 
                     b.ToTable("NailVariants");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.PointConversionLog", b =>
+                {
+                    b.Property<Guid>("ConversionLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ConversionRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("LoyaltyTransactionId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MoneyAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("PointsEarned")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WalletTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ConversionLogId");
+
+                    b.HasIndex("LoyaltyTransactionId");
+
+                    b.HasIndex("WalletTransactionId");
+
+                    b.ToTable("PointConversionLogs");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Procedure", b =>
@@ -1929,6 +2000,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("PaymentType")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Policy")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1949,6 +2023,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("WalletId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("WebhookPayload")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1961,6 +2038,8 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasIndex("OrderCode")
                         .IsUnique();
+
+                    b.HasIndex("WalletId");
 
                     b.ToTable("Transactions");
                 });
@@ -2058,6 +2137,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<int?>("CustomerNailId")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("CustomerNailRequestId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("NailVariantId")
                         .HasColumnType("integer");
 
@@ -2067,6 +2149,9 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Property<Guid?>("ServiceId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("ShapeMethodConfigId")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("WaitlistId")
                         .HasColumnType("uuid");
 
@@ -2074,9 +2159,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.HasIndex("CustomerNailId");
 
+                    b.HasIndex("CustomerNailRequestId");
+
                     b.HasIndex("NailVariantId");
 
                     b.HasIndex("ServiceId");
+
+                    b.HasIndex("ShapeMethodConfigId");
 
                     b.HasIndex("WaitlistId");
 
@@ -2149,6 +2238,110 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasIndex("SalonId");
 
                     b.ToTable("WalkInQueues");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WalletTransaction", b =>
+                {
+                    b.Property<Guid>("WalletTransactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReferenceId")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ReferenceType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WalletTransactionId");
+
+                    b.HasIndex("WalletId");
+
+                    b.ToTable("WalletTransactions");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WithdrawalRequest", b =>
+                {
+                    b.Property<Guid>("WithdrawalRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccountHolderName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AdminNote")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BankCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BankName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TransactionReference")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WithdrawalRequestId");
+
+                    b.HasIndex("WalletId");
+
+                    b.ToTable("WithdrawalRequests");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Booking", b =>
@@ -2516,6 +2709,17 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("QuizQuestion");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerWallet", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.Customer", "Customer")
+                        .WithOne()
+                        .HasForeignKey("Nailify.Capstone.Domain.Entities.CustomerWallet", "CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.FavoriteNail", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailDesign", "NailDesign")
@@ -2705,6 +2909,25 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("NailSurface");
                 });
 
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.PointConversionLog", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.LoyaltyTransaction", "LoyaltyTransaction")
+                        .WithMany()
+                        .HasForeignKey("LoyaltyTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.WalletTransaction", "WalletTransaction")
+                        .WithMany()
+                        .HasForeignKey("WalletTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LoyaltyTransaction");
+
+                    b.Navigation("WalletTransaction");
+                });
+
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Promotion", b =>
                 {
                     b.HasOne("Nailify.Capstone.Domain.Entities.Category", "Category")
@@ -2818,7 +3041,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("BookingId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerWallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId");
+
                     b.Navigation("Booking");
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.User", b =>
@@ -2857,6 +3086,11 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                         .HasForeignKey("CustomerNailId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerNailRequest", "CustomerNailRequest")
+                        .WithMany()
+                        .HasForeignKey("CustomerNailRequestId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nailify.Capstone.Domain.Entities.NailVariant", "NailVariant")
                         .WithMany()
                         .HasForeignKey("NailVariantId")
@@ -2865,6 +3099,11 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.HasOne("Nailify.Capstone.Domain.Entities.Services", "Service")
                         .WithMany()
                         .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nailify.Capstone.Domain.Entities.ShapeMethodConfig", "ShapeMethodConfig")
+                        .WithMany()
+                        .HasForeignKey("ShapeMethodConfigId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Nailify.Capstone.Domain.Entities.BookingWaitlist", "BookingWaitlist")
@@ -2877,9 +3116,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
 
                     b.Navigation("CustomerNail");
 
+                    b.Navigation("CustomerNailRequest");
+
                     b.Navigation("NailVariant");
 
                     b.Navigation("Service");
+
+                    b.Navigation("ShapeMethodConfig");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WalkInQueue", b =>
@@ -2918,6 +3161,28 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("OriginalBooking");
 
                     b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WalletTransaction", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerWallet", "Wallet")
+                        .WithMany("WalletTransactions")
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.WithdrawalRequest", b =>
+                {
+                    b.HasOne("Nailify.Capstone.Domain.Entities.CustomerWallet", "Wallet")
+                        .WithMany("WithdrawalRequests")
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.Booking", b =>
@@ -2986,6 +3251,13 @@ namespace Nailify.Capstone.Infrastructure.Migrations
                     b.Navigation("CustomerNailRequests");
 
                     b.Navigation("NailProcedures");
+                });
+
+            modelBuilder.Entity("Nailify.Capstone.Domain.Entities.CustomerWallet", b =>
+                {
+                    b.Navigation("WalletTransactions");
+
+                    b.Navigation("WithdrawalRequests");
                 });
 
             modelBuilder.Entity("Nailify.Capstone.Domain.Entities.LoyaltyTier", b =>

@@ -9,8 +9,8 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IUserService
     {
-        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null);
-        Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null);
+        Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, string? status = null, Guid? salonId = null);
+        Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null, string? status = null);
         Task<ApiResult<UserDto>> GetUserByIdAsync(Guid id);
         Task<ApiResult<UserDto>> CreateUserAsync(UserCreateRequest request);
         Task<ApiResult<UserDto>> UpdateUserAsync(Guid id, UserUpdateRequest request);
@@ -25,7 +25,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
         Task<ApiResult<UserDto>> UpdateProfileAsync(Guid userId, ProfileUpdateRequest request, string? avatarUrl = null);
         Task<ApiResult<bool>> UpdatePasswordAsync(Guid userId, UpdatePasswordRequest request);
         Task<ApiResult<CustomerProfileDto>> UpdateCustomerPreferencesAsync(Guid userId, CustomerPreferencesUpdateRequest request);
-        Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null);
+        Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null, string? status = null);
         Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId);
         Task<ApiResult<CustomerProfileDto>> UpdateCustomerProfileByAdminAsync(Guid userId, CustomerProfileUpdateRequest request);
         Task<ApiResult<CustomerProfileDto>> UpdateCustomerSelfProfileAsync(Guid userId, CustomerSelfProfileUpdateRequest request);

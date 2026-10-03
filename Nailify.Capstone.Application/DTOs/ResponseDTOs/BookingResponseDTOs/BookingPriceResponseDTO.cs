@@ -1,4 +1,4 @@
-﻿namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
+namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.BookingResponseDTOs
 {
     public class BookingPriceResponseDTO
     {
@@ -12,8 +12,10 @@
     public class DiscountBreakdownDTO
     {
         public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
         public decimal Amount { get; set; }
         public string Type { get; set; } = string.Empty; // "Promotion" or "Loyalty"
+        public bool IsAutoApplied { get; set; }
         public string AmountDisplay => $"-{Amount:N0}";
     }
 }

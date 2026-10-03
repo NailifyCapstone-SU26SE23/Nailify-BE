@@ -12,16 +12,18 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IRecalculationService _recalculationService;
 
-        public ComponentService(IUnitOfWork unitOfWork, IMapper mapper)
+        public ComponentService(IUnitOfWork unitOfWork, IMapper mapper, IRecalculationService recalculationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _recalculationService = recalculationService;
         }
 
-        public async Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null)
+        public async Task<ApiResult<PagedList<ComponentDto>>> GetPagedComponentsAsync(int pageNumber, int pageSize, string? name = null, ComponentType? componentType = null, string? status = null)
         {
-            var pagedResult = await _unitOfWork.ComponentRepository.GetPagedComponentsAsync(pageNumber, pageSize, name, componentType);
+            var pagedResult = await _unitOfWork.ComponentRepository.GetPagedComponentsAsync(pageNumber, pageSize, name, componentType, status);
             var mappedItems = _mapper.Map<List<ComponentDto>>(pagedResult.Items);
             var resultPagedList = new PagedList<ComponentDto>(mappedItems, pagedResult.MetaData.TotalItems, pageNumber, pageSize);
 
@@ -65,7 +67,8 @@ namespace Nailify.Capstone.Application.Services
 
             _unitOfWork.ComponentRepository.Update(component);
             await _unitOfWork.SaveChangesAsync();
-            await RecalculateAffectedNailVariantsAsync(id);
+            await _recalculationService.RecalculateNailVariantsByComponentIdAsync(id);
+            await _recalculationService.RecalculateCustomerNailsByComponentIdAsync(id);
 
             return new ApiSuccessResult<ComponentDto>(_mapper.Map<ComponentDto>(component), "Cập nhật thành phần thành công.");
         }
@@ -83,32 +86,5 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<bool>(true, "Xóa thành phần thành công.");
         }
-
-        private async Task RecalculateAffectedNailVariantsAsync(int componentId)
-        {
-            var variants = await _unitOfWork.NailVariantRepository.GetAllNailVariantsAsync();
-            var affectedVariants = variants
-                .Where(variant => variant.NailComponents.Any(nailComponent => nailComponent.ComponentId == componentId))
-                .ToList();
-
-            foreach (var variant in affectedVariants)
-            {
-                variant.Price = (variant.NailSurface?.Price ?? 0m)
-                    + variant.NailComponents.Sum(nailComponent =>
-                        nailComponent.Component.Price * GetFingerPriceMultiplier(nailComponent.FingerIndex));
-                variant.Duration = (variant.NailSurface?.Duration ?? 0)
-                    + variant.NailComponents.Sum(nailComponent => nailComponent.Component.Duration ?? 0);
-
-                _unitOfWork.NailVariantRepository.Update(variant);
-            }
-
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        private static int GetFingerPriceMultiplier(int fingerIndex)
-        {
-            return fingerIndex == -1 ? 5 : 1;
-        }
-
     }
 }

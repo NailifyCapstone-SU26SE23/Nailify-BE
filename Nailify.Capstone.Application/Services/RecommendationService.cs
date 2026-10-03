@@ -630,7 +630,7 @@ namespace Nailify.Capstone.Application.Services
                     Description = compMatch ? "Mức độ phức tạp phù hợp với thói quen làm móng của bạn." : "Mức độ phức tạp thiết kế."
                 });
 
-                dto.MatchedCharacteristics = matchedChars;
+                dto.MatchedCharacteristics = matchedChars.OrderByDescending(c => c.IsMatchingPreference).ToList();
                 recommendedList.Add(dto);
             }
             var results = recommendedList.OrderByDescending(r => r.Score).Take(limit).ToList();

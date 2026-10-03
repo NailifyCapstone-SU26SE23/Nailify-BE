@@ -1,6 +1,6 @@
 using Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs;
 
-namespace Nailify.Capstone.Infrastructure.Configuration.PayOS
+namespace Nailify.Capstone.Application.Common
 {
     public class PayoutResult
     {

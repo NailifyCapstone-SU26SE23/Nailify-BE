@@ -36,6 +36,15 @@ namespace Nailify.Capstone.Application.Services
             _bookingSchedulingService = bookingSchedulingService;
         }
 
+        private static bool IsItemFromOldBooking(AddonItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+                (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+                (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+                (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+            );
+        }
         public async Task<ApiResult<BookingProcedureResponseDTO>> ClaimProcedureStepAsync(Guid bookingProcedureId, Guid accountId)
         {
             var procedure = await _unitOfWork.BookingProcedureRepository.GetProcedureWithBookingItemAsync(bookingProcedureId, trackChanges: true);
@@ -144,7 +153,7 @@ namespace Nailify.Capstone.Application.Services
                         variantTargetDuration = variant?.Duration ?? 0;
                     }
 
-                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure.Duration ?? 0);
+                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure?.Duration ?? 0);
 
                     if (variantTargetDuration > 0 && totalCatalogDuration > 0 && variantTargetDuration != totalCatalogDuration)
                     {
@@ -155,7 +164,7 @@ namespace Nailify.Capstone.Application.Services
                         for (int i = 0; i < count; i++)
                         {
                             var x = activeNailProcedures[i];
-                            int catalogDuration = x.Procedure.Duration ?? 0;
+                            int catalogDuration = x.Procedure?.Duration ?? 0;
                             int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
                             if (i == count - 1)
@@ -167,21 +176,21 @@ namespace Nailify.Capstone.Application.Services
                                 accumulatedDuration += scaledDuration;
                             }
 
-                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(x.Procedure.ActiveDuration * scaleFactor)));
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round((x.Procedure?.ActiveDuration ?? 0) * scaleFactor)));
                             int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
 
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
                                 StepOrder = currentStepOrder++,
                                 Duration = scaledDuration,
                                 ActiveDuration = scaledActive,
                                 PassiveDuration = scaledPassive,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -195,14 +204,14 @@ namespace Nailify.Capstone.Application.Services
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
                                 StepOrder = currentStepOrder++,
-                                Duration = x.Procedure.Duration ?? 0,
-                                ActiveDuration = x.Procedure.ActiveDuration,
-                                PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                Duration = x.Procedure?.Duration ?? 0,
+                                ActiveDuration = x.Procedure?.ActiveDuration ?? 0,
+                                PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -227,7 +236,7 @@ namespace Nailify.Capstone.Application.Services
 
                 if (activeNailProcedures != null && activeNailProcedures.Any())
                 {
-                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.Procedure.Duration ?? 0);
+                    int totalCatalogDuration = activeNailProcedures.Sum(x => x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0);
 
                     if (targetDuration > 0 && totalCatalogDuration > 0 && targetDuration != totalCatalogDuration)
                     {
@@ -238,7 +247,7 @@ namespace Nailify.Capstone.Application.Services
                         for (int i = 0; i < count; i++)
                         {
                             var x = activeNailProcedures[i];
-                            int catalogDuration = x.Procedure.Duration ?? 0;
+                            int catalogDuration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0;
                             int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
 
                             if (i == count - 1)
@@ -250,21 +259,22 @@ namespace Nailify.Capstone.Application.Services
                                 accumulatedDuration += scaledDuration;
                             }
 
-                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(x.Procedure.ActiveDuration * scaleFactor)));
+                            int activeMins = x.Procedure?.ActiveDuration ?? (x.EstimatedMinutes ?? scaledDuration);
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(activeMins * scaleFactor)));
                             int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
 
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = !string.IsNullOrWhiteSpace(x.Name) ? x.Name : (x.Procedure?.Name ?? "Công đoạn custom"),
                                 StepOrder = currentStepOrder++,
                                 Duration = scaledDuration,
                                 ActiveDuration = scaledActive,
                                 PassiveDuration = scaledPassive,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? true,
+                                IsMainStep = x.Procedure?.IsMainStep ?? true,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -274,18 +284,22 @@ namespace Nailify.Capstone.Application.Services
                     {
                         foreach (var x in activeNailProcedures)
                         {
+                            int itemDuration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0;
+                            int activeMins = x.Procedure?.ActiveDuration ?? itemDuration;
+                            int passiveMins = x.Procedure?.PassiveDuration ?? 0;
+
                             var bookingProcedure = new BookingProcedure
                             {
                                 BookingItemId = item.BookingItemId,
                                 ProcedureId = x.ProcedureId,
-                                ProcedureName = x.Procedure.Name,
+                                ProcedureName = !string.IsNullOrWhiteSpace(x.Name) ? x.Name : (x.Procedure?.Name ?? "Công đoạn custom"),
                                 StepOrder = currentStepOrder++,
-                                Duration = x.Procedure.Duration ?? 0,
-                                ActiveDuration = x.Procedure.ActiveDuration,
-                                PassiveDuration = x.Procedure.PassiveDuration,
-                                CanOverlap = x.Procedure.CanOverlap,
-                                IsRequired = x.Procedure.IsRequired,
-                                IsMainStep = x.Procedure.IsMainStep,
+                                Duration = itemDuration,
+                                ActiveDuration = activeMins,
+                                PassiveDuration = passiveMins,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? true,
+                                IsMainStep = x.Procedure?.IsMainStep ?? true,
                                 Status = BookingProcedureStatus.Pending
                             };
                             await _unitOfWork.BookingProcedureRepository.CreateAsync(bookingProcedure);
@@ -320,7 +334,7 @@ namespace Nailify.Capstone.Application.Services
                     var bookingProcedure = new BookingProcedure
                     {
                         BookingItemId = item.BookingItemId,
-                        ProcedureName = $"Tạo dáng & làm móng: {shapeMethodConfig.Name}",
+                        ProcedureName = $"{shapeMethodConfig.Name}",
                         StepOrder = currentStepOrder++,
                         Duration = shapeMethodConfig.Duration,
                         ActiveDuration = shapeMethodConfig.Duration,
@@ -440,21 +454,36 @@ namespace Nailify.Capstone.Application.Services
 
                     if (nextProcedure != null && nextProcedure.AssignedArtistId.HasValue)
                     {
-                        var currentArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId);
-                        var currentArtistName = currentArtist != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}" : "Thợ nail";
+                        var currentArtist = _unitOfWork.NailArtistRepository != null ? await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(artistId) : null;
+                        var currentArtistName = currentArtist != null && currentArtist.Account != null ? $"{currentArtist.Account.FirstName} {currentArtist.Account.LastName}".Trim() : "Thợ nail";
 
                         var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(existbooking.BookingItem.BookingId);
-                        var customerName = booking != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}" : "Khách hàng";
+                        var customerName = booking?.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                        var salonObj = booking?.Salon ?? (_unitOfWork.SalonRepository != null && booking != null ? await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId) : null);
+                        string salonName = salonObj?.Name ?? "Salon";
 
-                        var nextArtistAccountId = nextProcedure.AssignedArtist.AccountId;
+                        var nextArtist = nextProcedure.AssignedArtist;
+                        if (nextArtist == null && nextProcedure.AssignedArtistId.HasValue && _unitOfWork.NailArtistRepository != null)
+                        {
+                            nextArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(nextProcedure.AssignedArtistId.Value);
+                        }
+
+                        string nextArtistName = nextArtist?.Account != null ? $"{nextArtist.Account.FirstName} {nextArtist.Account.LastName}".Trim() : "Thợ nail";
+                        var nextArtistAccountId = nextArtist?.AccountId ?? nextProcedure.AssignedArtistId.Value;
 
                         await _notificationService.SendNotificationToUserAsync(
                             nextArtistAccountId.ToString(),
                             "NextStepReady",
                             new
                             {
+                                BookingId = booking?.BookingId ?? Guid.Empty,
                                 BookingProcedureId = nextProcedure.BookingProcedureId,
                                 BookingItemId = nextProcedure.BookingItemId,
+                                SalonName = salonName,
+                                CustomerName = customerName,
+                                CurrentArtistName = currentArtistName,
+                                NextArtistName = nextArtistName,
+                                ProcedureName = nextProcedure.ProcedureName,
                                 Message = $"Thợ {currentArtistName} đã hoàn thành bước '{existbooking.ProcedureName}' cho khách {customerName}. Mời bạn vào thực hiện bước tiếp theo '{nextProcedure.ProcedureName}'."
                             }
                         );
@@ -576,7 +605,7 @@ namespace Nailify.Capstone.Application.Services
             var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
             return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách công việc có thể nhận thành công.");
         }
-  
+
         public async Task<ApiResult<OnsiteAddonSimulationResponseDTO>> SimulateOnsiteAddonAsync(SimulateOnsiteAddonRequestDTO request)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId);
@@ -597,37 +626,128 @@ namespace Nailify.Capstone.Application.Services
                 return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Vui lòng chọn ít nhất một dịch vụ hoặc mẫu móng phát sinh.");
             }
 
+            var serviceIds = request.AddonItems.Where(x => x.ServiceId.HasValue)
+                                               .Select(x => x.ServiceId!.Value)
+                                               .Distinct()
+                                               .ToList();
+
+            var variantIds = request.AddonItems.Where(x => x.NailVariantId.HasValue)
+                                               .Select(x => x.NailVariantId!.Value)
+                                               .Distinct()
+                                               .ToList();
+
+            var shapeConfigIds = request.AddonItems.Where(x => x.ShapeMethodConfigId.HasValue)
+                                                   .Select(x => x.ShapeMethodConfigId!.Value)
+                                                   .Distinct()
+                                                   .ToList();
+
+            var customRequestIds = request.AddonItems.Where(x => x.CustomerNailRequestId.HasValue)
+                                                     .Select(x => x.CustomerNailRequestId!.Value)
+                                                     .Distinct()
+                                                     .ToList();
+
+            var directCustomNailIds = request.AddonItems.Where(x => x.CustomerNailId.HasValue)
+                                                        .Select(x => x.CustomerNailId!.Value)
+                                                        .Distinct()
+                                                        .ToList();
+
+            var servicesMap = serviceIds.Any() ? _unitOfWork.ServicesRepository.FindByCondition(x => serviceIds.Contains(x.ServiceId))
+                                                                               .ToDictionary(x => x.ServiceId)
+                                               : new Dictionary<Guid, Domain.Entities.Services>();
+
+            var variantsMap = variantIds.Any() ? _unitOfWork.NailVariantRepository.FindByCondition(x => variantIds.Contains(x.NailVariantId))
+                                                                                  .ToDictionary(x => x.NailVariantId)
+                                               : new Dictionary<int, NailVariant>();
+
+            var shapeConfigsMap = shapeConfigIds.Any() ? _unitOfWork.ShapeMethodConfigRepository.FindByCondition(x => shapeConfigIds.Contains(x.ShapeMethodConfigId))
+                                                                                                .ToDictionary(x => x.ShapeMethodConfigId)
+                                                       : new Dictionary<int, ShapeMethodConfig>();
+
+            var customRequestsMap = customRequestIds.Any() ? (await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestsByIdsAsync(customRequestIds))
+                                                                                                             .ToDictionary(x => x.CustomerNailRequestId)
+                                                           : new Dictionary<Guid, CustomerNailRequest>();
+
+            var allCustomNailIds = directCustomNailIds.Concat(customRequestsMap.Values.Select(x => x.CustomerNailId))
+                                                      .Distinct()
+                                                      .ToList();
+
+            var customNailsMap = allCustomNailIds.Any() ? _unitOfWork.CustomerNailRepository.FindByCondition(x => allCustomNailIds.Contains(x.CustomerNailId))
+                                                                                            .ToDictionary(x => x.CustomerNailId)
+                                                        : new Dictionary<int, CustomerNail>();
+
+            Booking? oldBooking = null;
+            if (booking.WarrantyForBookingId.HasValue)
+            {
+                oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
+
             var addonNames = new List<string>();
             int totalDurationMinutes = 0;
             decimal totalAddonPrice = 0;
 
             foreach (var item in request.AddonItems)
             {
-                if (item.ServiceId.HasValue)
+                int qty = Math.Max(1, item.Quantity);
+                if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
                 {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if (service != null)
-                    {
-                        addonNames.Add(service.Name);
-                        totalDurationMinutes += service.Duration;
-                        totalAddonPrice += service.Price;
-                    }
+                    addonNames.Add(qty > 1 ? $"{service.Name} (x{qty})" : service.Name);
+                    totalDurationMinutes += service.Duration * qty;
+                    totalAddonPrice += service.Price * qty;
                 }
-                else if (item.NailVariantId.HasValue)
+                if (item.NailVariantId.HasValue && variantsMap.TryGetValue(item.NailVariantId.Value, out var variant))
                 {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
-                    if (variant != null)
+                    addonNames.Add(qty > 1 ? $"{variant.Name} (x{qty})" : variant.Name);
+                    totalDurationMinutes += (variant.Duration ?? 60) * qty;
+                    decimal price = variant.Price;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
                     {
-                        addonNames.Add(variant.Name);
-                        totalDurationMinutes += (variant.Duration ?? 60);
-                        totalAddonPrice += variant.Price;
+                        price = 0;
                     }
+                    totalAddonPrice += price * qty;
+                }
+                if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeConfig))
+                {
+                    addonNames.Add(qty > 1 ? $"Tạo dáng & làm móng: {shapeConfig.Name} (x{qty})" : $"Tạo dáng & làm móng: {shapeConfig.Name}");
+                    totalDurationMinutes += shapeConfig.Duration * qty;
+                    totalAddonPrice += shapeConfig.Price * qty;
+                }
+                if (item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var customRequest))
+                {
+                    customNailsMap.TryGetValue(customRequest.CustomerNailId, out var customNail);
+
+                    int duration = customRequest.Duration ?? customNail?.Duration ?? 60;
+                    decimal price = customRequest.Price ?? customNail?.Price ?? 0;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    string name = customNail?.Name ?? "Mẫu móng custom";
+
+                    addonNames.Add(qty > 1 ? $"Mẫu custom: {name} (x{qty})" : $"Mẫu custom: {name}");
+                    totalDurationMinutes += duration * qty;
+                    totalAddonPrice += price * qty;
+                }
+                if (item.CustomerNailId.HasValue && customNailsMap.TryGetValue(item.CustomerNailId.Value, out var directCustomNail))
+                {
+                    int duration = directCustomNail.Duration ?? 60;
+                    decimal price = directCustomNail.Price ?? 0;
+                    if (oldBooking != null && IsItemFromOldBooking(item, oldBooking.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    string name = directCustomNail.Name ?? "Mẫu móng custom";
+
+                    addonNames.Add(qty > 1 ? $"Mẫu custom: {name} (x{qty})" : $"Mẫu custom: {name}");
+                    totalDurationMinutes += duration * qty;
+                    totalAddonPrice += price * qty;
                 }
             }
+
             if (!addonNames.Any())
             {
                 return new ApiErrorResult<OnsiteAddonSimulationResponseDTO>("Không tìm thấy thông tin các dịch vụ chọn thêm.");
             }
+
             var primaryArtistId = booking.NailArtistId.Value;
             var primaryArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(primaryArtistId);
             var primaryArtistName = primaryArtist != null ? $"{primaryArtist.Account.FirstName} {primaryArtist.Account.LastName}" : "Thợ chính";
@@ -654,14 +774,28 @@ namespace Nailify.Capstone.Application.Services
                 TransitionBuffer = 1
             };
 
-            var hasPrimaryConflict = await _bookingSchedulingService.HasSimulationConflictAsync(
-              primaryArtistId,
-              booking.BookingDate,
-              new List<ProcedureScheduleSegment> { newSegment },
-              new List<ProcedureScheduleSegment>(),
-              capacity: primaryArtist?.ConcurrentCapacity ?? 1,
-              excludingBookingId: booking.BookingId
-            );
+            var activeArtists = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
+            var allArtistIds = activeArtists.Select(x => x.NailArtistId).ToList();
+
+            var allBusySegments = await _unitOfWork.BookingProcedureRepository.GetArtistBusySegmentsForArtistsByDateAsync
+                                                        (
+                                                            allArtistIds,
+                                                            booking.BookingDate,
+                                                            excludingBookingId: booking.BookingId
+                                                        );
+
+            var busySegmentsByArtist = allBusySegments.GroupBy(x => x.AssignedArtistId!.Value)
+                                                      .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Kiểm tra Thợ chính bận hay rảnh
+            var primaryBusySegments = busySegmentsByArtist.GetValueOrDefault(primaryArtistId) ?? new List<ProcedureScheduleSegment>();
+
+            var hasPrimaryConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                                                                            primaryArtistId,
+                                                                                            primaryBusySegments,
+                                                                                            new List<ProcedureScheduleSegment> { newSegment },
+                                                                                            primaryArtist?.ConcurrentCapacity ?? 1
+                                                                                          );
 
             string joinedNames = string.Join(", ", addonNames);
             var response = new OnsiteAddonSimulationResponseDTO
@@ -685,8 +819,7 @@ namespace Nailify.Capstone.Application.Services
             }
             // Thợ chính bận
             response.HasConflict = true;
-            var activeArtist = await _unitOfWork.NailArtistRepository.GetArtistsWithSkillsBySalonIdAsync(booking.SalonId);
-            var candidateSecondaryArtist = activeArtist.Where(x => x.NailArtistId != primaryArtistId).ToList();
+            var candidateSecondaryArtist = activeArtists.Where(x => x.NailArtistId != primaryArtistId).ToList();
 
             NailArtist? availableSecondary = null;
             foreach (var candidate in candidateSecondaryArtist)
@@ -705,24 +838,30 @@ namespace Nailify.Capstone.Application.Services
                     TransitionBuffer = 1
                 };
 
-                var hasSecondaryConflict = await _bookingSchedulingService.HasSimulationConflictAsync(
-                                            candidate.NailArtistId,
-                                            booking.BookingDate,
-                                            new List<ProcedureScheduleSegment> { secondarySegment },
-                                            new List<ProcedureScheduleSegment>(),
-                                            capacity: candidate.ConcurrentCapacity,
-                                            excludingBookingId: booking.BookingId
-                );
-
+                var candidateBusySegments = busySegmentsByArtist.GetValueOrDefault(candidate.NailArtistId) ?? new List<ProcedureScheduleSegment>();
+                var hasSecondaryConflict = _bookingSchedulingService.HasCapacityConflictInMemory(
+                                                                                                    candidate.NailArtistId,
+                                                                                                    candidateBusySegments,
+                                                                                                    new List<ProcedureScheduleSegment> { secondarySegment },
+                                                                                                    candidate.ConcurrentCapacity
+                                                                                                );
                 if (!hasSecondaryConflict)
                 {
                     availableSecondary = candidate;
                     break;
                 }
             }
+            string addonCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+            string addonSalonName = booking.Salon?.Name ?? "Salon";
+            if (addonSalonName == "Salon")
+            {
+                var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                if (salonObj != null) addonSalonName = salonObj.Name;
+            }
+
             if (availableSecondary != null)
             {
-                var secondaryName = availableSecondary.Account != null ? $"{availableSecondary.Account.FirstName} {availableSecondary.Account.LastName}" : "Thơ phụ";
+                var secondaryName = availableSecondary.Account != null ? $"{availableSecondary.Account.FirstName} {availableSecondary.Account.LastName}".Trim() : "Thợ phụ";
                 response.CanMultiArtistSplit = true;
                 response.SuggestedSecondaryArtistId = availableSecondary.NailArtistId;
                 response.SuggestedSecondaryArtistName = secondaryName;
@@ -730,11 +869,13 @@ namespace Nailify.Capstone.Application.Services
                 response.RecommendationMessage = $"Gợi ý Lễ tân: Bàn giao Khách D cho Thợ phụ {secondaryName} làm các dịch vụ phát sinh [{joinedNames}] ({totalDurationMinutes}p) từ {addonStartTime:hh\\:mm}.";
 
                 await _notificationService.SendNotificationToSalonStaffAsync(
-                    booking.Salon.ToString(),
+                    booking.SalonId.ToString(),
                     "OnsiteAddonConflictNotification",
                     new
                     {
                         BookingId = booking.BookingId,
+                        SalonName = addonSalonName,
+                        CustomerName = addonCustomerName,
                         PrimaryArtistId = primaryArtistId,
                         PrimaryArtistName = primaryArtistName,
                         AddonNames = addonNames,
@@ -758,14 +899,16 @@ namespace Nailify.Capstone.Application.Services
                                      booking.SalonId.ToString(),
                                     "OnsiteAddonConflictNotification",
                                      new
-                                    {
-                                        BookingId = booking.BookingId,
-                                        PrimaryArtistId = primaryArtistId,
-                                        PrimaryArtistName = primaryArtistName,
-                                        AddonNames = addonNames,
-                                        CanMultiArtistSplit = false,
-                                        SuggestedAlternativeTime = alternativeTime,
-                                        Message = response.RecommendationMessage
+                                     {
+                                         BookingId = booking.BookingId,
+                                         SalonName = addonSalonName,
+                                         CustomerName = addonCustomerName,
+                                         PrimaryArtistId = primaryArtistId,
+                                         PrimaryArtistName = primaryArtistName,
+                                         AddonNames = addonNames,
+                                         CanMultiArtistSplit = false,
+                                         SuggestedAlternativeTime = alternativeTime,
+                                         Message = response.RecommendationMessage
                                      }
             );
             return new ApiSuccessResult<OnsiteAddonSimulationResponseDTO>(response, "Salon hết thợ rảnh. Đã gửi thông báo tới Lễ tân để  hẹn giờ khác");
@@ -774,11 +917,11 @@ namespace Nailify.Capstone.Application.Services
         public async Task<ApiResult<List<BookingProcedureResponseDTO>>> ConfirmOnsiteAddonAsync(ConfirmOnsiteAddonRequestDTO request)
         {
             var booking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(request.BookingId, trackChanges: true);
-            if(booking == null)
+            if (booking == null)
             {
                 return new ApiErrorResult<List<BookingProcedureResponseDTO>>("Không tìm thấy đơn đặt lịch.");
             }
-            if(request.AddonItems == null || !request.AddonItems.Any())
+            if (request.AddonItems == null || !request.AddonItems.Any())
             {
                 return new ApiErrorResult<List<BookingProcedureResponseDTO>>("Không có dịch vụ phát sinh nào được chọn.");
             }
@@ -786,35 +929,103 @@ namespace Nailify.Capstone.Application.Services
             var existingProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
             int nextStepOrder = existingProcedures.Any() ? existingProcedures.Max(x => x.StepOrder) + 1 : 1;
 
+            var serviceIds = request.AddonItems.Where(x => x.ServiceId.HasValue).Select(x => x.ServiceId!.Value).Distinct().ToList();
+            var variantIds = request.AddonItems.Where(x => x.NailVariantId.HasValue).Select(x => x.NailVariantId!.Value).Distinct().ToList();
+            var shapeConfigIds = request.AddonItems.Where(x => x.ShapeMethodConfigId.HasValue).Select(x => x.ShapeMethodConfigId!.Value).Distinct().ToList();
+            var customRequestIds = request.AddonItems.Where(x => x.CustomerNailRequestId.HasValue).Select(x => x.CustomerNailRequestId!.Value).Distinct().ToList();
+            var directCustomNailIds = request.AddonItems.Where(x => x.CustomerNailId.HasValue).Select(x => x.CustomerNailId!.Value).Distinct().ToList();
+
+            var servicesMap = serviceIds.Any()
+        ? _unitOfWork.ServicesRepository.FindByCondition(x => serviceIds.Contains(x.ServiceId)).ToDictionary(x => x.ServiceId)
+        : new Dictionary<Guid, Domain.Entities.Services>();
+            var variantsMap = variantIds.Any()
+                ? _unitOfWork.NailVariantRepository.FindByCondition(x => variantIds.Contains(x.NailVariantId)).ToDictionary(x => x.NailVariantId)
+                : new Dictionary<int, NailVariant>();
+            var shapeConfigsMap = shapeConfigIds.Any()
+                ? _unitOfWork.ShapeMethodConfigRepository.FindByCondition(x => shapeConfigIds.Contains(x.ShapeMethodConfigId)).ToDictionary(x => x.ShapeMethodConfigId)
+                : new Dictionary<int, ShapeMethodConfig>();
+            var customRequestsMap = customRequestIds.Any()
+                ? (await _unitOfWork.CustomerNailRequestRepository.GetCustomerNailRequestsByIdsAsync(customRequestIds)).ToDictionary(x => x.CustomerNailRequestId)
+                : new Dictionary<Guid, CustomerNailRequest>();
+            var allCustomNailIds = directCustomNailIds
+                .Concat(customRequestsMap.Values.Select(x => x.CustomerNailId))
+                .Distinct()
+                .ToList();
+            var customNailsMap = allCustomNailIds.Any()
+                ? _unitOfWork.CustomerNailRepository.FindByCondition(x => allCustomNailIds.Contains(x.CustomerNailId)).ToDictionary(x => x.CustomerNailId)
+                : new Dictionary<int, CustomerNail>();
+
+            var variantProceduresList = variantIds.Any()
+              ? await _unitOfWork.NailProcedureRepository.GetActiveProceduresByVariantIdsAsync(variantIds)
+              : new List<NailProcedure>();
+            var variantProceduresMap = variantProceduresList.GroupBy(x => x.NailVariantId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+            var customNailProceduresList = allCustomNailIds.Any()
+                ? await _unitOfWork.NailProcedureRepository.GetActiveProceduresByCustomerNailIdsAsync(allCustomNailIds)
+                : new List<NailProcedure>();
+            var customNailProceduresMap = customNailProceduresList.GroupBy(x => x.CustomerNailId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+
+
             int totalAddedDuration = 0;
             decimal totalAddedPrice = 0;
             var createdProcedures = new List<BookingProcedure>();
-
-            foreach(var item in request.AddonItems)
+            Booking? oldBookingConfirm = null;
+            if (booking.WarrantyForBookingId.HasValue)
             {
-                string procedureName = null;
-                int durationMinutes = 30;
-                decimal addonPrice = 0;
+                oldBookingConfirm = await _unitOfWork.BookingRepository.GetBookingDetailAsync(booking.WarrantyForBookingId.Value);
+            }
+            foreach (var item in request.AddonItems)
+            {
+                int qty = Math.Max(1, item.Quantity);
+                int itemDuration = 0;
+                decimal itemPrice = 0;
 
-                if (item.ServiceId.HasValue)
+
+                if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var service))
                 {
-                    var service = await _unitOfWork.ServicesRepository.GetByIdAsync(item.ServiceId.Value);
-                    if(service != null)
-                    {
-                        procedureName = service.Name;
-                        addonPrice = service.Price;
-                        durationMinutes = service.Duration;
-                    }
+                    itemDuration += service.Duration * qty;
+                    itemPrice += service.Price * qty;
                 }
-                else if (item.NailVariantId.HasValue)
+                if (item.NailVariantId.HasValue && variantsMap.TryGetValue(item.NailVariantId.Value, out var variant))
                 {
-                    var variant = await _unitOfWork.NailVariantRepository.GetByIdAsync(item.NailVariantId.Value);
-                    if(variant != null)
+                    itemDuration += (variant.Duration ?? 60) * qty;
+                    decimal price = variant.Price;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
                     {
-                        procedureName = variant.Name;
-                        durationMinutes = variant.Duration ?? 60;
-                        addonPrice = variant.Price;
+                        price = 0;
                     }
+                    itemPrice += price * qty;
+                }
+                if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeConfig))
+                {
+                    itemDuration += shapeConfig.Duration * qty;
+                    itemPrice += shapeConfig.Price * qty;
+                }
+                // 4. Mẫu móng custom theo Yêu cầu báo giá (CustomerNailRequest)
+                if (item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var customRequest))
+                {
+                    customNailsMap.TryGetValue(customRequest.CustomerNailId, out var customNail);
+                    itemDuration += (customRequest.Duration ?? customNail?.Duration ?? 60) * qty;
+                    decimal price = customRequest.Price ?? customNail?.Price ?? 0;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    itemPrice += price * qty;
+                }
+                // 5. Mẫu móng custom trực tiếp (CustomerNail)
+                if (item.CustomerNailId.HasValue && customNailsMap.TryGetValue(item.CustomerNailId.Value, out var directCustomNail))
+                {
+                    itemDuration += (directCustomNail.Duration ?? 60) * qty;
+                    decimal price = directCustomNail.Price ?? 0;
+                    if (oldBookingConfirm != null && IsItemFromOldBooking(item, oldBookingConfirm.BookingItems))
+                    {
+                        price = 0;
+                    }
+                    itemPrice += price * qty;
+                }
+                if (itemDuration == 0 && itemPrice == 0)
+                {
+                    continue;
                 }
                 var bookingItem = new BookingItem
                 {
@@ -822,32 +1033,250 @@ namespace Nailify.Capstone.Application.Services
                     BookingId = booking.BookingId,
                     ServiceId = item.ServiceId,
                     NailVariantId = item.NailVariantId,
-                    Price = addonPrice,
-                    Duration = durationMinutes,
-                    Quantity = 1
+                    ShapeMethodConfigId = item.ShapeMethodConfigId,
+                    CustomerNailRequestId = item.CustomerNailRequestId,
+                    Price = itemPrice,
+                    Duration = itemDuration,
+                    Quantity = qty
                 };
 
                 await _unitOfWork.BookingItemRepository.CreateAsync(bookingItem);
-                var newProcedure = new BookingProcedure
+                
+                // 1. Công đoạn cho Variant mẫu móng (nếu có)
+                if (item.NailVariantId.HasValue && variantProceduresMap.TryGetValue(item.NailVariantId.Value, out var variantProcs) && variantProcs.Any())
                 {
-                    BookingProcedureId = Guid.NewGuid(),
-                    BookingItemId = bookingItem.BookingItemId,
-                    ProcedureName = procedureName,
-                    StepOrder = nextStepOrder++,
-                    Duration = durationMinutes,
-                    ActiveDuration = durationMinutes,
-                    PassiveDuration = 0,
-                    CanOverlap = false,
-                    IsRequired = true,
-                    IsMainStep = true,
-                    Status = BookingProcedureStatus.Pending,
-                    AssignedArtistId = assignedArtistId
-                };
-                await _unitOfWork.BookingProcedureRepository.CreateAsync(newProcedure);
+                    variantProcs = variantProcs.OrderBy(x => x.StepOrder).ToList();
+                    int variantTargetDuration = variantsMap.TryGetValue(item.NailVariantId.Value, out var v) ? (v.Duration ?? 60) * qty : itemDuration;
+                    int totalCatalogDuration = variantProcs.Sum(x => x.Procedure?.Duration ?? 0);
+                    if (variantTargetDuration > 0 && totalCatalogDuration > 0 && variantTargetDuration != totalCatalogDuration)
+                    {
+                        double scaleFactor = (double)variantTargetDuration / totalCatalogDuration;
+                        int accumulatedDuration = 0;
+                        int count = variantProcs.Count;
+                        for (int i = 0; i < count; i++)
+                        {
+                            var x = variantProcs[i];
+                            int catalogDuration = x.Procedure?.Duration ?? 0;
+                            int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
+                            if (i == count - 1) scaledDuration = Math.Max(1, variantTargetDuration - accumulatedDuration);
+                            else accumulatedDuration += scaledDuration;
+                            int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round((x.Procedure?.ActiveDuration ?? 0) * scaleFactor)));
+                            int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
+                            var newProc = new BookingProcedure
+                            {
+                                BookingProcedureId = Guid.NewGuid(),
+                                BookingItemId = bookingItem.BookingItemId,
+                                ProcedureId = x.ProcedureId,
+                                ProcedureName = x.Procedure.Name,
+                                StepOrder = nextStepOrder++,
+                                Duration = scaledDuration,
+                                ActiveDuration = scaledActive,
+                                PassiveDuration = scaledPassive,
+                                CanOverlap = x.Procedure.CanOverlap,
+                                IsRequired = x.Procedure.IsRequired,
+                                IsMainStep = x.Procedure.IsMainStep,
+                                Status = BookingProcedureStatus.Pending,
+                                AssignedArtistId = assignedArtistId
+                            };
+                            await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                            createdProcedures.Add(newProc);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var x in variantProcs)
+                        {
+                            var newProc = new BookingProcedure
+                            {
+                                BookingProcedureId = Guid.NewGuid(),
+                                BookingItemId = bookingItem.BookingItemId,
+                                ProcedureId = x.ProcedureId,
+                                ProcedureName = x.Procedure?.Name ?? string.Empty,
+                                StepOrder = nextStepOrder++,
+                                Duration = x.Procedure?.Duration ?? 0,
+                                ActiveDuration = x.Procedure?.ActiveDuration ?? 0,
+                                PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                IsRequired = x.Procedure?.IsRequired ?? false,
+                                IsMainStep = x.Procedure?.IsMainStep ?? false,
+                                Status = BookingProcedureStatus.Pending,
+                                AssignedArtistId = assignedArtistId
+                            };
+                            await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                            createdProcedures.Add(newProc);
+                        }
+                    }
+                }
+                else if (item.NailVariantId.HasValue && variantsMap.TryGetValue(item.NailVariantId.Value, out var singleVariant))
+                {
+                    int vDuration = (singleVariant.Duration ?? 60) * qty;
+                    var newProc = new BookingProcedure
+                    {
+                        BookingProcedureId = Guid.NewGuid(),
+                        BookingItemId = bookingItem.BookingItemId,
+                        ProcedureName = qty > 1 ? $"{singleVariant.Name} (x{qty})" : singleVariant.Name,
+                        StepOrder = nextStepOrder++,
+                        Duration = vDuration,
+                        ActiveDuration = vDuration,
+                        PassiveDuration = 0,
+                        CanOverlap = false,
+                        IsRequired = true,
+                        IsMainStep = true,
+                        Status = BookingProcedureStatus.Pending,
+                        AssignedArtistId = assignedArtistId
+                    };
+                    await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                    createdProcedures.Add(newProc);
+                }
 
-                totalAddedDuration += durationMinutes;
-                totalAddedPrice += addonPrice;
-                createdProcedures.Add(newProcedure);
+                // 2. Công đoạn cho Custom Nail (nếu có)
+                if (item.CustomerNailRequestId.HasValue || item.CustomerNailId.HasValue)
+                {
+                    int? targetCustomNailId = item.CustomerNailRequestId.HasValue && customRequestsMap.TryGetValue(item.CustomerNailRequestId.Value, out var cr)
+                        ? cr.CustomerNailId
+                        : item.CustomerNailId;
+                    List<NailProcedure>? customProcs = null;
+                    if (targetCustomNailId.HasValue)
+                    {
+                        customNailProceduresMap.TryGetValue(targetCustomNailId.Value, out customProcs);
+                    }
+                    if (customProcs != null && customProcs.Any())
+                    {
+                        customProcs = customProcs.OrderBy(x => x.StepOrder).ToList();
+                        int customTargetDuration = itemDuration;
+                        int totalCatalogDurationCustom = customProcs.Sum(x => x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0);
+                        if (customTargetDuration > 0 && totalCatalogDurationCustom > 0 && customTargetDuration != totalCatalogDurationCustom)
+                        {
+                            double scaleFactor = (double)customTargetDuration / totalCatalogDurationCustom;
+                            int accumulatedDuration = 0;
+                            int count = customProcs.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                var x = customProcs[i];
+                                int catalogDuration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0;
+                                int scaledDuration = (int)Math.Max(1, Math.Round(catalogDuration * scaleFactor));
+                                if (i == count - 1) scaledDuration = Math.Max(1, customTargetDuration - accumulatedDuration);
+                                else accumulatedDuration += scaledDuration;
+                                int activeDuration = x.Procedure?.ActiveDuration ?? catalogDuration;
+                                int scaledActive = (int)Math.Min(scaledDuration, Math.Max(1, Math.Round(activeDuration * scaleFactor)));
+                                int scaledPassive = Math.Max(0, scaledDuration - scaledActive);
+                                var newProc = new BookingProcedure
+                                {
+                                    BookingProcedureId = Guid.NewGuid(),
+                                    BookingItemId = bookingItem.BookingItemId,
+                                    ProcedureId = x.ProcedureId,
+                                    ProcedureName = x.Name ?? x.Procedure?.Name ?? "Công đoạn custom",
+                                    StepOrder = nextStepOrder++,
+                                    Duration = scaledDuration,
+                                    ActiveDuration = scaledActive,
+                                    PassiveDuration = scaledPassive,
+                                    CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                    IsRequired = x.Procedure?.IsRequired ?? true,
+                                    IsMainStep = x.Procedure?.IsMainStep ?? true,
+                                    Status = BookingProcedureStatus.Pending,
+                                    AssignedArtistId = assignedArtistId
+                                };
+                                await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                                createdProcedures.Add(newProc);
+                            }
+                        }
+                        else
+                        {
+                            foreach (var x in customProcs)
+                            {
+                                var newProc = new BookingProcedure
+                                {
+                                    BookingProcedureId = Guid.NewGuid(),
+                                    BookingItemId = bookingItem.BookingItemId,
+                                    ProcedureId = x.ProcedureId,
+                                    ProcedureName = x.Name ?? x.Procedure?.Name ?? "Công đoạn custom",
+                                    StepOrder = nextStepOrder++,
+                                    Duration = x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0,
+                                    ActiveDuration = x.Procedure?.ActiveDuration ?? x.EstimatedMinutes ?? x.Procedure?.Duration ?? 0,
+                                    PassiveDuration = x.Procedure?.PassiveDuration ?? 0,
+                                    CanOverlap = x.Procedure?.CanOverlap ?? false,
+                                    IsRequired = x.Procedure?.IsRequired ?? true,
+                                    IsMainStep = x.Procedure?.IsMainStep ?? true,
+                                    Status = BookingProcedureStatus.Pending,
+                                    AssignedArtistId = assignedArtistId
+                                };
+                                await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                                createdProcedures.Add(newProc);
+                            }
+                        }
+                    }
+                    else if (!item.NailVariantId.HasValue)
+                    {
+                        string customName = "Mẫu móng custom";
+                        if (targetCustomNailId.HasValue && customNailsMap.TryGetValue(targetCustomNailId.Value, out var cn))
+                        {
+                            customName = cn.Name;
+                        }
+                        var newProc = new BookingProcedure
+                        {
+                            BookingProcedureId = Guid.NewGuid(),
+                            BookingItemId = bookingItem.BookingItemId,
+                            ProcedureName = qty > 1 ? $"{customName} (x{qty})" : customName,
+                            StepOrder = nextStepOrder++,
+                            Duration = itemDuration,
+                            ActiveDuration = itemDuration,
+                            PassiveDuration = 0,
+                            CanOverlap = false,
+                            IsRequired = true,
+                            IsMainStep = true,
+                            Status = BookingProcedureStatus.Pending,
+                            AssignedArtistId = assignedArtistId
+                        };
+                        await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                        createdProcedures.Add(newProc);
+                    }
+                }
+
+                // 3. Công đoạn cho Dáng móng (ShapeMethodConfig)
+                if (item.ShapeMethodConfigId.HasValue && shapeConfigsMap.TryGetValue(item.ShapeMethodConfigId.Value, out var shapeCfg))
+                {
+                    var newProc = new BookingProcedure
+                    {
+                        BookingProcedureId = Guid.NewGuid(),
+                        BookingItemId = bookingItem.BookingItemId,
+                        ProcedureName = qty > 1 ? $"Tạo dáng & làm móng: {shapeCfg.Name} (x{qty})" : $"Tạo dáng & làm móng: {shapeCfg.Name}",
+                        StepOrder = nextStepOrder++,
+                        Duration = shapeCfg.Duration * qty,
+                        ActiveDuration = shapeCfg.Duration * qty,
+                        PassiveDuration = 0,
+                        CanOverlap = false,
+                        IsRequired = true,
+                        IsMainStep = true,
+                        Status = BookingProcedureStatus.Pending,
+                        AssignedArtistId = assignedArtistId
+                    };
+                    await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                    createdProcedures.Add(newProc);
+                }
+
+                // 4. Công đoạn cho Dịch vụ lẻ (Service)
+                if (item.ServiceId.HasValue && servicesMap.TryGetValue(item.ServiceId.Value, out var srv))
+                {
+                    var newProc = new BookingProcedure
+                    {
+                        BookingProcedureId = Guid.NewGuid(),
+                        BookingItemId = bookingItem.BookingItemId,
+                        ProcedureName = qty > 1 ? $"{srv.Name} (x{qty})" : srv.Name,
+                        StepOrder = nextStepOrder++,
+                        Duration = srv.Duration * qty,
+                        ActiveDuration = srv.Duration * qty,
+                        PassiveDuration = 0,
+                        CanOverlap = false,
+                        IsRequired = true,
+                        IsMainStep = true,
+                        Status = BookingProcedureStatus.Pending,
+                        AssignedArtistId = assignedArtistId
+                    };
+                    await _unitOfWork.BookingProcedureRepository.CreateAsync(newProc);
+                    createdProcedures.Add(newProc);
+                }
+                totalAddedDuration += itemDuration;
+                totalAddedPrice += itemPrice;
             }
 
             booking.TotalDuration += totalAddedDuration;
@@ -863,12 +1292,23 @@ namespace Nailify.Capstone.Application.Services
                 var secondaryArtist = await _unitOfWork.NailArtistRepository.GetNailArtistWithProfileAsync(assignedArtistId.Value);
                 if (secondaryArtist != null)
                 {
+                    string handoffCustomerName = booking.Customer?.User != null ? $"{booking.Customer.User.FirstName} {booking.Customer.User.LastName}".Trim() : "Khách hàng";
+                    string handoffSalonName = booking.Salon?.Name ?? "Salon";
+                    if (handoffSalonName == "Salon")
+                    {
+                        var salonObj = await _unitOfWork.SalonRepository.GetByIdAsync(booking.SalonId);
+                        if (salonObj != null) handoffSalonName = salonObj.Name;
+                    }
+
                     await _notificationService.SendNotificationToUserAsync(
                         secondaryArtist.AccountId.ToString(),
                         "MultiArtistHandoffAssigned",
                         new
                         {
                             BookingId = booking.BookingId,
+                            SalonName = handoffSalonName,
+                            CustomerName = handoffCustomerName,
+                            AddonNames = request.AddonItems.Select(x => x.ServiceId?.ToString() ?? x.NailVariantId?.ToString() ?? "Dịch vụ phát sinh").ToList(),
                             Message = $"Bạn được Lễ tân phân công tiếp nhận {request.AddonItems.Count} dịch vụ phát sinh (+{totalAddedDuration}p) cho khách hàng."
                         }
                     );
@@ -878,6 +1318,12 @@ namespace Nailify.Capstone.Application.Services
             var allProcedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(booking.BookingId);
             var response = _mapper.Map<List<BookingProcedureResponseDTO>>(allProcedures.OrderBy(x => x.StepOrder).ToList());
             return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, $"Thêm {request.AddonItems.Count} dịch vụ phát sinh thành công!");
+        }
+        public async Task<ApiResult<List<BookingProcedureResponseDTO>>> GetProceduresByBookingIdAsync(Guid bookingId)
+        {
+            var procedures = await _unitOfWork.BookingProcedureRepository.GetProceduresByBookingIdAsync(bookingId);
+            var response = _mapper.Map<List<BookingProcedureResponseDTO>>(procedures);
+            return new ApiSuccessResult<List<BookingProcedureResponseDTO>>(response, "Lấy danh sách quy trình theo mã đặt lịch thành công.");
         }
     }
 }

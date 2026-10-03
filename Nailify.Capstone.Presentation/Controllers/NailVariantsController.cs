@@ -5,6 +5,7 @@ using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.NailVariantRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
 using Nailify.Capstone.Application.Interfaces.ServiceInterfaces;
+using Nailify.Capstone.Domain.Enums;
 using Nailify.Capstone.Infrastructure.Service;
 using System.Security.Claims;
 
@@ -43,9 +44,11 @@ namespace Nailify.Capstone.Presentation.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] int? nailDesignId = null,
-            [FromQuery] string? name = null)
+            [FromQuery] string? name = null,
+            [FromQuery] ActiveStatusFilter? status = null)
         {
-            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name, GetCurrentUserIdOrNull());
+            var statusStr = (status == null || status == ActiveStatusFilter.All) ? null : status.ToString();
+            var result = await _nailVariantService.GetPagedNailVariantsAsync(pageNumber, pageSize, nailDesignId, name, GetCurrentUserIdOrNull(), statusStr);
             return Ok(result);
         }
 

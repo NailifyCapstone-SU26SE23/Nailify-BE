@@ -74,7 +74,10 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .ThenInclude(b => b.Customer)
                 .ThenInclude(c => c.User)
                 .Include(t => t.Booking)
-                .ThenInclude(b => b.Salon);
+                .ThenInclude(b => b.Salon)
+                .Include(t => t.Wallet)
+                .ThenInclude(w => w.Customer)
+                .ThenInclude(c => c.User);
         }
     }
 }

@@ -35,7 +35,7 @@ namespace Nailify.Capstone.Application.Services
             foreach(var req in requests)
             {
                var skillType = await _unitOfWork.SkillTypeRepository.GetByIdAsync(req.SkillTypeId);
-                if(skillType == null || skillType.Status == "InActive")
+                if(skillType == null || skillType.Status == "Inactive")
                 {
                     return new ApiErrorResult<List<NailArtistSkillResponseDTO>>($"Loại kỹ năng với ID {req.SkillTypeId} không tồn tại hoặc đã bị vô hiệu hóa.");
                 }

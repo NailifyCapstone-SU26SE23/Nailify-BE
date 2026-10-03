@@ -35,8 +35,8 @@ namespace Nailify.Capstone.Application.Services
         }
         public Task<ApiResult<BookingResponseDTO>> CreateBookingAsync(Guid customerId, CreateBookingRequestDTO request)
          => _bookingCreationService.CreateBookingAsync(customerId, request);
-        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
-            => _bookingCreationService.CalculateBookingPriceAsync(customerId, bookingItems, selectedPromotionIds);
+        public Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null, Guid? warrantyForBookingId = null)
+            => _bookingCreationService.CalculateBookingPriceAsync(customerId, bookingItems, selectedPromotionIds, warrantyForBookingId);
         public Task<ApiResult<BookingResponseDTO>> VerifyQrCodeAsync(string qrToken, Guid actorId)
             => _bookingLifecycleService.VerifyQrCodeAsync(qrToken, actorId);
         public Task<ApiResult<BookingResponseDTO>> CheckInBookingAsync(CheckInRequestDTO request, Guid actorId)
@@ -53,8 +53,8 @@ namespace Nailify.Capstone.Application.Services
             => _bookingLifecycleService.ConfirmBookingAsync(bookingId, actorId);
         public Task<ApiResult<BookingResponseDTO>> RejectBookingAsync(Guid bookingId, Guid actorId, RejectRequestDTO request)
             => _bookingLifecycleService.RejectBookingAsync(bookingId, actorId, request);
-        public Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid customerId, CancelBookingRequestDTO request)
-            => _bookingLifecycleService.CancelBookingAsync(bookingId, customerId, request);
+        public Task<ApiResult<BookingResponseDTO>> CancelBookingAsync(Guid bookingId, Guid actorId, CancelBookingRequestDTO request, bool isCustomerActor = false)
+            => _bookingLifecycleService.CancelBookingAsync(bookingId, actorId, request, isCustomerActor);
         public Task<ApiResult<BookingResponseDTO>> UpdateBookingAsync(Guid bookingId, UpdateBookingRequestDTO request, Guid actorId)
             => _bookingLifecycleService.UpdateBookingAsync(bookingId, request, actorId);
         public Task<ApiResult<List<SuggestedArtistResponseDTO>>> GetSuggestedArtistAsync(GetSuggestedArtistsRequestDTO request)

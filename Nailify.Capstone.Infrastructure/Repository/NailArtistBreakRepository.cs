@@ -24,5 +24,22 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.Status == ArtistBreakStatus.Approved)
                          .ToListAsync();
         }
+
+        public async Task<List<NailArtistBreak>> GetApprovedBreaksByArtistIdsAndDateAsync(IEnumerable<Guid> artistIds, DateTime date)
+        {
+            var idList = artistIds.Distinct().ToList();
+            if (!idList.Any())
+            {
+                return new List<NailArtistBreak>();
+            }
+            var targetDate = (date.Kind == DateTimeKind.Utc ? date.AddHours(7) : date).Date;
+
+            return await FindByCondition(
+                                         x => idList.Contains(x.NailArtistId)
+                                         && x.BreakDate.Date == targetDate
+                                         && x.Status == ArtistBreakStatus.Approved
+                                        )
+                        .ToListAsync();
+        }
     }
 }

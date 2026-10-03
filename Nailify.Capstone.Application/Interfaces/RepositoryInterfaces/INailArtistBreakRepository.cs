@@ -10,5 +10,6 @@ namespace Nailify.Capstone.Application.Interfaces.RepositoryInterfaces
     public interface INailArtistBreakRepository : IGenericRepository<NailArtistBreak>
     {
         Task<List<NailArtistBreak>> GetApprovedBreaksByArtistAndDateAsync(Guid artistId, DateTime date);
+        Task<List<NailArtistBreak>> GetApprovedBreaksByArtistIdsAndDateAsync(IEnumerable<Guid> artistIds, DateTime date);
     }
 }

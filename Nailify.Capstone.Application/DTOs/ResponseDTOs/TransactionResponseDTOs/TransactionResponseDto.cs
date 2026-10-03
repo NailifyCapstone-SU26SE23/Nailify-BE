@@ -1,4 +1,5 @@
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
 {
@@ -6,6 +7,7 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
     {
         public int TransactionId { get; set; }
         public Guid? BookingId { get; set; }
+        public Guid? WalletId { get; set; }
         public string OrderCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string? Reference { get; set; }
@@ -19,7 +21,9 @@ namespace Nailify.Capstone.Application.DTOs.ResponseDTOs.TransactionResponseDTOs
         public DateTime ExpiresAt { get; set; }
         public Guid CustomerId { get; set; }
         public string CustomerName { get; set; } = string.Empty;
-        public Guid SalonId { get; set; }
+        public Guid? SalonId { get; set; }
         public string SalonName { get; set; } = string.Empty;
+        public PaymentType PaymentType { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
     }
 }

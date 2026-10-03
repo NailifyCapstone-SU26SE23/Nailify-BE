@@ -65,11 +65,25 @@ namespace Nailify.Capstone.Presentation.Controllers
         /// <summary>
         /// Lấy danh sách các khung giờ bận của thợ làm móng trong ngày cụ thể.
         /// </summary>
-        [HttpGet("artist-available-slots")]
+        [HttpPost("artist-available-slots")]
         [ProducesResponseType(typeof(ApiResult<ArtistAvailabilityResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetArtistAvailableSlots([FromQuery] GetArtistAvailableSlotsRequestDTO request)
+        public async Task<IActionResult> GetArtistAvailableSlots([FromBody] GetArtistAvailableSlotsRequestDTO request)
         {
+            if (!request.CustomerId.HasValue)
+            {
+                try
+                {
+                    var customerId = GetCurrentUserId();
+                    if (customerId != Guid.Empty)
+                    {
+                        request.CustomerId = customerId;
+                    }
+                }
+                catch
+                {
+                }
+            }
             var response = await _bookingService.GetArtistAvailableSlotAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
@@ -111,7 +125,8 @@ namespace Nailify.Capstone.Presentation.Controllers
             var response = await _bookingService.CalculateBookingPriceAsync(
                 customerId,
                 request.BookingItems,
-                request.SelectedPromotionIds); 
+                request.SelectedPromotionIds,
+                request.WarrantyForBookingId); 
 
             return response.IsSucceeded ? Ok(response) : BadRequest(response);
         }
@@ -197,8 +212,14 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelBookingRequestDTO request)
         {
-            var customerId = GetCurrentUserId();
-            var response = await _bookingService.CancelBookingAsync(id, customerId, request);
+            var actorId = GetCurrentUserId();
+            var isCustomerActor = User.IsInRole(nameof(UserRole.Customer));
+            if (isCustomerActor)
+            {
+                request.CustomerRequest = true;
+            }
+
+            var response = await _bookingService.CancelBookingAsync(id, actorId, request, isCustomerActor);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);
         }
@@ -626,6 +647,18 @@ namespace Nailify.Capstone.Presentation.Controllers
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetSalonAvailableSlots([FromBody] GetSalonAvailableSlotsRequestDTO request)
         {
+            if (!request.CustomerId.HasValue)
+            {
+                try
+                {
+                    var customerId = GetCurrentUserId();
+                    if (customerId != Guid.Empty)
+                    {
+                        request.CustomerId = customerId;
+                    }
+                }
+                catch { }
+            }
             var response = await _bookingService.GetSalonAvailableSlotsAsync(request);
             if (!response.IsSucceeded) return BadRequest(response);
             return Ok(response);

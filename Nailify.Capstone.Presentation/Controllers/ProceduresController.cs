@@ -57,7 +57,7 @@ namespace Nailify.Capstone.Presentation.Controllers
         [HttpPost]
         [ProducesResponseType(typeof(ApiResult<ProcedureResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] CreateProcedureRequestDTO request)
+        public async Task<IActionResult> Create([FromQuery] CreateProcedureRequestDTO request)
         {
             var result = await _procedureService.CreateProcedureAsync(request);
             if (!result.IsSucceeded)

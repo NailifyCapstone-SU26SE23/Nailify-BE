@@ -6,9 +6,9 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface IShapeMethodConfigService
     {
-        Task<ApiResult<PagedList<ShapeMethodConfigDto>>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null);
+        Task<ApiResult<PagedList<ShapeMethodConfigDto>>> GetPagedShapeMethodConfigsAsync(int pageNumber, int pageSize, int? nailShapeId = null, string? name = null, string? status = null);
         Task<ApiResult<ShapeMethodConfigDto>> GetShapeMethodConfigByIdAsync(int id);
-        Task<ApiResult<List<ShapeMethodConfigDto>>> GetShapeMethodConfigsByNailShapeIdAsync(int nailShapeId);
+        Task<ApiResult<List<ShapeMethodConfigDto>>> GetShapeMethodConfigsByNailShapeIdAsync(int nailShapeId, string? status = null);
         Task<ApiResult<ShapeMethodConfigDto>> CreateShapeMethodConfigAsync(ShapeMethodConfigCreateRequest request);
         Task<ApiResult<ShapeMethodConfigDto>> UpdateShapeMethodConfigAsync(int id, ShapeMethodConfigUpdateRequest request);
         Task<ApiResult<bool>> DeleteShapeMethodConfigAsync(int id);

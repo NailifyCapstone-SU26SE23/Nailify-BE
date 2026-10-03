@@ -1,4 +1,4 @@
-﻿using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
+using Nailify.Capstone.Application.Interfaces.RepositoryInterfaces;
 using Nailify.Capstone.Domain.Entities;
 using Nailify.Capstone.Infrastructure.DBContext;
 using System;
@@ -46,6 +46,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                    .Include(x => x.Customer).ThenInclude(c => c.User)
                    .Include(x => x.Salon)
                    .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                   .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                   .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                   .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                   .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                   .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                    .OrderBy(x => x.Position)
                    .FirstOrDefaultAsync();   
 
@@ -56,6 +61,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.Salon)
                 .Include(x => x.PreferredNailArtist)
                     .ThenInclude(a => a.Account)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                 .OrderBy(x => x.Position)
                 .FirstOrDefaultAsync();
         }
@@ -65,7 +75,12 @@ namespace Nailify.Capstone.Infrastructure.Repository
             var query = FindByCondition(x => x.SalonId == salonId && x.Status == WaitlistStatus.Waiting, false)
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
-                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account);
+                .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail);
 
             var count = await query.CountAsync();
             var items = await query
@@ -96,6 +111,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
                 .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                 .FirstOrDefaultAsync();
         }
 
@@ -106,7 +126,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
                 .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
-                .Include(x => x.WaitlistItems)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                 .ToListAsync();
         }
 
@@ -118,7 +142,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                          && x.Status == WaitlistStatus.Notified
                                          && x.ExpiresAt.HasValue
                                          && x.ExpiresAt.Value > DateTime.UtcNow, false)
-                         .Include(x => x.WaitlistItems)
+                         .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                         .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                         .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                         .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                         .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                          .ToListAsync();
         }
         public async Task<BookingWaitlist?> GetWaitlistWithItemsAsync(Guid waitlistId)
@@ -127,7 +155,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                 .Include(x => x.Customer).ThenInclude(c => c.User)
                 .Include(x => x.Salon)
                 .Include(x => x.PreferredNailArtist).ThenInclude(a => a.Account)
-                .Include(x => x.WaitlistItems)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                 .FirstOrDefaultAsync();
         }
 
@@ -157,7 +189,11 @@ namespace Nailify.Capstone.Infrastructure.Repository
                                   .Include(x => x.Salon)
                                   .Include(x => x.PreferredNailArtist)
                                         .ThenInclude(a => a.Account)
-                                  .Include(x => x.WaitlistItems)
+                                  .Include(x => x.WaitlistItems).ThenInclude(wi => wi.NailVariant)
+                                  .Include(x => x.WaitlistItems).ThenInclude(wi => wi.Service)
+                                  .Include(x => x.WaitlistItems).ThenInclude(wi => wi.ShapeMethodConfig)
+                                  .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNail)
+                                  .Include(x => x.WaitlistItems).ThenInclude(wi => wi.CustomerNailRequest).ThenInclude(cnr => cnr.CustomerNail)
                                   .ToListAsync();
 
             if(!candidates.Any())
@@ -193,6 +229,13 @@ namespace Nailify.Capstone.Infrastructure.Repository
             .FirstOrDefault();
 
             return scoredCandidates?.Candidate;
+        }
+
+        public async Task<BookingWaitlist?> GetWaitlistForUpdateAsync(Guid waitlistId)
+        {
+            return await _context.Set<BookingWaitlist>()
+              .FromSqlRaw("SELECT * FROM \"BookingWaitlists\" WHERE \"WailistId\" = {0} FOR UPDATE", waitlistId)
+              .FirstOrDefaultAsync();
         }
     }
 }

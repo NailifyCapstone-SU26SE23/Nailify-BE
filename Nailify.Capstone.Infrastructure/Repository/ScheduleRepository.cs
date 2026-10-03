@@ -46,14 +46,25 @@ namespace Nailify.Capstone.Infrastructure.Repository
         public async Task<IEnumerable<Schedule>> GetSchedulesBySalonIdAsync(Guid salonId, DateTime? startDate, DateTime? endDate)
         {
             var query = FindByCondition(x => x.NailArtist.Account.SalonId == salonId
-                && (x.Status == "Available" || x.Status == "Active"));
-
-            if (startDate.HasValue)
-                query = query.Where(x => x.WorkDate >= startDate.Value);
-
-            if (endDate.HasValue)
-                query = query.Where(x => x.WorkDate <= endDate.Value);
-
+                && (x.Status == "Available" || x.Status == "Active") && x.NailArtist.Status == "Active");
+            if (startDate.HasValue && endDate.HasValue && startDate.Value.Date == endDate.Value.Date)
+            {
+                var localDate = (startDate.Value.Kind == DateTimeKind.Utc ? startDate.Value.AddHours(7) : startDate.Value).Date;
+                var startOfDayUtc = DateTime.SpecifyKind(localDate.AddHours(-7), DateTimeKind.Utc);
+                var endOfDayUtc = startOfDayUtc.AddDays(1).AddTicks(-1);
+                query = query.Where(x => x.WorkDate >= startOfDayUtc && x.WorkDate <= endOfDayUtc);
+            }
+            else
+            {
+                if (startDate.HasValue)
+                {
+                    query = query.Where(x => x.WorkDate >= startDate.Value);
+                }
+                if (endDate.HasValue)
+                {
+                    query = query.Where(x => x.WorkDate <= endDate.Value);
+                }
+            }
             return await query
                 .OrderBy(x => x.WorkDate)
                 .ThenBy(x => x.ShiftStart)

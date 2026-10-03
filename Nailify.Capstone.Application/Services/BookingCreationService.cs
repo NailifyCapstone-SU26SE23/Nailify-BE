@@ -53,8 +53,17 @@ namespace Nailify.Capstone.Application.Services
             _nailVariantService = nailVariantService;
             _logger = logger;
         }
+        private static bool IsItemFromOldBooking(BookingItemRequestDTO item, IEnumerable<BookingItem> oldBookingItems)
+        {
+            return oldBookingItems.Any(oldItem =>
+              (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
+              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId) ||
+              (item.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequestId == item.CustomerNailRequestId) ||
+              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequestId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
+          );
+        }
 
-        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null)
+        public async Task<ApiResult<BookingPriceResponseDTO>> CalculateBookingPriceAsync(Guid? customerId, IEnumerable<BookingItemRequestDTO> bookingItems, List<int>? selectedPromotionIds = null, Guid? warrantyForBookingId = null)
         {
             var normalizedItems = NormalizePriceRequestItems(bookingItems);
             var normalizedPromotionIds = selectedPromotionIds?
@@ -79,7 +88,25 @@ namespace Nailify.Capstone.Application.Services
             {
                 return new ApiErrorResult<BookingPriceResponseDTO>(calculation.ErrorMessage!);
             }
+            decimal calculatedPrice = calculation.Price;
 
+            if (warrantyForBookingId.HasValue)
+            {
+                var oldBooking = await _unitOfWork.BookingRepository.GetBookingDetailAsync(warrantyForBookingId.Value);
+                if (oldBooking != null)
+                {
+                    for (int i = 0; i < calculation.Items.Count; i++)
+                    {
+                        var item = calculation.Items[i];
+                        var reqItem = normalizedItems.ElementAtOrDefault(i);
+                        if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
+                        {
+                            item.Price = 0;
+                        }
+                    }
+                    calculatedPrice = calculation.Items.Sum(x => x.Price);
+                }
+            }
             var promotionDiscountAmount = 0m;
             var loyaltyDiscountAmount = 0m;
             var appliedPromotionDiscounts = new List<BookingDiscount>();
@@ -106,7 +133,7 @@ namespace Nailify.Capstone.Application.Services
                     }, applicablePromotions);
 
                 loyaltyDiscountAmount = decimal.Round(
-                    calculation.Price * loyaltyResult.Data.LoyaltyTier.DiscountRate,
+                    calculatedPrice * loyaltyResult.Data.LoyaltyTier.DiscountRate,
                     0,
                     MidpointRounding.AwayFromZero);
 
@@ -128,17 +155,19 @@ namespace Nailify.Capstone.Application.Services
                 .Select(discount => new DiscountBreakdownDTO
                 {
                     Name = discount.Name,
+                    Description = discount.Promotion?.Description ?? (discount.LoyaltyTierId.HasValue ? "Ưu đãi chiết khấu theo hạng thành viên" : null),
                     Amount = discount.DiscountAmount,
-                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion"
+                    Type = discount.LoyaltyTierId.HasValue ? "Loyalty" : "Promotion",
+                    IsAutoApplied = discount.IsAutoApplied
                 })
                 .ToList();
 
             var totalDiscountAmount = loyaltyDiscountAmount + promotionDiscountAmount;
             var response = new BookingPriceResponseDTO
             {
-                Price = calculation.Price,
+                Price = calculatedPrice,
                 Discount = -totalDiscountAmount,
-                TotalPrice = Math.Max(0, calculation.Price - totalDiscountAmount),
+                TotalPrice = Math.Max(0, calculatedPrice - totalDiscountAmount),
                 TotalDuration = calculation.Duration,
                 DiscountBreakdown = discountBreakdown
             };
@@ -329,21 +358,25 @@ namespace Nailify.Capstone.Application.Services
                 {
                     return new ApiErrorResult<BookingResponseDTO>("Đơn đặt lịch gốc này đã được yêu cầu bảo hành trước đó.");
                 }
-                foreach (var item in request.BookingItems)
+                bool hasWarrantyItem = request.BookingItems.Any(item => IsItemFromOldBooking(item, oldBooking.BookingItems));
+                if (!hasWarrantyItem)
                 {
-                    bool isValidItem = oldBooking.BookingItems.Any(oldItem =>
-                                                                              (item.NailVariantId.HasValue && oldItem.NailVariantId == item.NailVariantId) ||
-                                                                              (item.ServiceId.HasValue && oldItem.ServiceId == item.ServiceId) ||
-                                                                              (item.CustomerNailId.HasValue && oldItem.CustomerNailRequest != null && oldItem.CustomerNailRequest.CustomerNailId == item.CustomerNailId)
-                                                                   );
-                    if (!isValidItem)
+                    return new ApiErrorResult<BookingResponseDTO>("Vui lòng chọn ít nhất một dịch vụ hoặc mẫu móng thuộc đơn hàng gốc để bảo hành.");
+                }
+
+
+                for (int i = 0; i < calculation.Items.Count; i++)
+                {
+                    var item = calculation.Items[i];
+                    var reqItem = request.BookingItems.ElementAtOrDefault(i);
+                    if (reqItem != null && IsItemFromOldBooking(reqItem, oldBooking.BookingItems))
                     {
-                        return new ApiErrorResult<BookingResponseDTO>("Dịch vụ hoặc mẫu móng yêu cầu bảo hành không khớp với đơn đặt lịch gốc.");
+                        item.Price = 0;
                     }
                 }
-                bookingPrice.Price = 0;
-                bookingPrice.Discount = 0;
-                bookingPrice.TotalPrice = 0;
+                bookingPrice.Price = calculation.Items.Sum(x => x.Price);
+                bookingPrice.Discount = -totalDiscountAmount;
+                bookingPrice.TotalPrice = Math.Max(0, bookingPrice.Price - totalDiscountAmount);
             }
             string qrCodeToken = $"NAILIFY|{bookingId}|{request.BookingDate:yyyyMMdd}";
             string qrCodeBase64 = _qrService.GenerateQRCode(qrCodeToken);
@@ -441,8 +474,48 @@ namespace Nailify.Capstone.Application.Services
                     CreatedAt = DateTime.UtcNow
                 };
                 */
-                booking.Created(customerId);
+                decimal finalTotalPrice = bookingPrice.TotalPrice;
+                decimal walletPaidAmount = 0m;
 
+                if(request.UseWalletBalance && finalTotalPrice > 0)
+                {
+                    var wallet = await _unitOfWork.CustomerWalletRepository.GetByCustomerIdForUpdateAsync(customerId);
+                    if(wallet != null)
+                    {
+                        var availableBalance = wallet.Balance - wallet.FrozenBalance;
+                        if (availableBalance > 0) 
+                        {
+                            var salonForDeposit = await _unitOfWork.SalonRepository.GetByIdAsync(request.SalonId);
+                            decimal depositRate = salonForDeposit?.DepositConfig ?? 0.25m;
+                            decimal depositAmount = finalTotalPrice * depositRate;
+                            walletPaidAmount = Math.Min(availableBalance, depositAmount);
+                            var balanceBefore = wallet.Balance;
+                            wallet.Balance -= walletPaidAmount;
+                            wallet.UpdatedAt = DateTime.UtcNow;
+                            _unitOfWork.CustomerWalletRepository.Update(wallet);
+
+                            var walletTx = new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                WalletId = wallet.WalletId,
+                                Amount = -walletPaidAmount,
+                                BalanceBefore = balanceBefore,
+                                BalanceAfter = wallet.Balance,
+                                Type = WalletTransactionType.BookingPayment,
+                                Status = WalletTransactionStatus.Completed,
+                                ReferenceId = bookingId.ToString(),
+                                ReferenceType = WalletReferenceType.Booking,
+                                Description = $"Thanh toán cọc/đơn đặt lịch #{bookingId}",
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            await _unitOfWork.WalletTransactionRepository.CreateAsync(walletTx);
+                        }
+                    }
+                }
+                decimal amountDueForPayOS = finalTotalPrice - walletPaidAmount;
+                booking.AmountPaid = walletPaidAmount;
+                booking.AmountDue = amountDueForPayOS;
+             
 
                 await _unitOfWork.BookingRepository.CreateAsync(booking);
                 await _promotionService.UpdateUsageAsync(customerId, appliedPromotionDiscounts);
@@ -493,8 +566,9 @@ namespace Nailify.Capstone.Application.Services
             catch (Exception ex)
             {
                 await _unitOfWork.RollbackTransactionAsync();
-                _logger.LogError(ex, "Lỗi xảy ra khi CreateBookingAsync");
-                return new ApiErrorResult<BookingResponseDTO>("Có lỗi hệ thống xảy ra khi lưu đơn hàng.");
+                _logger.LogError(ex, "Lỗi xảy ra khi CreateBookingAsync: {Message}", ex.Message);
+                var detailMsg = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+                return new ApiErrorResult<BookingResponseDTO>($"Có lỗi hệ thống xảy ra khi lưu đơn hàng: {detailMsg}");
             }
         }
 

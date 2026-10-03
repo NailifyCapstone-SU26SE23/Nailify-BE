@@ -14,6 +14,7 @@ using Nailify.Capstone.Infrastructure.Configuration.PayOS;
 using Nailify.Capstone.Infrastructure.DBContext;
 using Nailify.Capstone.Infrastructure.Repository;
 using Nailify.Capstone.Infrastructure.Service;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
@@ -131,6 +132,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<ICustomerQuizAnswerRepository, CustomerQuizAnswerRepository>();
             services.AddScoped<ISalonOffDateRepository, SalonOffDateRepository>();
             services.AddScoped<INailArtistBreakRepository, NailArtistBreakRepository>();
+            services.AddScoped<ICustomerWalletRepository, CustomerWalletRepository>();
+            services.AddScoped<IWalletTransactionRepository, WalletTransactionRepository>();
+            services.AddScoped<IPointConversionLogRepository, PointConversionLogRepository>();
+            services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
 
             // Đăng ký Services
             services.AddScoped<IUserService, UserService>();
@@ -202,7 +207,10 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             services.AddScoped<IOrderCodeGenerator, PayOSHelper>();
             services.AddScoped<PayOSHelper>();
             services.AddScoped<PayOSService>();
+            services.AddScoped<IPayOSPaymentService, PayOSService>();
+            services.AddScoped<IWalletService, WalletService>();
             services.AddScoped<RefundService>();
+            services.AddScoped<IRefundService>(provider => provider.GetRequiredService<RefundService>());
             services.AddScoped<ITransactionService, TransactionService>();
             // Đăng ký Cloudinary Configuration
             var cloudinarySettings = configuration.GetSection("CloudinarySettings")
@@ -219,13 +227,13 @@ namespace Nailify.Capstone.Infrastructure.Configuration
 
             var redisSettings = configuration.GetSection("Redis")
                                              .Get<RedisConfiguration>()
-                                ?? new RedisConfiguration { UseMemoryCache = true };
+                                ?? new RedisConfiguration();
             services.AddSingleton<IRedisConfiguration>(redisSettings);
 
             var nemotronSettings = configuration.GetSection("NemotronConfig")
                                                 .Get<NemotronConfiguration>()
                                    ?? new NemotronConfiguration();
-           
+
             services.AddSingleton<INemotronConfiguration>(nemotronSettings);
 
             services.AddScoped<IGoogleAuthService, GoogleAuthService>();
@@ -236,6 +244,21 @@ namespace Nailify.Capstone.Infrastructure.Configuration
                                  ?? new GoogleConfiguration();
             services.AddSingleton<IGoogleConfiguration>(googleSettings);
 
+
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
+                options.InstanceName = redisSettings.InstanceName;
+            });
+
+            // ThanhDT
+            /*
+            services.AddStackExchangeRedisCache(options =>
+            {
+               options.ConfigurationOptions = ConfigurationOptions.Parse(redisSettings.ConnectionString);
+               options.InstanceName = redisSettings.InstanceName;
+            });
+            */
             if (redisSettings.UseMemoryCache)
             {
                 services.AddDistributedMemoryCache();
@@ -244,50 +267,58 @@ namespace Nailify.Capstone.Infrastructure.Configuration
             {
                 services.AddStackExchangeRedisCache(options =>
                 {
-                   options.Configuration = redisSettings?.ConnectionString;
-                   options.InstanceName = redisSettings?.InstanceName;
+                    options.Configuration = redisSettings?.ConnectionString;
+                    options.InstanceName = redisSettings?.InstanceName;
                 });
             }
 
             var emailSettings = configuration.GetSection("SMTPEmailSettings")
                                   .Get<SmtpEmailConfiguration>()
                     ?? new SmtpEmailConfiguration();
-            services.AddSingleton<IEmailConfiguration>(emailSettings);
+services.AddSingleton<IEmailConfiguration>(emailSettings);
 
-            var sendGridSettings = configuration.GetSection("SendGrid")
-                                  .Get<SendGridEmailConfiguration>()
-                    ?? new SendGridEmailConfiguration();
-            services.AddSingleton(sendGridSettings);
+var sendGridSettings = configuration.GetSection("SendGrid")
+                      .Get<SendGridEmailConfiguration>()
+        ?? new SendGridEmailConfiguration();
+services.AddSingleton(sendGridSettings);
 
-            var paymentSettings = configuration.GetSection("PayOSSettings")
-                                  .Get<PayOSSettings>()
-                    ?? new PayOSSettings();
-            services.AddSingleton<IPayOSSettings>(paymentSettings);
+var paymentSettings = configuration.GetSection("PayOSSettings")
+                      .Get<PayOSSettings>()
+        ?? new PayOSSettings();
+services.AddSingleton<IPayOSSettings>(paymentSettings);
 
-            var paymentUrls = configuration.GetSection("PaymentUrls")
-                                  .Get<PaymentUrls>()
-                    ?? new PaymentUrls();
-            if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
-            {
-                paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
-            }
-            if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
-            {
-                paymentUrls.CancelUrl = paymentSettings.CancelUrl;
-            }
-            services.AddSingleton<IPaymentUrls>(paymentUrls);
+var paymentUrls = configuration.GetSection("PaymentUrls")
+                      .Get<PaymentUrls>()
+        ?? new PaymentUrls();
+if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+{
+    paymentUrls.ReturnUrl = paymentSettings.ReturnUrl;
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+{
+    paymentUrls.CancelUrl = paymentSettings.CancelUrl;
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.ReturnUrl))
+{
+    paymentUrls.ReturnUrl = "https://localhost:7066/swagger/index.html";
+}
+if (string.IsNullOrWhiteSpace(paymentUrls.CancelUrl))
+{
+    paymentUrls.CancelUrl = "https://localhost:7066/swagger/index.html";
+}
+services.AddSingleton<IPaymentUrls>(paymentUrls);
 
-            // Đăng ký FluentValidation từ tầng Application
-            services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);
+// Đăng ký FluentValidation từ tầng Application
+services.AddValidatorsFromAssembly(typeof(Nailify.Capstone.Application.Validation.UserRequestDTOs.UserRegisterRequestValidator).Assembly);
 
-            // Đăng ký AutoMapper
-            services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
+// Đăng ký AutoMapper
+services.AddAutoMapper(typeof(Nailify.Capstone.Application.Mapping.MappingProfile).Assembly);
 
-            // Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
-            services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
+// Đăng ký MediatR cho Assembly chứa BookingService (Tầng Application)
+services.AddMediatR(typeof(Nailify.Capstone.Application.Services.BookingService).Assembly);
 
 
-            return services;
+return services;
         }
     }
 }

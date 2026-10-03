@@ -1,6 +1,7 @@
 using AutoMapper;
 using Nailify.Capstone.Application.Interfaces.MappingInterface;
 using Nailify.Capstone.Domain.Entities;
+using Nailify.Capstone.Domain.Enums;
 
 namespace Nailify.Capstone.Application.DTOs.RequestDTOs.LoyaltyTierRequestDTOs
 {
@@ -15,7 +16,7 @@ namespace Nailify.Capstone.Application.DTOs.RequestDTOs.LoyaltyTierRequestDTOs
         public string? TextColor { get; set; }
         public string? ColorJson { get; set; }
         public int? SortOrder { get; set; }
-
+        public ActiveStatusFilter? Status { get; set; }
         public void Mapping(Profile profile)
         {
             profile.CreateMap<LoyaltyTierRequest, LoyaltyTier>();

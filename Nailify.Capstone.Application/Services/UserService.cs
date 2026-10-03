@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.Extensions.Logging;
 using Nailify.Capstone.Application.Common;
 using Nailify.Capstone.Application.DTOs.RequestDTOs.UserRequestDTOs;
 using Nailify.Capstone.Application.DTOs.ResponseDTOs;
@@ -17,18 +18,21 @@ namespace Nailify.Capstone.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly ILogger<UserService> _logger;
 
         public UserService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            IPasswordHasher passwordHasher)
+            IPasswordHasher passwordHasher,
+            ILogger<UserService> logger)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _passwordHasher = passwordHasher;
+            _logger = logger;
         }
         #region Account Management
-        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, Guid? salonId = null)
+        public async Task<ApiResult<PagedList<UserDto>>> GetPagedUsersAsync(int pageNumber, int pageSize, string? searchTerm = null, UserRole? role = null, string? status = null,  Guid? salonId = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>>? predicate = null;
             if (!string.IsNullOrWhiteSpace(searchTerm) || role.HasValue || salonId.HasValue)
@@ -37,15 +41,10 @@ namespace Nailify.Capstone.Application.Services
                 predicate = u =>
                     (string.IsNullOrEmpty(term) || u.Email.ToLower().Contains(term) || u.FirstName.ToLower().Contains(term) || u.LastName.ToLower().Contains(term))
                     && (!role.HasValue || u.Role == role.Value)
-                    && (!salonId.HasValue || u.SalonId == salonId.Value)
-                    && u.Status == "Active";
-            }
-            else
-            {
-                predicate = u => u.Status == "Active";
+                    && (!salonId.HasValue || u.SalonId == salonId.Value);
             }
 
-            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, null);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
@@ -65,20 +64,20 @@ namespace Nailify.Capstone.Application.Services
             return new ApiSuccessResult<PagedList<UserDto>>(response, "Lấy danh sách người dùng thành công.");
         }
 
-        public async Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null)
+        public async Task<ApiResult<PagedList<UserDto>>> GetSalonStaffAsync(Guid salonId, int pageNumber, int pageSize, UserRole? role = null, string? status = null)
         {
             System.Linq.Expressions.Expression<Func<User, bool>> predicate;
 
             if (role.HasValue)
             {
-                predicate = u => u.SalonId == salonId && u.Role == role.Value && u.Status == "Active";
+                predicate = u => u.SalonId == salonId && u.Role == role.Value;
             }
             else
             {
-                predicate = u => u.SalonId == salonId && (u.Role == UserRole.Manager || u.Role == UserRole.Receptionist || u.Role == UserRole.Staff_Artist) && u.Status == "Active";
+                predicate = u => u.SalonId == salonId && (u.Role == UserRole.Manager || u.Role == UserRole.Receptionist || u.Role == UserRole.Staff_Artist);
             }
 
-            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+            var pagedResult = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate, status, null);
 
             var mappedItems = _mapper.Map<List<UserDto>>(pagedResult.Items);
 
@@ -283,37 +282,47 @@ namespace Nailify.Capstone.Application.Services
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Cập nhật đặc điểm sở thích cá nhân thành công.");
         }
-        public async Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null)
+        public async Task<ApiResult<PagedList<CustomerProfileDto>>> GetPagedCustomersAsync(int pageNumber, int pageSize, string? searchTerm = null, string? status = null)
         {
-            System.Linq.Expressions.Expression<Func<User, bool>> predicate = u => u.Role == UserRole.Customer;
-            if (!string.IsNullOrWhiteSpace(searchTerm))
+
+            try
             {
-                var term = searchTerm.Trim().ToLower();
-                predicate = u => u.Role == UserRole.Customer &&
-                                 (u.Email.ToLower().Contains(term) ||
-                                  u.FirstName.ToLower().Contains(term) ||
-                                  u.LastName.ToLower().Contains(term));
-            }
-
-            var pagedUsers = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
-            var customerProfiles = new List<CustomerProfileDto>();
-
-            foreach (var user in pagedUsers.Items)
-            {
-                var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(user.UserId);
-
-                var profileDto = _mapper.Map<CustomerProfileDto>(user);
-
-                if (customer != null)
+                System.Linq.Expressions.Expression<Func<User, bool>> predicate = u => u.Role == UserRole.Customer;
+                if (!string.IsNullOrWhiteSpace(searchTerm))
                 {
-                    _mapper.Map(customer, profileDto);
+                    var term = searchTerm.Trim().ToLower();
+                    predicate = u => u.Role == UserRole.Customer &&
+                                     ((u.Email != null && u.Email.ToLower().Contains(term)) ||
+                                      (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
+                                      (u.LastName != null && u.LastName.ToLower().Contains(term)));
                 }
-                customerProfiles.Add(profileDto);
-            }
 
-            var resultPagedList = new PagedList<CustomerProfileDto>(customerProfiles, pagedUsers.MetaData.TotalItems, pageNumber, pageSize);
-            return new ApiSuccessResult<PagedList<CustomerProfileDto>>(resultPagedList, "Lấy danh sách khách hàng phân trang thành công.");
+                var pagedUsers = await _unitOfWork.UserRepository.GetPagedAsync(pageNumber, pageSize, predicate);
+                var customerProfiles = new List<CustomerProfileDto>();
+
+                foreach (var user in pagedUsers.Items)
+                {
+                    var customer = await _unitOfWork.CustomerRepository.GetByIdAsync(user.UserId);
+
+                    var profileDto = _mapper.Map<CustomerProfileDto>(user);
+
+                    if (customer != null)
+                    {
+                        MapCustomerFieldsToDto(customer, profileDto);
+                    }
+                    customerProfiles.Add(profileDto);
+                }
+
+                var resultPagedList = new PagedList<CustomerProfileDto>(customerProfiles, pagedUsers.MetaData.TotalItems, pageNumber, pageSize);
+                return new ApiSuccessResult<PagedList<CustomerProfileDto>>(resultPagedList, "Lấy danh sách khách hàng phân trang thành công.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy danh sách khách hàng phân trang.");
+                return new ApiErrorResult<PagedList<CustomerProfileDto>>($"Lỗi hệ thống: {ex.Message}");
+            }
         }
+
         public async Task<ApiResult<CustomerProfileDto>> GetCustomerProfileByIdAsync(Guid userId)
         {
             var user = await _unitOfWork.UserRepository.GetByIdAsync(userId);
@@ -327,16 +336,11 @@ namespace Nailify.Capstone.Application.Services
 
             if (customer != null)
             {
-                _mapper.Map(customer, profileDto);
+                MapCustomerFieldsToDto(customer, profileDto);
                 // Deserialize các chuỗi JSON từ Database
                 profileDto.PreferredColors = DeserializeList(customer.PreferredColorsJson);
                 profileDto.PreferredStyles = DeserializeList(customer.PreferredStylesJson);
                 profileDto.PreferredOccasions = DeserializeList(customer.PreferredOccasionsJson);
-
-                profileDto.SkinShade = customer.SkinShade;
-                profileDto.HandShape = customer.HandShape;
-                profileDto.PreferredComplexity = customer.PreferredComplexity;
-                profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
 
                 // Lấy tên dáng móng
                 if (customer.PreferredNailShapeId.HasValue)
@@ -347,6 +351,19 @@ namespace Nailify.Capstone.Application.Services
             }
 
             return new ApiSuccessResult<CustomerProfileDto>(profileDto, "Lấy thông tin hồ sơ khách hàng thành công.");
+        }
+
+        private static void MapCustomerFieldsToDto(Customer customer, CustomerProfileDto profileDto)
+        {
+            profileDto.LoyaltyPoint = customer.LoyaltyPoint;
+            profileDto.LifetimePoints = customer.LifetimePoints;
+            profileDto.SkinTone = customer.SkinTone;
+            profileDto.SkinShade = customer.SkinShade;
+            profileDto.HandShape = customer.HandShape;
+            profileDto.Occupation = customer.Occupation;
+            profileDto.NailCondition = customer.NailCondition;
+            profileDto.PreferredComplexity = customer.PreferredComplexity;
+            profileDto.PreferredNailShapeId = customer.PreferredNailShapeId;
         }
 
         public async Task<ApiResult<CustomerProfileDto>> UpdateCustomerProfileByAdminAsync(Guid userId, CustomerProfileUpdateRequest request)

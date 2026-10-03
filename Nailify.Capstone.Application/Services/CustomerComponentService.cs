@@ -12,13 +12,13 @@ namespace Nailify.Capstone.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly ICustomerNailService _customerNailService;
+        private readonly IRecalculationService _recalculationService;
 
-        public CustomerComponentService(IUnitOfWork unitOfWork, IMapper mapper, ICustomerNailService customerNailService)
+        public CustomerComponentService(IUnitOfWork unitOfWork, IMapper mapper, IRecalculationService recalculationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-            _customerNailService = customerNailService;
+            _recalculationService = recalculationService;
         }
 
         public async Task<ApiResult<PagedList<CustomerComponentDto>>> GetPagedCustomerComponentsAsync(int pageNumber, int pageSize, Guid? userId = null, string? name = null, ComponentType? componentType = null)
@@ -93,7 +93,7 @@ namespace Nailify.Capstone.Application.Services
 
             foreach (var customerNailId in affectedCustomerNailIds)
             {
-                await _customerNailService.RecalculateCustomerNailPriceAsync(customerNailId);
+                await _recalculationService.RecalculateCustomerNailAsync(customerNailId);
             }
 
             return new ApiSuccessResult<bool>(true, "Xóa thành phần tùy chỉnh thành công.");
@@ -104,7 +104,7 @@ namespace Nailify.Capstone.Application.Services
             var customerNailIds = await _unitOfWork.CustomerComponentRepository.GetCustomerNailIdsByCustomerComponentIdAsync(customerComponentId);
             foreach (var customerNailId in customerNailIds)
             {
-                await _customerNailService.RecalculateCustomerNailPriceAsync(customerNailId);
+                await _recalculationService.RecalculateCustomerNailAsync(customerNailId);
             }
         }
     }

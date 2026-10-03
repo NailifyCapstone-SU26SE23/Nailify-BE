@@ -6,7 +6,7 @@ namespace Nailify.Capstone.Application.Interfaces.ServiceInterfaces
 {
     public interface ILoyaltyTierService
     {
-        Task<ApiResult<List<LoyaltyTierDto>>> GetAllAsync();
+        Task<ApiResult<PagedList<LoyaltyTierDto>>> GetAllAsync(int pageNumber, int pageSize, string? status);
         Task<ApiResult<LoyaltyTierDto>> GetByIdAsync(int id);
         Task<ApiResult<UserLoyaltyDto>> GetMyLoyaltyAsync(Guid userId);
         Task<ApiResult<LoyaltyTierDto>> CreateAsync(LoyaltyTierRequest request, string? imageUrl = null);
