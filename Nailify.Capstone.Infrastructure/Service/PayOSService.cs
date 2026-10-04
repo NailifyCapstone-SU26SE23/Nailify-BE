@@ -947,7 +947,14 @@ namespace Nailify.Capstone.Infrastructure.Service
             transaction.Booking.AmountDue = Math.Max(0m, totalPrice - newAmountPaid);
             if (transaction.Booking.Status == BookingStatus.ServiceCompleted)
             {
-                transaction.Booking.CheckOut(Guid.Empty);
+                if (transaction.Booking.WarrantyForBookingId.HasValue)
+                {
+                    transaction.Booking.CheckOutWarranty(Guid.Empty);
+                }
+                else
+                {
+                    transaction.Booking.CheckOut(Guid.Empty);
+                }
             }
             return Task.CompletedTask;
         }
